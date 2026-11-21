@@ -392,6 +392,12 @@ export default function InspectionFormPage() {
     const totalSteps = steps.length
     const stepIndex = Math.min(currentStep, totalSteps - 1)
     const currentStepDef = steps[stepIndex]
+    // Approvals → Settings → Inspection form. Exact until it has loaded (the stricter rule).
+    const [defectMatch, setDefectMatch] = useState<"exact" | "atLeast">("exact")
+    useEffect(() => {
+        fetch("/api/inspections/form-rules").then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.form?.defectMatch === "atLeast") setDefectMatch("atLeast") }).catch(() => {})
+    }, [])
     const defectStepIndex = steps.findIndex(s => s.key === "defect")
 
     // Every reworked piece must be booked against a defect: the defects may add
@@ -408,7 +414,12 @@ export default function InspectionFormPage() {
     const inspectedQtyIn = inspectedInput ? qty(inspectedInput.id) : 0
     // Every rework and every rejected piece must be booked against a defect.
     const badPieces = reworkQty + rejectedQtyIn
-    const defectShortfall = (reworkField || rejectedInput) && defectFields.length > 0 ? Math.max(0, badPieces - defectTotal) : 0
+    // Approvals → Settings → Inspection form: "exact" (default) — the defects must
+    // equal Rework + Rejected; "atLeast" — they must cover them, more allowed.
+    const checkDefects = (!!reworkField || !!rejectedInput) && defectFields.length > 0
+    const defectShortfall = checkDefects ? Math.max(0, badPieces - defectTotal) : 0
+    const defectExcess = checkDefects && defectMatch === "exact" ? Math.max(0, defectTotal - badPieces) : 0
+    const defectMismatch = defectShortfall > 0 || defectExcess > 0
 
     // Pieces booked under OTHER need saying what the defects were
     // (lib/other-defect): "Other: 3" tells a reviewer nothing. One row per
@@ -446,9 +457,9 @@ export default function InspectionFormPage() {
      * fall short of the rework qty, or OTHER's pieces aren't all described.
      */
     const checkDefectTotal = () => {
-        if (!canEdit || (defectShortfall <= 0 && !otherProblem)) return true
-        const target = defectShortfall > 0 ? "defect-total-check" : `field-${OTHER_DEFECT_KEY}`
-        if (defectShortfall > 0) setDefectBlocked(true)
+        if (!canEdit || (!defectMismatch && !otherProblem)) return true
+        const target = defectMismatch ? "defect-total-check" : `field-${OTHER_DEFECT_KEY}`
+        if (defectMismatch) setDefectBlocked(true)
         if (otherProblem) setOtherNoteBlocked(true)
         if (defectStepIndex >= 0 && stepIndex !== defectStepIndex) setCurrentStep(defectStepIndex)
         setTimeout(() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50)
@@ -1211,11 +1222,11 @@ export default function InspectionFormPage() {
                         })()}
                         {/* Live check against Rework Qty: the defects must cover every reworked
                             piece before Next; more is fine (the extra is counted as rejected). */}
-                        {(reworkField || rejectedInput) && badPieces > 0 && (
-                            <div id="defect-total-check" role={defectShortfall > 0 && defectBlocked ? "alert" : undefined}
+                        {(reworkField || rejectedInput) && (badPieces > 0 || defectExcess > 0) && (
+                            <div id="defect-total-check" role={defectMismatch && defectBlocked ? "alert" : undefined}
                                 className={cn(
                                     "mt-[12px] rounded-[9px] border px-[12px] py-[9px] text-[12.5px] flex items-center gap-2",
-                                    defectShortfall === 0 ? "bg-[#f0fdf4] border-[#bbf7d0] text-[#15803d]"
+                                    !defectMismatch ? "bg-[#f0fdf4] border-[#bbf7d0] text-[#15803d]"
                                         : defectBlocked ? "bg-[#fef2f2] border-[#fecaca] text-[#b91c1c]"
                                         : "bg-[#fffbeb] border-[#fde68a] text-[#92400e]",
                                 )}>
@@ -1228,6 +1239,8 @@ export default function InspectionFormPage() {
                                 <span className="ml-auto text-right">
                                     {defectShortfall > 0
                                         ? `Enter ${defectShortfall} more defect${defectShortfall === 1 ? "" : "s"} to continue`
+                                        : defectExcess > 0
+                                        ? `${defectExcess} defect${defectExcess === 1 ? "" : "s"} more than Rework + Rejected (${badPieces}) — correct the defects or the quantities to continue`
                                         : defectTotal > badPieces
                                         ? `${defectTotal - badPieces} more defect${defectTotal - badPieces === 1 ? "" : "s"} than pieces — fine if a piece had more than one`
                                         : "All rework and rejected pieces covered"}

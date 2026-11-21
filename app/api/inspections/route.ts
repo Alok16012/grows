@@ -30,6 +30,9 @@ export async function GET(req: Request) {
                     submittedAt: true,
                     createdAt: true,
                     assignmentId: true,
+                    sentBackCount: true,
+                    sentBackAt: true,
+                    reviewerNotes: true,
                     assignment: {
                         select: {
                             project: { select: { name: true } }

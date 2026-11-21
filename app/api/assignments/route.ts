@@ -87,6 +87,9 @@ export async function GET(req: Request) {
                             status: true,
                             submittedAt: true,
                             assignmentId: true,
+                            sentBackCount: true,
+                            sentBackAt: true,
+                            reviewerNotes: true,
                         },
                         orderBy: { createdAt: "desc" },
                         take: 1

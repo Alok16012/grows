@@ -129,7 +129,10 @@ export default function InspectionDashboard() {
         (a.status === "active" && !a.isMultiPart && a.inspection && a.inspection.status !== "draft")
     )
     const activeCount = activeAssignments.length
-    const draftCount = recentSubmissions.filter(s => s.status === "draft").length
+    // A report sent back for correction is a draft again; it needs the inspector first.
+    const isSentBack = (i: any) => i?.status === "draft" && (i?.sentBackCount ?? 0) > 0
+    const sentBackList = recentSubmissions.filter(isSentBack)
+    const draftCount = recentSubmissions.filter(s => s.status === "draft" && !isSentBack(s)).length
     const pendingCount = recentSubmissions.filter(s => s.status === "pending").length
     const approvedInspections = recentSubmissions.filter(s => s.status === "approved")
     const approvedCount = approvedInspections.length
@@ -167,6 +170,32 @@ export default function InspectionDashboard() {
                 <h1 className="text-[22px] font-semibold text-[var(--text)] tracking-[-0.4px]">Inspector Workspace</h1>
                 <p className="text-[13px] text-[var(--text2)] mt-[3px]">Track assignments and submit inspection reports</p>
             </div>
+
+            {/* Sent back for correction — first thing the inspector sees */}
+            {sentBackList.length > 0 && (
+                <div role="alert" className="mb-5 rounded-[12px] border-2 border-[#f97316] bg-[#fff7ed] p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#f97316] text-white text-[13px] font-bold">!</span>
+                        <p className="text-[14px] font-bold text-[#9a3412]">
+                            {sentBackList.length} report{sentBackList.length === 1 ? " was" : "s were"} sent back for correction
+                        </p>
+                    </div>
+                    <div className="space-y-2">
+                        {sentBackList.map(s => (
+                            <div key={s.id} className="flex flex-wrap items-center gap-2 rounded-[9px] bg-white border border-[#fed7aa] px-3 py-2">
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[13px] font-semibold text-[var(--text)]">{s.assignment.project.name}</p>
+                                    {s.reviewerNotes && <p className="text-[12px] text-[#9a3412] truncate">Reviewer: “{s.reviewerNotes}”</p>}
+                                    <p className="text-[11px] text-[var(--text3)]">Sent back {safeDistance(s.sentBackAt || s.createdAt)} ago{s.sentBackCount > 1 ? ` · ${s.sentBackCount} times` : ""}</p>
+                                </div>
+                                <Link href={`/inspection/${s.assignmentId}/form`} className="inline-flex items-center gap-1 rounded-[8px] bg-[#f97316] px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-[#ea580c]">
+                                    Correct &amp; resubmit →
+                                </Link>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* SECTION 1: STATUS CARDS — hidden on mobile (shown in welcome banner) */}
             <div className="hidden md:grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -344,7 +373,13 @@ export default function InspectionDashboard() {
                         </div>
                     ) : (
                         activeAssignments.map((a) => (
-                            <div key={a.id} className="bg-white border border-[var(--border)] rounded-[12px] p-5 mb-3 hover:shadow-md transition-shadow">
+                            <div key={a.id} className={cn("bg-white rounded-[12px] p-5 mb-3 hover:shadow-md transition-shadow", isSentBack(a.inspection) ? "border-2 border-[#f97316]" : "border border-[var(--border)]")}>
+                                {isSentBack(a.inspection) && (
+                                    <div className="-mt-1 mb-3 rounded-[8px] bg-[#fff7ed] border border-[#fed7aa] px-3 py-2">
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-[#c2410c]">Sent back for correction</p>
+                                        {a.inspection.reviewerNotes && <p className="text-[12px] text-[#9a3412] mt-0.5">“{a.inspection.reviewerNotes}”</p>}
+                                    </div>
+                                )}
                                 <p className="text-[10.5px] font-semibold text-[var(--text3)] uppercase tracking-[0.6px] mb-1 flex items-center gap-1">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
@@ -383,9 +418,12 @@ export default function InspectionDashboard() {
                                     href={a.isMultiPart && a.inspection && a.inspection.status !== "draft" && a.inspection.status !== "rejected"
                                         ? `/inspection/${a.id}/form?newPart=1`
                                         : `/inspection/${a.id}/form`}
-                                    className="flex items-center justify-center gap-2 w-full bg-[var(--accent)] text-white rounded-[9px] py-2.5 text-[13px] font-medium hover:bg-[var(--accent-hover)] transition-colors"
+                                    className={cn("flex items-center justify-center gap-2 w-full text-white rounded-[9px] py-2.5 text-[13px] font-medium transition-colors",
+                                        isSentBack(a.inspection) ? "bg-[#f97316] hover:bg-[#ea580c]" : "bg-[var(--accent)] hover:bg-[var(--accent-hover)]")}
                                 >
-                                    {a.inspection?.status === "draft"
+                                    {isSentBack(a.inspection)
+                                        ? "Correct & Resubmit"
+                                        : a.inspection?.status === "draft"
                                         ? "Complete Inspection"
                                         : a.isMultiPart && a.inspection
                                             ? `Start Part ${(a.partCount ?? 1) + 1}`
@@ -469,7 +507,8 @@ export default function InspectionDashboard() {
 
                     <div className="bg-white border border-[var(--border)] rounded-[12px] overflow-hidden">
                         {recentSubmissions.slice(0, 10).map((s) => (
-                            <div key={s.id} className="p-4 border-b border-[var(--border)] last:border-b-0 flex flex-wrap items-center justify-between gap-2 hover:bg-[var(--surface2)] transition-colors">
+                            <div key={s.id} className={cn("p-4 border-b border-[var(--border)] last:border-b-0 flex flex-wrap items-center justify-between gap-2 transition-colors",
+                                isSentBack(s) ? "bg-[#fff7ed] border-l-4 border-l-[#f97316] hover:bg-[#ffedd5]" : "hover:bg-[var(--surface2)]")}>
                                 <div className="min-w-0">
                                     <p className="text-[13px] font-medium text-[var(--text)] mb-1">{s.assignment.project.name}</p>
                                     <div className="flex items-center gap-1.5 text-[12px] text-[var(--text3)]">
@@ -481,7 +520,10 @@ export default function InspectionDashboard() {
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
-                                    {s.status === "draft" && (
+                                    {isSentBack(s) && (
+                                        <span className="bg-[#f97316] text-white rounded-[20px] px-3 py-1 text-[11.5px] font-semibold">Sent back for correction</span>
+                                    )}
+                                    {s.status === "draft" && !isSentBack(s) && (
                                         <span className="bg-[#fef3c7] text-[#d97706] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Draft</span>
                                     )}
                                     {s.status === "pending" && (
@@ -498,7 +540,7 @@ export default function InspectionDashboard() {
                                         approved or rejected row promised an edit that the
                                         server would refuse. */}
                                     <Link href={`/inspection/${s.assignmentId}/form`} className="text-[12.5px] font-medium text-[var(--accent)] hover:underline">
-                                        {s.status === "draft" ? "Complete Inspection" : "View"} →
+                                        {isSentBack(s) ? "Correct & resubmit" : s.status === "draft" ? "Complete Inspection" : "View"} →
                                     </Link>
                                 </div>
                             </div>

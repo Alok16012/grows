@@ -31,6 +31,14 @@ export type InspectionSettings = {
         /** For weekly: 0 = Sunday … 6 = Saturday. */
         weekday: number
     }
+    form: {
+        /**
+         * Defect Distribution vs Rework + Rejected on the inspection form:
+         * "exact" — the defect total must equal Rework + Rejected before Next;
+         * "atLeast" — it must cover them (more allowed, a piece can have two defects).
+         */
+        defectMatch: "exact" | "atLeast"
+    }
     drafts: {
         /** Remind the inspector about a draft this many days old. 0 = never. */
         remindAfterDays: number
@@ -43,6 +51,7 @@ export const DEFAULT_INSPECTION_SETTINGS: InspectionSettings = {
     approval: { targetHours: 24, escalateAfterHours: 72, remindApprovers: true, autoSignature: true },
     alerts: { enabled: true, rejectedPct: 2, rejectedQty: 0, reworkPct: 0 },
     summary: { frequency: "off", weekday: 1 },
+    form: { defectMatch: "exact" },
     drafts: { remindAfterDays: 2, deleteEmptyAfterDays: 0 },
 }
 
@@ -52,7 +61,7 @@ const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d)
 
 export function sanitizeInspectionSettings(v: any): InspectionSettings {
     const d = DEFAULT_INSPECTION_SETTINGS
-    const a = v?.approval ?? {}, al = v?.alerts ?? {}, s = v?.summary ?? {}, dr = v?.drafts ?? {}
+    const a = v?.approval ?? {}, al = v?.alerts ?? {}, s = v?.summary ?? {}, dr = v?.drafts ?? {}, fo = v?.form ?? {}
     return {
         approval: {
             targetHours: num(a.targetHours, d.approval.targetHours, 1, 24 * 60),
@@ -69,6 +78,9 @@ export function sanitizeInspectionSettings(v: any): InspectionSettings {
         summary: {
             frequency: s.frequency === "daily" || s.frequency === "weekly" || s.frequency === "off" ? s.frequency : d.summary.frequency,
             weekday: num(s.weekday, d.summary.weekday, 0, 6),
+        },
+        form: {
+            defectMatch: fo.defectMatch === "atLeast" ? "atLeast" : "exact",
         },
         drafts: {
             remindAfterDays: num(dr.remindAfterDays, d.drafts.remindAfterDays, 0, 365),

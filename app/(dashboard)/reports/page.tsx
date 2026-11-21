@@ -121,6 +121,20 @@ type ReportDimension = {
 }
 
 /**
+ * The breakdown card's title from the fields the forms carry (client, Nov 2026):
+ * "Shift-Wise Analysis", "Model and Shift-Wise Analysis", "Line, Model and
+ * Shift-Wise Analysis". Shift goes last, as in their reports.
+ */
+function breakdownTitle(labels: string[]): string {
+    const nice = (l: string) => l.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+    const list = Array.from(new Set(labels.map(nice).filter(Boolean)))
+        .sort((a, b) => (/^shift$/i.test(a) ? 1 : 0) - (/^shift$/i.test(b) ? 1 : 0))
+    if (!list.length) return "Form Field Analysis"
+    const joined = list.length === 1 ? list[0] : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`
+    return `${joined}-Wise Analysis`
+}
+
+/**
  * Accepted / rework / rejected split by any grouping field the inspection
  * forms carry — Line, Model, Shift, Location, Customer, whatever the site's
  * form has. Replaces the fixed Location and Shift charts, which rendered for
@@ -131,12 +145,13 @@ function BreakdownCard({ dimensions }: { dimensions: ReportDimension[] }) {
     // Switching site or month changes which fields exist; fall back to the
     // most-answered one rather than showing a field that's no longer there.
     const active = dimensions.find(d => d.key === selected) ?? dimensions[0]
+    const title = breakdownTitle(dimensions.map(d => d.label))
 
     return (
         <div className="bg-white border border-[var(--border)] rounded-[14px] p-[20px] print-card">
             <div className="flex items-start justify-between gap-[12px] mb-[12px]">
                 <div>
-                    <h3 className="text-[14px] font-[600] text-[var(--text)]">Breakdown by Form Field</h3>
+                    <h3 className="text-[14px] font-[600] text-[var(--text)]">{title}</h3>
                     <p className="text-[11px] text-[var(--text3)] mt-[2px]">Built from the fields on these inspection forms</p>
                 </div>
                 {active && <span className="text-[11px] font-[500] text-[var(--text3)] whitespace-nowrap">{active.buckets.length} values</span>}

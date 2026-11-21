@@ -13,6 +13,7 @@ type S = {
     alerts: { enabled: boolean; rejectedPct: number; rejectedQty: number; reworkPct: number }
     summary: { frequency: "off" | "daily" | "weekly"; weekday: number }
     drafts: { remindAfterDays: number; deleteEmptyAfterDays: number }
+    form: { defectMatch: "exact" | "atLeast" }
 }
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -144,6 +145,20 @@ export default function InspectionSettingsPage() {
                         </select>
                     </div>
                 )}
+            </Card>
+
+            <Card title="Inspection form" hint="Rules inspectors must meet before they can move on.">
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <p className="text-[13px] text-[var(--text)]">Defect Distribution total</p>
+                        <p className="text-[11.5px] text-[var(--text3)]">Compared with Rework Qty + Rejected Qty. Next stays blocked until it meets this.</p>
+                    </div>
+                    <select value={s.form?.defectMatch ?? "exact"} onChange={e => set("form", { defectMatch: e.target.value as S["form"]["defectMatch"] })}
+                        className="h-9 rounded-[9px] border border-[var(--border)] px-2.5 text-[13px] bg-white">
+                        <option value="exact">Must equal Rework + Rejected</option>
+                        <option value="atLeast">Must be at least Rework + Rejected</option>
+                    </select>
+                </div>
             </Card>
 
             <Card title="Drafts" hint="Reports started but not submitted.">
