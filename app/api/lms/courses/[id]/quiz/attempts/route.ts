@@ -1,4 +1,6 @@
 import { getServerSession } from "next-auth"
+import { getLmsSettings } from "@/lib/lms-settings"
+import { questionsForAttempt, attemptSeed } from "@/lib/lms-quiz"
 import { raiseSkillsFromCourse } from "@/lib/skills"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -91,7 +93,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         const results: { questionId: string; correct: boolean; correctOptionId: string | null }[] = []
         const attemptsLeft = quiz.maxAttempts ? quiz.maxAttempts - used - 1 : null
 
-        for (const question of quiz.questions) {
+        // Question bank: the same random set the learner was shown for this attempt.
+        const qs = (await getLmsSettings()).quiz
+        const ordered = [...quiz.questions].sort((a, b) => a.order - b.order).map(q => ({ ...q, options: [...q.options].sort((a, b) => a.order - b.order) }))
+        const served = questionsForAttempt(ordered, { perAttempt: qs.questionsPerAttempt, shuffleOptions: false, seed: attemptSeed(enrollment.id, used + 1) })
+
+        for (const question of served) {
             totalPoints += question.points || 1
             const selectedOptionId = answers[question.id]
             const correctOption = question.options.find(o => o.isCorrect)
@@ -148,6 +155,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             })
         }
 
+        // The next attempt's random set (no answers), so "Try again" shows new questions.
+        const nextQuestions = !passed && (attemptsLeft === null || attemptsLeft > 0)
+            ? questionsForAttempt(ordered, { perAttempt: qs.questionsPerAttempt, shuffleOptions: qs.shuffleOptions, seed: attemptSeed(enrollment.id, used + 2) })
+                .map(q => ({ id: q.id, question: q.question, questionType: q.questionType, points: q.points, order: q.order, options: q.options.map(o => ({ id: o.id, text: o.text })) }))
+            : null
+
         // Reveal the right answers only once there's nothing left to gain from
         // them — after a pass or the last attempt.
         const reveal = passed || (attemptsLeft !== null && attemptsLeft <= 0)
@@ -160,6 +173,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             passingScore: quiz.passingScore,
             attemptsLeft,
             results: shown,
+            nextQuestions,
         })
     } catch (error) {
         console.error("[LMS_QUIZ_ATTEMPT_POST]", error)

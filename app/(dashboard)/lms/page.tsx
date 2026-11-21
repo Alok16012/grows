@@ -18,6 +18,7 @@ import { DocumentViewer } from "@/components/DocumentViewer"
 import { StatCard, statGridClass } from "@/components/StatCard"
 import LmsSettingsTab from "./LmsSettingsTab"
 import SkillMatrixTab from "./SkillMatrixTab"
+import SiteRefresher from "./SiteRefresher"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1972,6 +1973,7 @@ export default function LMSPage() {
                 {/* ── Enrollments Tab ── */}
                 {activeTab === "enrollments" && (
                     <div className="space-y-4">
+                        <div className="flex justify-end"><SiteRefresher onDone={fetchEnrollments} /></div>
                         {/* Filters */}
                         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4 space-y-3">
                             <div className="flex flex-wrap gap-2 items-center">

@@ -1,4 +1,6 @@
 import { getServerSession } from "next-auth"
+import { getLmsSettings } from "@/lib/lms-settings"
+import { questionsForAttempt, currentAttemptNo, attemptSeed } from "@/lib/lms-quiz"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
@@ -47,6 +49,15 @@ export async function GET(req: Request) {
             },
             orderBy: { enrolledAt: "desc" },
         })
+
+        // Question bank (LMS → Settings): each attempt shows its own random set.
+        const qs = (await getLmsSettings()).quiz
+        const attemptNo = new Map<string, number>()
+        for (const e of enrollments) if (e.course.quiz) attemptNo.set(e.id, await currentAttemptNo(e.course.quiz.id, employee.id, e.enrolledAt))
+        for (const e of enrollments) {
+            if (!e.course.quiz) continue
+            e.course.quiz.questions = questionsForAttempt(e.course.quiz.questions, { perAttempt: qs.questionsPerAttempt, shuffleOptions: qs.shuffleOptions, seed: attemptSeed(e.id, attemptNo.get(e.id) ?? 1) })
+        }
 
         const result = enrollments.map(e => ({
             id: e.id,

@@ -26,6 +26,12 @@ export type LmsSettings = {
         escalateAfterDays: number
         escalateTo: "hr" | "manager" | "both"
     }
+    quiz: {
+        /** Question bank: each attempt draws this many random questions. 0 = all questions. */
+        questionsPerAttempt: number
+        /** Show answer options in a random order. */
+        shuffleOptions: boolean
+    }
     skills: {
         /** Level a linked skill reaches when its course is passed (theory). */
         courseLevel: number
@@ -47,6 +53,7 @@ export const DEFAULT_LMS_SETTINGS: LmsSettings = {
     autoAssign: { nightly: true, onChange: true },
     defaults: { dueDays: 14, passingScore: 70, maxAttempts: 3 },
     reminders: { beforeDays: 3, overdueEveryDays: 3, escalateAfterDays: 7, escalateTo: "hr" },
+    quiz: { questionsPerAttempt: 0, shuffleOptions: true },
     skills: { courseLevel: 1, multiskillMinLevel: 3, multiskillMinSkills: 2, reviewEveryDays: 90 },
     retraining: { enabled: true, beforeDays: 15 },
 }
@@ -57,7 +64,7 @@ const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d)
 
 export function sanitizeLmsSettings(v: any): LmsSettings {
     const d = DEFAULT_LMS_SETTINGS
-    const a = v?.autoAssign ?? {}, df = v?.defaults ?? {}, r = v?.reminders ?? {}, rt = v?.retraining ?? {}, sk = v?.skills ?? {}
+    const a = v?.autoAssign ?? {}, df = v?.defaults ?? {}, r = v?.reminders ?? {}, rt = v?.retraining ?? {}, sk = v?.skills ?? {}, qz = v?.quiz ?? {}
     return {
         autoAssign: { nightly: bool(a.nightly, d.autoAssign.nightly), onChange: bool(a.onChange, d.autoAssign.onChange) },
         defaults: {
@@ -71,6 +78,7 @@ export function sanitizeLmsSettings(v: any): LmsSettings {
             escalateAfterDays: num(r.escalateAfterDays, d.reminders.escalateAfterDays, 0, 180),
             escalateTo: r.escalateTo === "manager" || r.escalateTo === "both" || r.escalateTo === "hr" ? r.escalateTo : d.reminders.escalateTo,
         },
+        quiz: { questionsPerAttempt: num(qz.questionsPerAttempt, d.quiz.questionsPerAttempt, 0, 100), shuffleOptions: bool(qz.shuffleOptions, d.quiz.shuffleOptions) },
         skills: {
             courseLevel: num(sk.courseLevel, d.skills.courseLevel, 1, 4),
             multiskillMinLevel: num(sk.multiskillMinLevel, d.skills.multiskillMinLevel, 1, 4),

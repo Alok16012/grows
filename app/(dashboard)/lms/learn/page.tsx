@@ -409,10 +409,12 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
     onComplete: (passed: boolean, score: number) => void
 }) {
     const [currentQuestion, setCurrentQuestion] = useState(0)
+    // This attempt's questions (a random set when LMS → Settings uses a question bank).
+    const [questions, setQuestions] = useState(quiz?.questions ?? [])
     const [answers, setAnswers] = useState<Record<string, string>>({})
     const [timeLeft, setTimeLeft] = useState(quiz?.timeLimit ? quiz.timeLimit * 60 : null)
     const [submitting, setSubmitting] = useState(false)
-    const [result, setResult] = useState<{ score: number; passed: boolean; attemptsLeft: number | null; results: any[] } | null>(null)
+    const [result, setResult] = useState<{ score: number; passed: boolean; attemptsLeft: number | null; results: any[]; nextQuestions?: any[] | null } | null>(null)
 
     useEffect(() => {
         if (timeLeft === null || timeLeft <= 0) return
@@ -488,7 +490,7 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
                     <div className="flex gap-3 mt-8">
                         {!result.passed && result.attemptsLeft !== 0 && (
                             <button
-                                onClick={() => { setResult(null); setAnswers({}); setCurrentQuestion(0) }}
+                                onClick={() => { if (result?.nextQuestions?.length) setQuestions(result.nextQuestions); setResult(null); setAnswers({}); setCurrentQuestion(0) }}
                                 className="flex-1 h-11 text-[13px] border border-[var(--border)] rounded-[10px] text-[var(--text2)] hover:bg-[var(--surface2)] flex items-center justify-center gap-2"
                             >
                                 <RotateCcw size={14} /> Try Again
@@ -506,9 +508,9 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
         )
     }
 
-    const question = quiz.questions[currentQuestion]
+    const question = questions[currentQuestion]
     const answeredCount = Object.keys(answers).length
-    const progress = (answeredCount / quiz.questions.length) * 100
+    const progress = (answeredCount / questions.length) * 100
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -530,7 +532,7 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
 
                 <div className="px-6 py-3 bg-[var(--surface2)] border-b border-[var(--border)] shrink-0">
                     <div className="flex items-center justify-between text-[11px] text-[var(--text3)] mb-1.5">
-                        <span>Question {currentQuestion + 1} of {quiz.questions.length}</span>
+                        <span>Question {currentQuestion + 1} of {questions.length}</span>
                         <span>{answeredCount} answered</span>
                     </div>
                     <div className="h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
@@ -567,14 +569,14 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
                         Previous
                     </button>
                     <div className="flex gap-2">
-                        {quiz.questions.map((_, idx) => (
+                        {questions.map((_, idx) => (
                             <button
                                 key={idx}
                                 onClick={() => setCurrentQuestion(idx)}
                                 className={`w-7 h-7 rounded-full text-[11px] font-medium transition-colors ${
                                     idx === currentQuestion
                                         ? "bg-[var(--accent)] text-white"
-                                        : answers[quiz.questions[idx].id]
+                                        : answers[questions[idx].id]
                                             ? "bg-green-100 text-green-700"
                                             : "bg-[var(--surface2)] text-[var(--text3)]"
                                 }`}
@@ -583,7 +585,7 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
                             </button>
                         ))}
                     </div>
-                    {currentQuestion < quiz.questions.length - 1 ? (
+                    {currentQuestion < questions.length - 1 ? (
                         <button
                             onClick={() => setCurrentQuestion(prev => prev + 1)}
                             className="px-4 py-2 text-[13px] bg-[var(--accent)] text-white rounded-[8px]"
@@ -593,7 +595,7 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
                     ) : (
                         <button
                             onClick={handleSubmit}
-                            disabled={submitting || answeredCount < quiz.questions.length}
+                            disabled={submitting || answeredCount < questions.length}
                             className="px-4 py-2 text-[13px] bg-green-600 text-white rounded-[8px] disabled:opacity-50 flex items-center gap-2"
                         >
                             {submitting && <Loader2 size={14} className="animate-spin" />}
@@ -606,13 +608,31 @@ function QuizTakingModal({ quiz, courseId, enrollmentId, onClose, onComplete }: 
     )
 }
 
-function CertificateModal({ certificate, courseName, employeeName, issuedAt, onClose }: {
+/** Certificate PDF with a QR code to the public check page, built on click. */
+async function downloadCertificatePdf(enrollmentId: string) {
+    const r = await fetch(`/api/lms/certificate/${enrollmentId}`)
+    const c = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(c?.error || "Could not prepare the certificate")
+    const [{ pdf }, { CertificatePDF }, React, QR, { COMPANY }] = await Promise.all([
+        import("@react-pdf/renderer"), import("@/components/lms/CertificatePDF"), import("react"), import("qrcode"), import("@/lib/company"),
+    ])
+    const qr = await QR.toDataURL(c.verifyUrl, { margin: 1, width: 240 })
+    const logo = await fetch("/logo.png").then(x => x.ok ? x.blob() : null).then(b => b && new Promise<string>(res => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.readAsDataURL(b) })).catch(() => null)
+    const blob = await pdf(React.createElement(CertificatePDF, { c, company: COMPANY.legalName || COMPANY.name, logo, qr }) as any).toBlob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a"); a.href = url; a.download = `${c.certificate}.pdf`; document.body.appendChild(a); a.click(); a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+function CertificateModal({ certificate, courseName, employeeName, issuedAt, onClose, enrollmentId }: {
     certificate: string
     courseName: string
     employeeName: string
     issuedAt?: string
     onClose: () => void
+    enrollmentId?: string
 }) {
+    const [pdfBusy, setPdfBusy] = useState(false)
     // The certificate was issued when the course was completed — not whenever
     // the modal happens to be opened.
     const issuedDate = issuedAt ? new Date(issuedAt) : new Date()
@@ -631,12 +651,21 @@ function CertificateModal({ certificate, courseName, employeeName, issuedAt, onC
                 <div className="p-6 text-center">
                     <p className="text-[11px] text-[var(--text3)] font-mono">{certificate}</p>
                     <p className="text-[11px] text-[var(--text3)] mt-1">Issued on {format(issuedDate, "dd MMMM yyyy")}</p>
-                    <button
-                        onClick={onClose}
-                        className="mt-4 h-10 px-6 text-[13px] bg-[var(--surface2)] text-[var(--text2)] rounded-[8px] hover:bg-[var(--border)]"
-                    >
-                        Close
-                    </button>
+                    <div className="mt-4 flex justify-center gap-2">
+                        {enrollmentId && (
+                            <button disabled={pdfBusy}
+                                onClick={async () => { setPdfBusy(true); try { await downloadCertificatePdf(enrollmentId) } catch (e: any) { toast.error(e.message) } finally { setPdfBusy(false) } }}
+                                className="h-10 px-5 text-[13px] bg-[var(--accent)] text-white rounded-[8px] disabled:opacity-60">
+                                {pdfBusy ? "Preparing…" : "Download PDF"}
+                            </button>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="h-10 px-6 text-[13px] bg-[var(--surface2)] text-[var(--text2)] rounded-[8px] hover:bg-[var(--border)]"
+                        >
+                            Close
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -872,6 +901,7 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
                     courseName={course.title}
                     employeeName={(enrollment as Enrollment & { employeeName?: string }).employeeName || "Employee"}
                     issuedAt={completedAt}
+                    enrollmentId={enrollment.id}
                     onClose={() => setShowCertificate(false)}
                 />
             )}

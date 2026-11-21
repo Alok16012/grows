@@ -12,6 +12,7 @@ type S = {
     reminders: { beforeDays: number; overdueEveryDays: number; escalateAfterDays: number; escalateTo: "hr" | "manager" | "both" }
     retraining: { enabled: boolean; beforeDays: number }
     skills: { courseLevel: number; multiskillMinLevel: number; multiskillMinSkills: number; reviewEveryDays: number }
+    quiz: { questionsPerAttempt: number; shuffleOptions: boolean }
 }
 
 function Card({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
@@ -100,6 +101,10 @@ export default function LmsSettingsTab() {
                             <option value="hr">HR (LMS managers)</option><option value="manager">Employee&apos;s manager</option><option value="both">Both</option>
                         </select>
                     </Row>
+                </Card>
+                <Card title="Quiz" hint="A question bank makes copying answers harder: add more questions to a course than you ask each time.">
+                    <Row label="Questions per attempt" hint="Each attempt draws this many at random. 0 = all questions."><Num value={s.quiz.questionsPerAttempt} onChange={n => set("quiz", { questionsPerAttempt: n })} unit="qs" /></Row>
+                    <Row label="Shuffle answer options"><Check value={s.quiz.shuffleOptions} onChange={b => set("quiz", { shuffleOptions: b })} /></Row>
                 </Card>
                 <Card title="Skill matrix" hint="How levels are counted for the matrix and the Operation Manager KPIs.">
                     <Row label="Level given when a linked course is passed" hint="1 = theory done. On-the-job sign-off sets 2–4."><Num value={s.skills.courseLevel} onChange={n => set("skills", { courseLevel: n })} unit="level" /></Row>

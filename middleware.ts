@@ -129,7 +129,8 @@ export default withAuth(
 // applications (/apply), the candidate join form (/join), shared inspection
 // reports (/share), candidate onboarding links (/onboarding/<token>; the
 // /onboarding list page itself is still protected) and the Terms of Use and
-// Privacy Notice (/terms, readable before signing in).
+// Privacy Notice (/terms, readable before signing in) and certificate checks
+// (/verify/<certificate>, the QR code on a training certificate).
 export const config = {
-    matcher: ["/((?!api|_next|login|apply|join|share|onboarding/|terms$|.*\\..*).*)"],
+    matcher: ["/((?!api|_next|login|apply|join|share|verify/|onboarding/|terms$|.*\\..*).*)"],
 }
