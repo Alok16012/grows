@@ -8,7 +8,7 @@ import type { Range as XLSXRange } from "xlsx"
 const loadXLSX = () => import("xlsx")
 import { toast } from "sonner"
 import { DEFAULT_PAYROLL_RULES, PayrollRules } from "@/lib/payroll-rules"
-import { downloadEcrTxt } from "@/lib/ecr-download"
+import { downloadEcrTxt, downloadEsicEcrXls } from "@/lib/ecr-download"
 import {
     Loader2, Download, ChevronRight, ShieldCheck,
     FileSpreadsheet, TableProperties, RefreshCw
@@ -33,6 +33,7 @@ const ESIC_ITEMS: ReportItem[] = [
     { id: "esic-summary",   label: "ESIC Summary (Site-wise)", shortLabel: "ESIC Summary", type: "esic-summary"   },
     { id: "esic-deduction", label: "ESIC Deduction (Form 7)",  shortLabel: "Form 7",       type: "esic-deduction" },
     { id: "esic-challan",   label: "ESIC Challan",             shortLabel: "ESIC Challan", type: "esic-challan"   },
+    { id: "esic-ecr",       label: "ESIC ECR File (MC upload)", shortLabel: "ECR File",    type: "esic-ecr"       },
 ]
 const PT_ITEMS: ReportItem[] = [
     { id: "pt-summary",   label: "PT Summary (Site-wise)", shortLabel: "PT Summary",   type: "pt-summary"   },
@@ -145,6 +146,16 @@ function ComplianceInner() {
         setDlLoading(key)
         try {
             // EPFO ingests a text file, not a spreadsheet.
+            // ESIC's portal takes its own .xls template.
+            if (item.type === "esic-ecr") {
+                const result = await downloadEsicEcrXls(month, year)
+                if (!result.ok) { toast.error(result.message); return }
+                const extra = result.missingIp ? ` · ${result.missingIp} without an IP number (see the "Missing IP number" sheet)` : ""
+                if (result.draft) toast.warning(`Downloaded ${item.label} — DRAFT: ${result.draft} row(s) not locked yet${extra}`, { duration: 8000 })
+                else if (result.missingIp) toast.warning(`Downloaded ${item.label}: ${result.rows} IP(s)${extra}`, { duration: 8000 })
+                else toast.success(`Downloaded ${item.label}: ${result.rows} IP(s)`)
+                return
+            }
             if (item.type === "pf-ecr") {
                 const result = await downloadEcrTxt(month, year)
                 if (result.ok && result.draft) toast.warning(`Downloaded ${item.label} — DRAFT: ${result.draft} row(s) not locked yet`, { duration: 7000 }); else if (result.ok) toast.success(`Downloaded: ${item.label}`)

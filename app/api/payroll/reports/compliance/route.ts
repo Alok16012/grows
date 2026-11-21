@@ -1,4 +1,5 @@
 import { statutoryFlagsForMonth } from "@/lib/employee-statutory"
+import { buildEsicEcrXls } from "@/lib/esic-ecr"
 import { otHoursOf } from "@/lib/payroll-rules"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
@@ -60,6 +61,7 @@ type PayrollRow = {
         uan: string | null
         pfNumber: string | null
         esiNumber: string | null
+        dateOfLeaving?: Date | null
         state: string | null
         bankAccountNumber: string | null
         bankIFSC: string | null
@@ -224,6 +226,7 @@ async function handle(req: Request, ctx: { draft: number }): Promise<NextRespons
                         uan: true,
                         pfNumber: true,
                         esiNumber: true,
+                        dateOfLeaving: true,
                         state: true,
                         bankAccountNumber: true,
                         bankIFSC: true,
@@ -237,6 +240,30 @@ async function handle(req: Request, ctx: { draft: number }): Promise<NextRespons
         // time; no row / no table = pension applicable, the old behaviour.
         const statutory = await statutoryFlagsForMonth(payrolls.map(p => p.employee.id), { month, year })
         for (const p of payrolls) p.pensionApplicable = statutory.get(p.employee.id)?.pensionApplicable ?? true
+
+        // ESIC monthly contribution upload (.xls in the portal's MC template).
+        // Everyone ESIC was charged for, plus covered IPs with no days that month
+        // (reason code / last working day, lib/esic-ecr).
+        if (type === "esic-ecr") {
+            const rowsFor = stateFilter ? payrolls.filter(p => p.employee.state?.toLowerCase() === stateFilter.toLowerCase()) : payrolls
+            const members = rowsFor.filter(p => (p.esiEmployee || 0) + (p.esiEmployer || 0) > 0
+                || (!(p.presentDays ?? 0) && !!p.employee.esiNumber && statutory.get(p.employee.id)?.esicApplicable !== false))
+            if (!members.length) return new NextResponse("No ESIC members for this period", { status: 404 })
+            const { file, rows, missing } = buildEsicEcrXls(members.map(p => ({
+                ipNumber: p.employee.esiNumber, name: `${p.employee.firstName} ${p.employee.lastName}`, empCode: p.employee.employeeId,
+                days: p.presentDays ?? 0, wages: esiWages(p, rules), leftOn: p.employee.dateOfLeaving ?? null,
+            })), { month, year })
+            return new NextResponse(new Uint8Array(file), {
+                headers: {
+                    "Content-Type": "application/vnd.ms-excel",
+                    "Content-Disposition": `attachment; filename="ESIC_ECR_${MONTH_NAMES[month - 1]}_${year}.xls"`,
+                    "X-Esic-Rows": String(rows),
+                    "X-Esic-Missing-Ip": String(missing),
+                    "X-Payroll-Draft": String((payrolls as unknown as { status: string }[]).filter(p => p.status === "DRAFT").length),
+                    "Access-Control-Expose-Headers": "X-Esic-Rows, X-Esic-Missing-Ip, X-Payroll-Draft",
+                },
+            })
+        }
 
         ctx.draft = (payrolls as unknown as { status: string }[]).filter(p => p.status === "DRAFT").length
 

@@ -12,7 +12,29 @@
 const MONTHS = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"]
 
-export type EcrDownloadResult = { ok: true; draft?: number } | { ok: false; message: string }
+export type EcrDownloadResult = { ok: true; draft?: number; rows?: number; missingIp?: number } | { ok: false; message: string }
+
+/** ESIC monthly contribution upload (.xls, the portal's MC template). */
+export async function downloadEsicEcrXls(month: number, year: number): Promise<EcrDownloadResult> {
+    const res = await fetch(`/api/payroll/reports/compliance?month=${month}&year=${year}&type=esic-ecr&includeDraft=1`)
+    if (!res.ok) {
+        const detail = await res.text().catch(() => "")
+        return { ok: false, message: detail.trim() || "No data found for this period" }
+    }
+    const draft = Number(res.headers.get("X-Payroll-Draft") || 0)
+    const rows = Number(res.headers.get("X-Esic-Rows") || 0)
+    const missingIp = Number(res.headers.get("X-Esic-Missing-Ip") || 0)
+    const url = URL.createObjectURL(await res.blob())
+    try {
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `ESIC_ECR_${MONTHS[month - 1]}_${year}${draft ? "_DRAFT" : ""}.xls`
+        a.click()
+    } finally {
+        URL.revokeObjectURL(url)
+    }
+    return { ok: true, draft, rows, missingIp }
+}
 
 export async function downloadEcrTxt(month: number, year: number): Promise<EcrDownloadResult> {
     const res = await fetch(
