@@ -1077,6 +1077,8 @@ model Payroll {
   arrears             Float         @default(0)
   /// Approved expense claims paid with this salary (Expense Claims → Pay with salary). Included in netSalary, not in gross / PF / ESIC.
   reimbursement       Float         @default(0)
+  /// Asset recoveries (lost / damaged / not returned) deducted from this salary. Included in otherDeductions.
+  assetRecovery       Float         @default(0)
   // --- Net & CTC ---
   netSalary           Float         @default(0)
   ctc                 Float         @default(0) // CTC = fullGross + empPF + empESIC
@@ -1336,6 +1338,105 @@ model AssetMeta {
   trackSerial  Boolean  @default(false)
   updatedAt    DateTime @updatedAt
   asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+}
+
+/// More about an asset (Assets Phases 2-4). Its own table: AssetMeta belongs to
+/// another database role. No relation field, so Asset queries are unchanged.
+model AssetDetail {
+  assetId       String    @id
+  // Sizes of one item share a group ("T shirt" → S, M, L …); kits and employee sizes use it.
+  groupName     String?
+  // ₹ charged per unit when lost / damaged / not returned (blank = purchase cost).
+  recoveryCost  Float?
+  warrantyUntil DateTime?
+  siteId        String?
+  siteName      String?
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@index([groupName])
+}
+
+/// An employee's size for an item group (Assets → Sizes). scripts/asset-phase2.sql.
+model EmployeeSize {
+  id         String   @id @default(uuid())
+  employeeId String
+  groupName  String
+  size       String
+  updatedBy  String?
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@unique([employeeId, groupName], map: "EmployeeSize_employee_group_key")
+}
+
+/// Uniform / PPE kit: item groups and quantities, for a site / designation, optionally issued on joining.
+model AssetKit {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  siteId      String?
+  siteName    String?
+  designation String?
+  items       Json     @default("[]") // [{ groupName, qty }]
+  onJoining   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+/// A charge to an employee for a lost / damaged / not-returned item (Assets → Recoveries).
+model AssetRecovery {
+  id           String    @id @default(uuid())
+  recoveryNo   String    @unique // REC-0001
+  employeeId   String
+  issueId      String?
+  assetId      String
+  quantity     Int       @default(1)
+  amount       Float
+  reason       String // LOST | DAMAGED | NOT_RETURNED
+  status       String    @default("PENDING") // PENDING | SCHEDULED | RECOVERED | WAIVED
+  via          String? // PAYROLL | FNF | CASH
+  payrollMonth Int?
+  payrollYear  Int?
+  note         String?
+  createdBy    String?
+  decidedBy    String?
+  decidedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([payrollYear, payrollMonth], map: "AssetRecovery_payroll_idx")
+}
+
+/// Physical verification of stock (Assets → Verification).
+model AssetVerification {
+  id             String    @id @default(uuid())
+  verificationNo String    @unique // VER-0001
+  name           String
+  siteId         String?
+  siteName       String?
+  status         String    @default("OPEN") // OPEN | CLOSED
+  note           String?
+  startedBy      String?
+  startedAt      DateTime  @default(now())
+  closedBy       String?
+  closedAt       DateTime?
+}
+
+model AssetVerificationLine {
+  id             String    @id @default(uuid())
+  verificationId String
+  assetId        String
+  expectedQty    Int       @default(0)
+  countedQty     Int?
+  condition      String?
+  note           String?
+  countedBy      String?
+  countedAt      DateTime?
+
+  @@index([verificationId])
 }
 
 model AssetAuditLog {

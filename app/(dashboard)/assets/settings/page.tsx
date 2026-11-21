@@ -52,7 +52,7 @@ export default function AssetSettingsPage() {
             const r = await fetch("/api/cron/asset-daily", { method: "POST" })
             const d = await r.json()
             if (!r.ok) throw new Error(d?.error || "Could not run")
-            toast.success(`Reminders sent to ${d.reminded} employee(s); ${d.overdue} receipt(s) overdue`)
+            toast.success(`Reminders sent to ${d.reminded} employee(s); ${d.overdue} receipt(s) overdue; ${d.lowStock ?? 0} item(s) low on stock`)
         } catch (e: any) { toast.error(e.message) } finally { setRunning(false) }
     }
 
@@ -85,6 +85,13 @@ export default function AssetSettingsPage() {
                 <Row label="Tell the issuers after" hint="A daily count of receipts still not confirmed. 0 = never.">
                     <input disabled={ro} type="number" min={0} className={inp} value={s.acknowledgement.tellIssuersAfterDays} onChange={e => setAck("tellIssuersAfterDays", Number(e.target.value) || 0)} />
                     <span className="text-[12px] text-[var(--text3)]">days</span>
+                </Row>
+                <Row label="Show new joiners needing a kit for" hint="Kits & sizes → Issue kit → New joiners.">
+                    <input disabled={ro} type="number" min={0} className={inp} value={s.kits.joinerWindowDays} onChange={e => setS(p => ({ ...p, kits: { joinerWindowDays: Number(e.target.value) || 0 } }))} />
+                    <span className="text-[12px] text-[var(--text3)]">days</span>
+                </Row>
+                <Row label="Low-stock message" hint="Daily message to issuers when a size is at or below its reorder level (Kits & sizes → Item groups).">
+                    <input disabled={ro} type="checkbox" checked={s.stock.lowStockAlert} onChange={e => setS(p => ({ ...p, stock: { lowStockAlert: e.target.checked } }))} />
                 </Row>
                 {canManage && (
                     <button onClick={runNow} disabled={running} className="mt-2 inline-flex items-center gap-1.5 h-9 px-4 rounded-[9px] border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text2)] disabled:opacity-60">

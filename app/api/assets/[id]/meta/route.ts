@@ -25,6 +25,12 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         }
         if (body?.trackSerial !== undefined) data.trackSerial = body.trackSerial === true
 
+        // Item group (sizes of one item), in AssetDetail.
+        if (body?.groupName !== undefined) {
+            const groupName = body.groupName?.toString().trim().slice(0, 80) || null
+            await prisma.assetDetail.upsert({ where: { assetId: params.id }, create: { assetId: params.id, groupName }, update: { groupName } })
+        }
+        if (!Object.keys(data).length) return NextResponse.json(await prisma.assetMeta.findUnique({ where: { assetId: params.id } }) ?? { assetId: params.id })
         const meta = await prisma.$transaction(async tx => {
             const before = await tx.assetMeta.findUnique({ where: { assetId: params.id } })
             const saved = await tx.assetMeta.upsert({

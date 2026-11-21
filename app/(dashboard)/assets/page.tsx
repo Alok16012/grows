@@ -171,6 +171,12 @@ export default function AssetsPage({ searchParams }: { searchParams?: { tab?: st
                     </div>
                     <div className="page-actions">
                         {(canManage || canIssue) && (
+                            <a href="/assets/kits" title="Uniform / PPE kits, employee sizes, stock by size"
+                                className="inline-flex items-center justify-center gap-2 h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] rounded-[10px] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
+                                <Boxes size={16} /> Kits &amp; sizes
+                            </a>
+                        )}
+                        {(canManage || canIssue) && (
                             <a href="/assets/settings" title="Asset settings: reminders and limits"
                                 className="inline-flex items-center justify-center gap-2 h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] rounded-[10px] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
                                 <Settings size={16} /> Settings

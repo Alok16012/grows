@@ -26,5 +26,13 @@ export async function runAssetDaily(now = new Date()) {
             await notifyApprovers(["assets.issue", "assets.manage"], { title: "Asset receipts not confirmed", message: `${overdue} issued item(s) not confirmed by the employee for more than ${tellIssuersAfterDays} days.`, type: "asset", link: "/assets?tab=issued" })
         }
     }
-    return { reminded, overdue }
+    // Items at or below their reorder level.
+    let lowStock = 0
+    if (s.stock.lowStockAlert) {
+        const low: { name: string; available: number; reorderLevel: number }[] = await prisma.$queryRawUnsafe(
+            `SELECT a.name, a.available, m."reorderLevel" FROM "Asset" a JOIN "AssetMeta" m ON m."assetId" = a.id WHERE a."isActive" AND m."reorderLevel" > 0 AND a.available <= m."reorderLevel" ORDER BY a.name`)
+        lowStock = low.length
+        if (low.length) await notifyApprovers(["assets.issue", "assets.manage"], { title: "Low stock", message: low.slice(0, 8).map(l => `${l.name}: ${l.available} left (reorder at ${l.reorderLevel})`).join("; ") + (low.length > 8 ? "…" : ""), type: "asset", link: "/assets?tab=stock" })
+    }
+    return { reminded, overdue, lowStock }
 }

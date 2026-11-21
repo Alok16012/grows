@@ -178,7 +178,7 @@ export async function recordLedgerOnly(db: Db, input: Omit<StockTxnInput, "quant
 // ─── Audit ────────────────────────────────────────────────────────────────────
 
 type AuditInput = {
-    entity: "AssetRequest" | "AssetIssue" | "AssetStock" | "AssetMeta"
+    entity: "AssetRequest" | "AssetIssue" | "AssetStock" | "AssetMeta" | "AssetKit" | "AssetRecovery" | "AssetVerification" | "AssetDetail"
     entityId: string
     action: string
     userId?: string | null
@@ -390,7 +390,7 @@ type IssueInput = {
     replacesIssueId?: string | null
     requestItemId?: string | null
     actorId: string
-    refType: "REQUEST" | "DIRECT"
+    refType: "REQUEST" | "DIRECT" | "KIT"
 }
 
 /**
