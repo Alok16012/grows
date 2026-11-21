@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { recalcDraftPayroll } from "@/lib/payroll-recalc"
 import { getServerSession } from "next-auth"
 import { randomUUID } from "crypto"
 import { authOptions } from "@/lib/auth"
@@ -96,7 +97,8 @@ export async function POST(req: Request) {
             })
         })
 
-        return NextResponse.json({ ok: true, updated: saved, skippedPension, from })
+        const recalculated = await recalcDraftPayroll({ from, employeeIds: valid })
+        return NextResponse.json({ ok: true, updated: saved, skippedPension, from, recalculated })
     } catch (e) {
         if (isMissingTableErr(e)) return NextResponse.json({ error: STATUTORY_MISSING_MESSAGE, code: "NOT_SET_UP" }, { status: 503 })
         console.error("[STATUTORY_BULK]", e)

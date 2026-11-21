@@ -158,7 +158,8 @@ export default function PayrollSettingsPage() {
             setDirty(false)
             setViewing({ month: applyFrom.effectiveMonth, year: applyFrom.effectiveYear })
             loadRules({ month: applyFrom.effectiveMonth, year: applyFrom.effectiveYear })
-            toast.success(`Calculation settings saved — they apply from ${MONTHS[applyFrom.effectiveMonth - 1]} ${applyFrom.effectiveYear}. Earlier months keep their old settings.`)
+            const rc = d.recalculated
+            toast.success(`Calculation settings saved — they apply from ${MONTHS[applyFrom.effectiveMonth - 1]} ${applyFrom.effectiveYear}.${rc?.rows ? ` ${rc.rows} draft payroll row${rc.rows === 1 ? "" : "s"} recalculated (${rc.months.join(", ")}).` : " No draft payroll to update."}`)
         } catch (e) { toast.error((e as Error).message || "Save failed") }
         finally { setSaving(false) }
     }

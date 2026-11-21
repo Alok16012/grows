@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { recalcDraftPayroll } from "@/lib/payroll-recalc"
 import { checkEffectiveMonth, openPayrollMonth } from "@/lib/payroll-change-control"
 import { refreshArrears, logRevisions, salaryFigures } from "@/lib/salary-arrears"
 import { NextResponse } from "next/server"
@@ -436,9 +437,12 @@ export async function POST(req: Request) {
         before: beforeRevs.get(id) ?? null, after: afterById.get(id)!, changedBy: session.user.id,
     })))
     const arrearsPending = await refreshArrears(savedIds, { month: effMonth!, year: effYear! }, session.user.id)
+    // Their draft payroll from that month on picks up the new structure now.
+    const recalculated = await recalcDraftPayroll({ from: { month: effMonth!, year: effYear! }, employeeIds: savedIds })
 
     return NextResponse.json({
         updated,
+        recalculated,
         errors,
         // Arrears filed for HR review (Payroll → Arrears) because a locked / paid month changed.
         arrearsPending,

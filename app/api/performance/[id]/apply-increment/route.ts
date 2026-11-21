@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { recalcDraftPayroll } from "@/lib/payroll-recalc"
 import { checkEffectiveMonth } from "@/lib/payroll-change-control"
 import { refreshArrears, logRevisions, salaryFigures } from "@/lib/salary-arrears"
 import { NextResponse } from "next/server"
@@ -135,7 +136,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             }
         })
         await logRevisions([{ employeeId: r.review.employeeId, effectiveYear: my.year, effectiveMonth: my.month, source: "increment", before: salaryFigures(prevRev), after: salaryFigures(fields) ?? {}, changedBy: session.user.id }])
-        return NextResponse.json({ ok: true, effective: my, basicFrom: r.from.basic, basicTo: r.to.basic, ctcFrom: r.ctcFrom, ctcTo: r.ctcTo })
+        // Draft payroll from that month on picks up the raise now.
+        const recalculated = await recalcDraftPayroll({ from: my, employeeIds: [r.review.employeeId] })
+        return NextResponse.json({ ok: true, effective: my, basicFrom: r.from.basic, basicTo: r.to.basic, ctcFrom: r.ctcFrom, ctcTo: r.ctcTo, recalculated })
     } catch (e) {
         console.error("[APPRAISAL_APPLY_INCREMENT]", e)
         return NextResponse.json({ error: "Could not apply the increment. Please try again." }, { status: 500 })

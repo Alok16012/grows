@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { recalcDraftPayroll } from "@/lib/payroll-recalc"
 import { NextResponse } from "next/server"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
@@ -75,7 +76,9 @@ export async function PUT(req: Request) {
             summary: `${body?.reset ? "Defaults" : "Calculation settings"} from ${from.month}/${from.year}${body?.reason ? ` — back-dated: ${body.reason}` : ""}`,
             after: rules, ...requestMeta(req),
         })
-        return NextResponse.json({ rules, customized: true, from })
+        // Draft payroll from that month on picks up the new settings now — no attendance re-upload.
+        const recalculated = await recalcDraftPayroll({ from })
+        return NextResponse.json({ rules, customized: true, from, recalculated })
     } catch (e) {
         console.error("[PAYROLL_RULES_PUT]", e)
         return new NextResponse("Internal Error", { status: 500 })
@@ -92,5 +95,6 @@ export async function DELETE(req: Request) {
     const problem = await deletePayrollRulesVersion(from, session.user.id ?? "system")
     if (problem) return NextResponse.json({ error: problem }, { status: 400 })
     auditLater({ actorId: session.user.id ?? "system", actorName: session.user.name ?? "", action: "payroll.rules_delete", targetType: "Setting", targetId: `payrollRules:${from.year}-${from.month}`, targetName: "Calculation settings", summary: `Removed the version from ${from.month}/${from.year}`, ...requestMeta(req) })
-    return NextResponse.json({ ok: true })
+    const recalculated = await recalcDraftPayroll({ from })
+    return NextResponse.json({ ok: true, recalculated })
 }

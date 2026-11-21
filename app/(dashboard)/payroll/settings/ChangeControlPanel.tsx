@@ -31,6 +31,16 @@ export default function ChangeControlPanel({ versions, window, viewing, onView, 
             toast.success("Version removed"); onChanged()
         } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
     }
+    async function recalcNow() {
+        if (!confirm("Recalculate every DRAFT payroll row from the open payroll month with the current settings, salary structures and PF / ESIC switches? Locked months are not touched.")) return
+        setBusy(true)
+        try {
+            const r = await fetch("/api/payroll/recalc", { method: "POST" })
+            const d = await r.json().catch(() => ({}))
+            if (!r.ok) throw new Error(d?.error || "Could not recalculate")
+            toast.success(d.rows ? `${d.rows} draft payroll row${d.rows === 1 ? "" : "s"} recalculated (${d.months.join(", ")})` : "No draft payroll to recalculate")
+        } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
+    }
     async function saveControl(patch: Partial<W["control"]>) {
         if (!window) return
         setBusy(true)
@@ -91,6 +101,10 @@ export default function ChangeControlPanel({ versions, window, viewing, onView, 
                         </select>
                     </label>
                     {!isAdmin && <p className="text-[11px] text-[var(--text3)] mt-1">Only an admin can change these.</p>}
+                    <div className="mt-3 border-t border-[var(--border)] pt-3">
+                        <p className="text-[12.5px] text-[var(--text2)] mb-2">Draft payroll updates by itself when settings, a salary structure, an increment or PF / ESIC switches change. You can also refresh it here — no attendance re-upload needed.</p>
+                        <button disabled={busy} onClick={recalcNow} className="h-9 px-3.5 rounded-[8px] border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text2)] disabled:opacity-50">Recalculate draft payroll now</button>
+                    </div>
                 </>)}
             </div>
         </div>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { recalcDraftPayroll } from "@/lib/payroll-recalc"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
@@ -54,7 +55,8 @@ export async function PUT(req: Request, { params }: Params) {
         if (problem) return NextResponse.json({ error: problem }, { status: 400 })
         await saveStatutoryChange([params.id], patch, from, session.user.id ?? null, typeof body?.backdateReason === "string" ? body.backdateReason.slice(0, 300) : null)
         const flags = (await statutoryFlagsForMonth([params.id], open)).get(params.id) ?? { ...DEFAULT_STATUTORY }
-        return NextResponse.json({ installed: true, flags, from })
+        const recalculated = await recalcDraftPayroll({ from, employeeIds: [params.id] })
+        return NextResponse.json({ installed: true, flags, from, recalculated })
     } catch (e) {
         if (isMissingTableErr(e)) return NextResponse.json({ error: STATUTORY_MISSING_MESSAGE, code: "NOT_SET_UP" }, { status: 503 })
         console.error("[EMPLOYEE_STATUTORY_PUT]", e)
