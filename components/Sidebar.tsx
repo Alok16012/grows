@@ -274,7 +274,6 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "My Assignments", href: "/inspection", permissionAny: ["inspection.view", "inspection.submit", "inspection.history"], matchPrefixes: ["/inspection"], hideForAdmin: true, group: "My work" },
                 { name: "My Attendance", href: "/attendance", permission: "self.view", hideIfHas: "attendance.view", group: "My work" },
                 { name: "My Leaves", href: "/leaves", permission: "self.view", hideIfHas: "leaves.view", group: "My work" },
-                { name: "My Performance", href: "/performance/hub", permission: "self.view", hideIfHas: "performance.view", matchPrefixes: ["/performance"], group: "My work" },
                 { name: "My Learning", href: "/lms/learn", permission: "lms.view", hideForAdmin: true, group: "My work" },
                 { name: "My Profile", href: "/profile", permission: "self.view", group: "My account" },
                 { name: "My Onboarding", href: "/self-onboarding", permission: "self.view", hideForAdmin: true, group: "My account" },

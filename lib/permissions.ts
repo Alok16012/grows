@@ -421,8 +421,10 @@ export function canViewPerfHub(session: PermSession): boolean {
 }
 
 // Filing your own KPI reports / register entries is self-service.
+// Own DWM reports / scorecard / appraisal: only for roles with Performance
+// ticked in Roles (client correction, 21 Nov — was open to everyone).
 export function canSelfServePerfHub(session: PermSession): boolean {
-    return checkAccess(session, [], "self.view") || canViewPerfHub(session)
+    return canViewPerfHub(session)
 }
 
 // ─── Policy sign-off ─────────────────────────────────────────────────────────

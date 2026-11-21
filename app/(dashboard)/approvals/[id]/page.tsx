@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { basicFieldSlot } from "@/lib/form-field-order"
 import { useRouter, useParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { Textarea } from "@/components/ui/textarea"
@@ -186,6 +187,48 @@ export default function ReviewInspectionPage() {
     // listed (it read "Not filled" for every defect the part didn't have).
     const shownResponses = (inspection.responses as any[]).filter(r =>
         r.field?.category !== "DEFECT" || (String(r.value ?? "").trim() !== "" && Number(r.value) !== 0))
+
+    // Grouped for review (client correction, 21 Nov): key quantities first,
+    // then Basic info · Defects found · Results. The "Inspector Name" answer is
+    // left out — the inspector already shows under Inspection Details.
+    const groups = (() => {
+        const label = (r: any) => String(r?.field?.fieldLabel ?? "").trim().toUpperCase()
+        const list = shownResponses
+            .filter(r => !/INSPECTOR\s*NAME/.test(label(r)))
+            .sort((a: any, b: any) => (a.field?.displayOrder ?? 0) - (b.field?.displayOrder ?? 0))
+        const bySlot = (slot: string) => list.find(r => r.field && basicFieldSlot(r.field) === slot)
+        const byLabel = (re: RegExp) => list.find(r => re.test(label(r)))
+        const accepted = list.find(r => r.field?.reportRole === "ACCEPTED") ?? byLabel(/^ACCEPTED\s*(QTY|QUANTITY)$/)
+        const qty = [
+            { key: "insp", label: "Inspected", resp: bySlot("INSPECTED"), pct: undefined as any, bg: "#f8fafc", border: "#e2e8f0", fg: "#0f172a" },
+            { key: "acc", label: "Accepted", resp: accepted, pct: byLabel(/^ACCEPT(ED|ANCE)\s*%$/), bg: "#f0fdf4", border: "#bbf7d0", fg: "#15803d" },
+            { key: "rw", label: "Rework", resp: bySlot("REWORK"), pct: byLabel(/^REWORK\s*%$/), bg: "#fff7ed", border: "#fed7aa", fg: "#c2410c" },
+            { key: "rj", label: "Rejected", resp: bySlot("REJECTED"), pct: byLabel(/^REJECT(ED|ION)\s*%$/), bg: "#fef2f2", border: "#fecaca", fg: "#b91c1c" },
+        ]
+        const used = new Set(qty.flatMap(q => [q.resp?.id, q.pct?.id]).filter(Boolean))
+        const rest = list.filter(r => !used.has(r.id))
+        const isDefect = (r: any) => r.field?.category === "DEFECT" || /DEFECT/.test(label(r))
+        const isResult = (r: any) => r.field?.category === "AUTO" && !isDefect(r)
+        return {
+            qty,
+            count: list.length,
+            sections: [
+                { key: "basic", title: "Basic info", items: rest.filter(r => !isDefect(r) && !isResult(r)) },
+                { key: "defects", title: "Defects found", items: rest.filter(isDefect) },
+                { key: "results", title: "Results", items: rest.filter(isResult) },
+            ],
+        }
+    })()
+
+    const renderResponseCard = (resp: any) => (
+        <div key={resp.id} className="bg-white border border-[var(--border)] rounded-[12px] p-4 hover:border-[var(--border2)] transition-colors">
+            <div className="flex items-center justify-between gap-2 mb-3">
+                <p className="text-[10px] font-semibold text-[var(--text3)] uppercase tracking-[0.6px] leading-tight">{resp.field.fieldLabel}</p>
+                <span className="text-[9.5px] text-[#c4c1bb] bg-[var(--bg)] px-1.5 py-0.5 rounded shrink-0 uppercase tracking-[0.3px]">{resp.field.fieldType}</span>
+            </div>
+            <div>{renderFieldValue(resp.field, resp.value)}</div>
+        </div>
+    )
 
     const renderFieldValue = (field: any, value: string) => {
         if (!value) return <p className="text-[13px] text-[var(--border2)] italic">Not filled</p>
@@ -414,36 +457,41 @@ export default function ReviewInspectionPage() {
                     <div className="flex items-center justify-between px-0.5">
                         <h2 className="text-[14px] font-semibold text-[var(--text)]">Inspection Responses</h2>
                         <span className="text-[12px] text-[var(--text3)] bg-[#f0ede8] px-2.5 py-1 rounded-full">
-                            {shownResponses.length} fields
+                            {groups.count} fields
                         </span>
                     </div>
 
-                    {inspection.responses.length === 0 ? (
+                    {inspection.responses.length > 0 && (
+                        <div className="space-y-4">
+                            {/* Key quantities */}
+                            {groups.qty.some(q => q.resp) && (
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    {groups.qty.map(q => (
+                                        <div key={q.key} className="rounded-[12px] border p-3.5" style={{ background: q.bg, borderColor: q.border }}>
+                                            <p className="text-[10px] font-semibold uppercase tracking-[0.6px]" style={{ color: q.fg }}>{q.label}</p>
+                                            <p className="text-[24px] font-bold leading-tight mt-1 tabular-nums" style={{ color: q.fg }}>{q.resp?.value !== undefined && q.resp?.value !== "" ? Number(q.resp.value).toLocaleString("en-IN") : "—"}</p>
+                                            {q.pct?.value ? <p className="text-[11px] font-medium mt-0.5" style={{ color: q.fg }}>{Number(q.pct.value).toFixed(2)}%</p> : null}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {groups.sections.filter(s => s.items.length).map(s => (
+                                <div key={s.key}>
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.7px] text-[var(--text3)] mb-2 px-0.5">{s.title} <span className="font-medium normal-case tracking-normal">· {s.items.length}</span></p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {s.items.map(renderResponseCard)}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {inspection.responses.length === 0 && (
                         <div className="bg-white border border-[var(--border)] rounded-[14px] py-20 flex flex-col items-center gap-3 text-center">
                             <div className="w-12 h-12 rounded-full bg-[var(--bg)] flex items-center justify-center">
                                 <Inbox className="h-5 w-5 text-[var(--border2)]" />
                             </div>
                             <p className="text-[13px] text-[var(--text3)]">No responses recorded</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {shownResponses
-                                .sort((a: any, b: any) => a.field.displayOrder - b.field.displayOrder)
-                                .map((resp: any) => (
-                                    <div key={resp.id} className="bg-white border border-[var(--border)] rounded-[12px] p-4 hover:border-[var(--border2)] transition-colors">
-                                        <div className="flex items-center justify-between gap-2 mb-3">
-                                            <p className="text-[10px] font-semibold text-[var(--text3)] uppercase tracking-[0.6px] leading-tight">
-                                                {resp.field.fieldLabel}
-                                            </p>
-                                            <span className="text-[9.5px] text-[#c4c1bb] bg-[var(--bg)] px-1.5 py-0.5 rounded shrink-0 uppercase tracking-[0.3px]">
-                                                {resp.field.fieldType}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            {renderFieldValue(resp.field, resp.value)}
-                                        </div>
-                                    </div>
-                                ))}
                         </div>
                     )}
                 </div>
@@ -464,7 +512,6 @@ export default function ReviewInspectionPage() {
                                 <div>
                                     <p className="text-[10px] text-[var(--text3)] uppercase tracking-[0.5px] mb-0.5">Inspector</p>
                                     <p className="text-[13px] font-semibold text-[var(--text)]">{inspection.submitter?.name}</p>
-                                    <p className="text-[11px] text-[var(--text3)]">{inspection.submitter?.email}</p>
                                 </div>
                             </div>
                             <div className="h-px bg-[var(--bg)]" />
@@ -658,7 +705,7 @@ export default function ReviewInspectionPage() {
                                     {inspection.reviewerNotes && (
                                         <div className="bg-[var(--surface2)] border border-[#f0ede8] rounded-[10px] p-3.5">
                                             <p className="text-[10px] text-[var(--text3)] uppercase tracking-[0.5px] mb-1.5">Reviewer Notes</p>
-                                            <p className="text-[13px] text-[var(--text)] leading-relaxed">"{inspection.reviewerNotes}"</p>
+                                            <p className="text-[13px] text-[var(--text)] leading-relaxed">&ldquo;{inspection.reviewerNotes}&rdquo;</p>
                                         </div>
                                     )}
 
