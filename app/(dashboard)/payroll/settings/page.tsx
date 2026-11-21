@@ -482,10 +482,19 @@ export default function PayrollSettingsPage() {
                 <div style={cardStyle}>
                     <div>
                         <h2 style={cardTitle}>Overtime, LWF &amp; Defaults</h2>
-                        <p style={cardHint}>OT pay = OT rate/hour × hours per OT day × OT days. The rate/hour follows each site&apos;s OT rule (below). Defaults are used when a value is missing from a salary structure or attendance sheet.</p>
+                        <p style={cardHint}>OT pay = OT rate/hour × OT hours. OT hours are the attendance OT figure when it is entered in hours, or OT days × hours per OT day. The rate/hour follows each site&apos;s OT rule (below). Defaults are used when a value is missing from a salary structure or attendance sheet.</p>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                        <NumField label="Hours per OT day" value={rules.ot.hoursPerDay} onChange={n => up("ot", { hoursPerDay: n })} />
+                        <label style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                            <span style={fieldLabel}>OT in attendance is</span>
+                            <select value={rules.ot.inputUnit} onChange={e => up("ot", { inputUnit: e.target.value as "hours" | "days" })} style={inputStyle}>
+                                <option value="hours">Hours — pay = rate × OT hours</option>
+                                <option value="days">Days — hours = days × hours per day</option>
+                            </select>
+                        </label>
+                        {rules.ot.inputUnit === "days"
+                            ? <NumField label="Hours per OT day" value={rules.ot.hoursPerDay} onChange={n => up("ot", { hoursPerDay: n })} />
+                            : <div />}
                         <NumField label="LWF employee" suffix="₹" value={rules.lwf.employeeDefault} onChange={n => up("lwf", { employeeDefault: n })} />
                         <NumField label="LWF employer" suffix="₹" value={rules.lwf.employerDefault} onChange={n => up("lwf", { employerDefault: n })} />
                     </div>

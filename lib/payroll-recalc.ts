@@ -12,7 +12,7 @@ import { syncOtRatesToStructures } from "@/lib/payroll-ot-sync"
 import { manualOtResolver } from "@/lib/payroll-manual-ot"
 import { postedSites } from "@/lib/attendance-guard"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
-import { rulesForPeriod } from "@/lib/payroll-rules"
+import { rulesForPeriod, otHoursOf } from "@/lib/payroll-rules"
 import { getRulesResolver } from "@/lib/payroll-rules-server"
 import { revisionsForMonth } from "@/lib/salary-revision"
 import { statutoryResolver } from "@/lib/employee-statutory"
@@ -89,7 +89,7 @@ async function recalcRows(opts: { from: YM; employeeIds?: string[] }): Promise<R
                 where: { id: row.id },
                 data: {
                     ...calc,
-                    overtimeHrs: Math.round((row.otDays || 0) * rules.ot.hoursPerDay),
+                    overtimeHrs: otHoursOf(rules.ot, row.otDays || 0),
                     lwpDays: Math.max(row.workingDays - row.presentDays, 0),
                     totalDeductions: calc.totalDeductions + tds,
                     netSalary: Math.round(calc.netSalary - tds + arrears),

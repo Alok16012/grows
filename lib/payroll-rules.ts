@@ -201,7 +201,10 @@ export type PayrollRules = {
         employerDefault: number
     }
     ot: {
-        // 1 OT day = this many hours at the employee's per-hour OT rate.
+        // What the OT figure in the attendance sheet is: "hours" → OT pay = rate × those
+        // hours; "days" → OT hours = days × hoursPerDay, then rate × hours.
+        inputUnit: "hours" | "days"
+        // 1 OT day = this many hours (only when inputUnit is "days").
         hoursPerDay: number
         // The OT rules a site can use (editable in the popup).
         formulas: OtFormula[]
@@ -287,6 +290,7 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
         employerDefault: 0,
     },
     ot: {
+        inputUnit: "hours",
         hoursPerDay: 4,
         formulas: DEFAULT_OT_FORMULAS.map(f => ({ ...f, parts: [...f.parts] })),
         manualRates: {},
@@ -489,6 +493,12 @@ function sanitizeOtSites(v: unknown, ids: Set<string>): Record<string, OtSiteRul
     return out
 }
 
+/** OT hours from the attendance OT figure (hours as entered, or days × hours per OT day). */
+export function otHoursOf(ot: PayrollRules["ot"], value: number): number {
+    const v = Number(value) || 0
+    return Math.round((ot.inputUnit === "hours" ? v : v * (ot.hoursPerDay || 0)) * 100) / 100
+}
+
 /** The OT rule in force for a site (its own, else the default). */
 export function otRuleFor(ot: PayrollRules["ot"], siteId?: string | null): { formula: OtFormula | null; siteRate: number | null } {
     const own = siteId ? ot.sites?.[siteId] : undefined
@@ -601,6 +611,7 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
             employerDefault: num(lwf.employerDefault, d.lwf.employerDefault),
         },
         ot: {
+            inputUnit: ot.inputUnit === "hours" ? "hours" : ot.inputUnit === "days" ? "days" : (input && typeof input === "object" && Object.keys(input).length ? "days" : d.ot.inputUnit),
             hoursPerDay: num(ot.hoursPerDay, d.ot.hoursPerDay, { min: 0, max: 24 }),
             ...(() => {
                 const formulas = sanitizeOtFormulas(ot.formulas, ot)

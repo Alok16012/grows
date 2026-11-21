@@ -80,6 +80,13 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
     // "View" on August opens August, not the calendar month.
     const [month, setMonth] = useState(String(initialMonth ?? currentPayrollMonth()))
     const [year,  setYear]  = useState(String(initialYear  ?? currentPayrollYear()))
+    // How the attendance OT figure is read (Calculation Settings for this month): hours, or days × hours per day.
+    const [otUnit, setOtUnit] = useState<{ unit: "hours" | "days"; hpd: number }>({ unit: "days", hpd: 4 })
+    useEffect(() => {
+        fetch(`/api/payroll/rules?month=${month}&year=${year}`).then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.rules?.ot) setOtUnit({ unit: d.rules.ot.inputUnit === "hours" ? "hours" : "days", hpd: Number(d.rules.ot.hoursPerDay) || 0 }) })
+            .catch(() => {})
+    }, [month, year])
 
     const [sites,          setSites]          = useState<Site[]>([])
     const [siteStatus,     setSiteStatus]     = useState<SiteStatus[]>([])
@@ -573,7 +580,7 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                                 <th style={{ ...th, background: "#eff6ff" }}>Month<br/>Days</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>LOP</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>Days</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>OT<br/>Days</th>
+                                                <th style={{ ...th, background: "#eff6ff" }}>OT<br/>{otUnit.unit === "hours" ? "(hrs)" : "Days"}</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>OT<br/>Hrs</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>Canteen<br/>Days</th>
                                                 <th style={{ ...th, background: "#eff6ff" }}>Canteen ₹<br/><span style={{ fontWeight: 400, fontSize: 9 }}>blank = days×rate</span></th>
@@ -616,7 +623,7 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                                 // PROCESSED/PAID rows are locked — amounts can't change until Unlock.
                                                 const locked = rowStatus[emp.id] === "PROCESSED" || rowStatus[emp.id] === "PAID"
                                                 const inp: React.CSSProperties = locked ? { ...attInput, background: "var(--surface2)", color: "var(--text3)", cursor: "not-allowed" } : attInput
-                                                const lop = monthDays - workedDays; const otDays = att.otDays ?? 0; const otHrs = Math.round(otDays * 8 * 100) / 100
+                                                const lop = monthDays - workedDays; const otDays = att.otDays ?? 0; const otHrs = Math.round((otUnit.unit === "hours" ? otDays : otDays * otUnit.hpd) * 100) / 100
                                                 return (
                                                     <tr key={emp.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "var(--surface)" : "var(--surface2)" }}>
                                                         <td style={td}>{i+1}</td>
@@ -665,7 +672,7 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.monthDays ?? defaultDays) - (attRows[e.id]?.workedDays ?? 0)), 0)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.workedDays ?? 0), 0)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + (attRows[e.id]?.otDays ?? 0), 0) * 1000) / 1000}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + (attRows[e.id]?.otDays ?? 0) * 8, 0) * 100) / 100}</td>
+                                                    <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + (attRows[e.id]?.otDays ?? 0) * (otUnit.unit === "hours" ? 1 : otUnit.hpd), 0) * 100) / 100}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenDays ?? 0), 0)}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenAmount ?? 0), 0) || "—"}</td>
                                                     <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.otherDeductions ?? 0), 0)}</td>

@@ -1,4 +1,5 @@
 import { statutoryFlagsForMonth } from "@/lib/employee-statutory"
+import { otHoursOf } from "@/lib/payroll-rules"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -565,7 +566,7 @@ async function handle(req: Request, ctx: { draft: number }): Promise<NextRespons
                         "IFSC CODE": p.employee.bankIFSC ?? "",
                         "ACCOUNT NO.": p.employee.bankAccountNumber ?? "",
                         "Days Paid": p.presentDays ?? p.workingDays ?? 0,
-                        "OT Hrs": Math.round((p.otDays ?? 0) * rules.ot.hoursPerDay),
+                        "OT Hrs": otHoursOf(rules.ot, p.otDays ?? 0),
                         // CTC (full month) rate columns
                         "Basic_R": Math.round(p.basicFull ?? p.basicSalary),
                         "DA_R": Math.round(p.daFull ?? p.da),

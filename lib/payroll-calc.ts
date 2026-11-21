@@ -15,8 +15,9 @@
 //
 // Proration: ROUND(component × WorkedDays / MonthDays)  ← multiply FIRST (Excel-exact)
 //
-// OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
-//   Default hoursPerDay = 4 (e.g. ₹170/hr × 4 = ₹680/day)
+// OT Pay: ROUND(OT rate per hour × OT hours, 0)
+//   OT hours = the attendance OT figure when Calculation Settings says it is
+//   entered in hours; when it is entered in days, days × hours per OT day.
 //   The rate per hour follows the site's OT rule (Calculation Settings → OT rule
 //   by site; rules editable there): ticked salary parts ÷ days ÷ hours ×
 //   multiplier, e.g. (Basic+DA) ÷ 26 ÷ 8 × 2, or a fixed rate (blank = the
@@ -42,7 +43,7 @@
 // PT (Maharashtra slab on earned gross): ≤7,500 → 0; ≤10,000 → 175; above →
 //   200 (300 in February). Female employees exempt up to ₹25,000.
 //
-import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt, esicEligibilityBase, esicChargeAmount, employerPfBase, roundAmt, esicWagesOf, otRatePerHourFor, otRuleFor } from "./payroll-rules"
+import { DEFAULT_PAYROLL_RULES, PayrollRules, computePt, esicEligibilityBase, esicChargeAmount, employerPfBase, roundAmt, esicWagesOf, otRatePerHourFor, otRuleFor, otHoursOf } from "./payroll-rules"
 
 export function calcGrowusPayroll(sal: {
     basic: number; da: number; washing: number; conveyance: number
@@ -117,12 +118,12 @@ export function calcGrowusPayroll(sal: {
     const bonusEarned   = r(bonusFull, fm.bonus)
     const otherEarned   = r(otherAllowance, fm.otherAllowance)
 
-    // OT Pay: ROUND(otRatePerHour × hoursPerDay × OT_Days, 0)
+    // OT Pay: ROUND(OT rate per hour × OT hours, 0)
     const otRate = otRatePerHourFor(rules.ot, sal.siteId,
         { basic, da, hra: hraFull, washing, conveyance, leaveWithWages, bonus: bonusFull, otherAllowance }, otRatePerHour, sal.employeeId)
     const manualAmount = otRuleFor(rules.ot, sal.siteId).formula?.kind === "MANUAL_AMOUNT"
         && att.otAmount != null && Number.isFinite(att.otAmount) ? att.otAmount : null
-    const otPay = manualAmount !== null ? Math.round(manualAmount) : Math.round(otRate * rules.ot.hoursPerDay * otDays)
+    const otPay = manualAmount !== null ? Math.round(manualAmount) : Math.round(otRate * otHoursOf(rules.ot, otDays))
 
     const grossEarned = basicEarned + daEarned + hraEarned + washingEarned + convEarned +
         lwwEarned + bonusEarned + otherEarned + otPay + (productionIncentive || 0)

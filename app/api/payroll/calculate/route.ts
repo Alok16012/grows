@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { otHoursOf } from "@/lib/payroll-rules"
 import { syncOtRatesToStructures } from "@/lib/payroll-ot-sync"
 import { manualOtResolver } from "@/lib/payroll-manual-ot"
 import { postedSites } from "@/lib/attendance-guard"
@@ -290,9 +291,8 @@ export async function POST(req: Request) {
                 presentDays: att.workedDays,
                 // Extra days worked are not "negative leave without pay".
                 lwpDays:     Math.max(att.monthDays - att.workedDays, 0),
-                // Actual OT hours: 1 OT day = rules.ot.hoursPerDay extra hours
-                // (was hardcoded ×8 while pay was computed at ×4).
-                overtimeHrs: Math.round(att.otDays * rules.ot.hoursPerDay),
+                // OT hours, as paid: entered in hours, or days × hours per OT day.
+                overtimeHrs: otHoursOf(rules.ot, att.otDays),
                 status:      "DRAFT" as const,
                 processedBy: session.user.id ?? "system",
             }
