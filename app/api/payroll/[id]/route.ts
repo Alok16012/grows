@@ -1,4 +1,4 @@
-import { statutoryFlagsFor } from "@/lib/employee-statutory"
+import { statutoryFlagsForMonth } from "@/lib/employee-statutory"
 import { commNotify, employeeRecipients, fmtInr } from "@/lib/comm/recipients"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
@@ -113,7 +113,7 @@ export async function PUT(
             }
 
             const [{ rules: baseRules }, employee, revisions] = await Promise.all([
-                getPayrollRules(),
+                getPayrollRules({ month: existing.month, year: existing.year }),
                 prisma.employee.findUnique({
                     where: { id: existing.employeeId },
                     select: { gender: true, isHandicap: true, employeeSalary: { select: { complianceType: true } } },
@@ -146,7 +146,7 @@ export async function PUT(
             // bonus per rules, CALL exempt.
             const esicLimit = employee?.isHandicap ? rules.esic.handicapLimit : rules.esic.eligibilityLimit
             // Same switch the wage run honours (Employee Master → ESIC Applicable).
-            const esicApplicable = (await statutoryFlagsFor([existing.employeeId])).get(existing.employeeId)?.esicApplicable ?? true
+            const esicApplicable = (await statutoryFlagsForMonth([existing.employeeId], { month: existing.month, year: existing.year })).get(existing.employeeId)?.esicApplicable ?? true
             const esicEligible = rules.esic.enabled && (!isCALL || rules.call.esic) && esicApplicable && esicEligibilityBase(rules.esic, { basic: existing.basicFull, da: existing.daFull, gross: existing.grossFullMonth }, { basic: existing.basicSalary, da: existing.da, gross: grossSalary }) <= esicLimit
             const esicWages = esicWagesOf(rules.esic, { gross: grossSalary, washing: existing.washing, conveyance: existing.conveyance, bonus: existing.bonus, ot: newOvertimePay, incentive: existing.productionIncentive })
             const esicCharge = esicChargeAmount(rules.esic, { esicWages, basicDa: existing.basicSalary + existing.da })

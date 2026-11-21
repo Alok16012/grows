@@ -77,11 +77,12 @@ export async function previewSettlement(input: Omit<ExitInput, "employee" | "id"
 async function settlementFor(exit: ExitInput, record: FnfRecord) {
     const exitId = exit.id
     const e = exit.employee
-    const fnf = (await getPayrollRules()).rules.fnf
     const fmtL = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`
 
     const lwd = exit.lastWorkingDate ?? new Date(exit.resignationDate.getTime() + exit.noticePeriodDays * DAY_MS)
     const lwdMonth = lwd.getUTCMonth() + 1, lwdYear = lwd.getUTCFullYear()
+    // Settlement rules as they stood in the leaving month (Calculation Settings are dated).
+    const fnf = (await getPayrollRules({ month: lwdMonth, year: lwdYear })).rules.fnf
 
     // Salary in force for the leaving month: newest dated revision on or before
     // it, else the employee's current structure, else the legacy basic field.

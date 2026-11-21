@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { checkEffectiveMonth } from "@/lib/payroll-change-control"
 import { refreshArrears, logRevisions, salaryFigures } from "@/lib/salary-arrears"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -48,7 +49,7 @@ async function load(reviewId: string, month: number, year: number) {
         complianceType: (base as any).complianceType === "CALL" ? "CALL" : "OR",
     }
     const to = { ...from, basic: Math.round(from.basic * (1 + pct / 100)) }
-    const { rules } = await getPayrollRules()
+    const { rules } = await getPayrollRules({ month, year })
     const cost = (s: typeof from) => calcFullMonthCosts({ ...s, isHandicap: review.employee.isHandicap ?? false }, { gender: review.employee.gender ?? "Male" }, rules)
     return { review, pct, from, to, ctcFrom: cost(from).ctc, ctcTo: cost(to).ctc }
 }
@@ -79,8 +80,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         const session = await getServerSession(authOptions)
         if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         if (!guard(session)) return NextResponse.json({ error: "You need Payroll (edit) to apply increments." }, { status: 403 })
-        const my = monthYear(await req.json().catch(() => ({})))
+        const body = await req.json().catch(() => ({}))
+        const my = monthYear(body)
         if (!my) return NextResponse.json({ error: "Pick the month the increment starts." }, { status: 400 })
+        // Change control (Payroll → Calculation Settings): open payroll month or the next.
+        const effProblem = await checkEffectiveMonth(my, { isAdmin: (session.user as any)?.role === "ADMIN" }, body?.backdateReason)
+        if (effProblem) return NextResponse.json({ error: effProblem }, { status: 400 })
         const r = await load(params.id, my.month, my.year)
         if ("error" in r) return r.error
 

@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { checkEffectiveMonth, openPayrollMonth } from "@/lib/payroll-change-control"
 import { refreshArrears, logRevisions, salaryFigures } from "@/lib/salary-arrears"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -7,7 +8,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { calcFullMonthCosts } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
-import { rulesForToday } from "@/lib/payroll-rules"
+import { rulesForPeriod } from "@/lib/payroll-rules"
 import { isValidEffectiveMonth, monthKey, monthInIST, revisionsForMonth } from "@/lib/salary-revision"
 
 // GET /api/payroll/salary-structure[?month=&year=]
@@ -104,6 +105,14 @@ export async function POST(req: Request) {
     if (dated && !isValidEffectiveMonth(body.effectiveMonth, body.effectiveYear)) {
         return new NextResponse("Invalid effective month", { status: 400 })
     }
+    // Change control (Payroll → Calculation Settings): a salary change starts in
+    // the open payroll month or the next one — never an earlier month unless an
+    // admin back-dates it with a reason. An undated save means the open month.
+    const open = await openPayrollMonth()
+    if (dated) {
+        const problem = await checkEffectiveMonth({ month: Number(body.effectiveMonth), year: Number(body.effectiveYear) }, { isAdmin: (session?.user as any)?.role === "ADMIN" }, body.backdateReason)
+        if (problem) return new NextResponse(problem, { status: 400 })
+    }
     // An undated save (the Salary Master drawer and row edits) means "from
     // this month on". Overwriting the live row in place used to change every
     // past month too, because months without a revision fall back to it —
@@ -111,8 +120,8 @@ export async function POST(req: Request) {
     // same history-preserving path as a dated upload.
     const today = monthInIST()
     const hasEffective = true
-    const effMonth = dated ? Number(body.effectiveMonth) : today.month
-    const effYear  = dated ? Number(body.effectiveYear)  : today.year
+    const effMonth = dated ? Number(body.effectiveMonth) : open.month
+    const effYear  = dated ? Number(body.effectiveYear)  : open.year
 
     const rows: {
         employeeId: string   // the UUID from Employee.id
@@ -128,14 +137,14 @@ export async function POST(req: Request) {
     // Rules drive default rates and the CTC preview; employee gender/handicap
     // feed the same engine the wage run uses, so stored CTC matches reality.
     const [{ rules: baseRules }, empDetails] = await Promise.all([
-        getPayrollRules(),
+        getPayrollRules({ month: effMonth, year: effYear }),
         prisma.employee.findMany({
             where: { id: { in: rows.map(r => r.employeeId) } },
             select: { id: true, gender: true, isHandicap: true, dateOfJoining: true },
         }),
     ])
-    // Structure previews show the rules in force this month (Oct 2026 revision).
-    const rules = rulesForToday(baseRules)
+    // CTC uses the rules in force in the month this change starts.
+    const rules = rulesForPeriod(baseRules, effMonth, effYear)
     const empById = new Map(empDetails.map(e => [e.id, e]))
 
     // EmployeeSalary is the snapshot the rest of the app shows, so it must hold

@@ -8,7 +8,7 @@ import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { rulesForPeriod } from "@/lib/payroll-rules"
 import { checkAccess } from "@/lib/permissions"
 import { revisionsForMonth } from "@/lib/salary-revision"
-import { statutoryFlagsFor } from "@/lib/employee-statutory"
+import { statutoryFlagsForMonth } from "@/lib/employee-statutory"
 import { onRollsWhere } from "@/lib/employee-filter"
 import { istPeriod, latestPayrollPeriod, periodKey, periodLabel } from "@/lib/payroll-period"
 
@@ -153,7 +153,7 @@ export async function POST(req: Request) {
         // Company-configurable calculation rules (Payroll → Calculation Settings),
         // as they apply to THIS month — the Oct 2026 PF/ESIC revision only
         // from its effective month, so re-running September is unchanged.
-        const { rules: baseRules } = await getPayrollRules()
+        const { rules: baseRules } = await getPayrollRules({ month, year })
         const rules = rulesForPeriod(baseRules, month, year)
 
         // The structure in force for THIS month, not whatever EmployeeSalary
@@ -164,7 +164,8 @@ export async function POST(req: Request) {
         const revisions = await revisionsForMonth(employees.map(e => e.id), { month, year })
         // PF / pension / ESIC switches per employee. No row (or the table not
         // created yet) = all applicable, i.e. the old behaviour.
-        const statutory = await statutoryFlagsFor(employees.map(e => e.id))
+        // PF / pension / ESIC switches in force for THIS month (dated changes).
+        const statutory = await statutoryFlagsForMonth(employees.map(e => e.id), { month, year })
         const defaultMonthDays = rules.defaults.monthDays
 
         // ── STEP 1: Calculate ALL payroll values in memory (pure JS, zero DB calls) ──

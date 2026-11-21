@@ -1,4 +1,4 @@
-import { statutoryFlagsFor } from "@/lib/employee-statutory"
+import { statutoryResolver } from "@/lib/employee-statutory"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -75,10 +75,10 @@ export async function GET(req: Request) {
         const access = accessFrom(session)
         // PF Pension Applicability (Employee Master) for the EPS / EPF split on
         // the compliance screens. Only false is meaningful; default true.
-        const statutory = await statutoryFlagsFor([...new Set(payrolls.map(p => p.employeeId))])
+        const statutoryAt = await statutoryResolver([...new Set(payrolls.map(p => p.employeeId))])
         return NextResponse.json(payrolls.map(p => ({
             ...p,
-            pensionApplicable: statutory.get(p.employeeId)?.pensionApplicable ?? true,
+            pensionApplicable: statutoryAt(p.employeeId, { month: p.month, year: p.year }).pensionApplicable,
             employee: p.employee ? maskEmployee(p.employee, access) : p.employee,
         })))
     } catch (error) {

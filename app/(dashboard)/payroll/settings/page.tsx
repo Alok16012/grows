@@ -1,5 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
+import EffectiveMonthPicker, { type EffectiveChoice } from "@/components/payroll/EffectiveMonthPicker"
+import ChangeControlPanel from "./ChangeControlPanel"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -83,6 +85,12 @@ export default function PayrollSettingsPage() {
     const [saving, setSaving] = useState(false)
     const [resetting, setResetting] = useState(false)
     const [dirty, setDirty] = useState(false)
+    // Dated versions + change control (lib/payroll-rules-server, lib/payroll-change-control).
+    const [versions, setVersions] = useState<any[]>([])
+    const [window_, setWindow] = useState<any>(null)
+    const [viewing, setViewing] = useState<{ month: number; year: number } | null>(null)
+    const [applyFrom, setApplyFrom] = useState<EffectiveChoice | null>(null)
+    const isAdmin = (session?.user as any)?.role === "ADMIN"
 
     // Live-preview sample employee (fully editable)
     const [sample, setSample] = useState({
@@ -96,13 +104,24 @@ export default function PayrollSettingsPage() {
         newRule: true,
     })
 
-    useEffect(() => {
-        fetch("/api/payroll/rules")
+    // Load the version in force for the open payroll month (or the one being viewed).
+    const loadRules = (p: { month: number; year: number } | null = viewing) => {
+        setLoading(true)
+        fetch(`/api/payroll/rules${p ? `?month=${p.month}&year=${p.year}` : ""}`)
             .then(r => r.ok ? r.json() : Promise.reject(new Error("Failed to load rules")))
-            .then(d => { if (d?.rules) { setRules(d.rules); setCustomized(!!d.customized) } })
+            .then(d => { if (d?.rules) { setRules(d.rules); setCustomized(!!d.customized); setVersions(d.versions ?? []); setWindow(d.window ?? null); setDirty(false) } })
             .catch(() => toast.error("Could not load saved rules — showing defaults"))
             .finally(() => setLoading(false))
-    }, [])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => { loadRules(null) }, [])
+    const viewVersion = (p: { month: number; year: number } | null) => {
+        if (dirty && !confirm("Discard your unsaved edits?")) return
+        // "Before the first version" = any month earlier than it.
+        const first = versions[0]
+        const target = p ?? (first ? { month: first.fromMonth === 1 ? 12 : first.fromMonth - 1, year: first.fromMonth === 1 ? first.fromYear - 1 : first.fromYear } : null)
+        setViewing(p); loadRules(target)
+    }
 
     // Section updaters
     const up = <K extends keyof PayrollRules>(key: K, patch: Partial<PayrollRules[K]>) => {
@@ -126,36 +145,40 @@ export default function PayrollSettingsPage() {
     const handleSave = async () => {
         setSaving(true)
         try {
+            if (!applyFrom) throw new Error("Pick the month these settings apply from.")
             const res = await fetch("/api/payroll/rules", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rules }),
+                body: JSON.stringify({ rules, effectiveMonth: applyFrom.effectiveMonth, effectiveYear: applyFrom.effectiveYear, reason: applyFrom.backdateReason }),
             })
-            if (!res.ok) throw new Error(await res.text())
+            if (!res.ok) { const d = await res.json().catch(() => null); throw new Error(d?.error || "Save failed") }
             const d = await res.json()
             setRules(d.rules)
             setCustomized(true)
             setDirty(false)
-            toast.success("Calculation rules saved. They apply from the next payroll processing run.")
+            setViewing({ month: applyFrom.effectiveMonth, year: applyFrom.effectiveYear })
+            loadRules({ month: applyFrom.effectiveMonth, year: applyFrom.effectiveYear })
+            toast.success(`Calculation settings saved — they apply from ${MONTHS[applyFrom.effectiveMonth - 1]} ${applyFrom.effectiveYear}. Earlier months keep their old settings.`)
         } catch (e) { toast.error((e as Error).message || "Save failed") }
         finally { setSaving(false) }
     }
 
     const handleReset = async () => {
-        if (!confirm("Reset all calculation rules to the verified Growus defaults? Your customizations will be removed.")) return
+        if (!applyFrom) { toast.error("Pick the month the defaults apply from."); return }
+        if (!confirm(`Put the verified Growus defaults in from ${MONTHS[applyFrom.effectiveMonth - 1]} ${applyFrom.effectiveYear}? Earlier months keep their settings.`)) return
         setResetting(true)
         try {
             const res = await fetch("/api/payroll/rules", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ reset: true }),
+                body: JSON.stringify({ reset: true, effectiveMonth: applyFrom.effectiveMonth, effectiveYear: applyFrom.effectiveYear, reason: applyFrom.backdateReason }),
             })
-            if (!res.ok) throw new Error(await res.text())
+            if (!res.ok) { const d = await res.json().catch(() => null); throw new Error(d?.error || "Reset failed") }
             const d = await res.json()
             setRules(d.rules)
-            setCustomized(false)
             setDirty(false)
-            toast.success("Rules reset to defaults")
+            loadRules({ month: applyFrom.effectiveMonth, year: applyFrom.effectiveYear })
+            toast.success("Defaults saved as a new version")
         } catch (e) { toast.error((e as Error).message || "Reset failed") }
         finally { setResetting(false) }
     }
@@ -231,6 +254,7 @@ export default function PayrollSettingsPage() {
                     </div>
                 </div>
                 <div className="page-actions">
+                    <EffectiveMonthPicker compact prefix="Apply from" onChange={setApplyFrom} />
                     <button onClick={handleReset} disabled={resetting || saving} style={btnGhost}>
                         {resetting ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Reset to defaults
                     </button>
@@ -241,12 +265,15 @@ export default function PayrollSettingsPage() {
                 </div>
             </div>
 
+            {/* Dated versions + change control */}
+            <ChangeControlPanel versions={versions} window={window_} viewing={viewing} onView={viewVersion} onChanged={() => loadRules(viewing)} isAdmin={isAdmin} />
+
             {/* Scope note */}
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "10px 14px", borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1e40af", lineHeight: 1.55 }}>
                 <Info size={14} style={{ marginTop: 2, flexShrink: 0 }} />
                 <span>
-                    Saved rules apply the <b>next time payroll is processed</b>. Months that are already processed or locked keep the
-                    figures they were calculated with. CALL (contract) employees always skip PF and ESIC regardless of these settings.
+                    Saved settings apply <b>from the month you pick next to Save</b> (the open payroll month or the next). Months before it keep
+                    the settings that were in force then, even if re-processed; locked months are never recalculated. CALL (contract) employees always skip PF and ESIC regardless of these settings.
                 </span>
             </div>
 

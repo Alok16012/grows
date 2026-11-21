@@ -6,6 +6,7 @@
 // processed; locked months are not recalculated.
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import EffectiveMonthPicker, { type EffectiveChoice } from "@/components/payroll/EffectiveMonthPicker"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
@@ -17,6 +18,7 @@ type Row = {
     id: string; employeeId: string; name: string; designation: string | null
     site: { id: string; name: string } | null; compliance: string
     pfApplicable: boolean; pensionApplicable: boolean; esicApplicable: boolean
+    upcoming?: { fromYear: number; fromMonth: number; flags: { pfApplicable: boolean; pensionApplicable: boolean; esicApplicable: boolean } } | null
 }
 type Flag = "pfApplicable" | "pensionApplicable" | "esicApplicable"
 const FLAG_LABEL: Record<Flag, string> = { pfApplicable: "PF", pensionApplicable: "PF Pension (EPS)", esicApplicable: "ESIC" }
@@ -45,6 +47,9 @@ export default function StatutoryApplicabilityPage() {
     const [show, setShow] = useState<"all" | "noPf" | "noPension" | "noEsic">("all")
     const [selected, setSelected] = useState<Set<string>>(new Set())
     const [saving, setSaving] = useState(false)
+    // Change control: the month the switches change from (open payroll month or the next).
+    const [effChoice, setEffChoice] = useState<EffectiveChoice | null>(null)
+    const [openMonth, setOpenMonth] = useState<{ month: number; year: number } | null>(null)
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -52,7 +57,7 @@ export default function StatutoryApplicabilityPage() {
             const res = await fetch("/api/employees/statutory")
             const d = await res.json().catch(() => null)
             if (!res.ok) { setError(d?.error || "Could not load employees."); return }
-            setError(null); setInstalled(d.installed !== false); setRows(d.employees ?? [])
+            setError(null); setInstalled(d.installed !== false); setRows(d.employees ?? []); setOpenMonth(d.window?.open ?? null)
         } catch { setError("Could not load employees. Check your connection.") }
         finally { setLoading(false) }
     }, [])
@@ -87,11 +92,15 @@ export default function StatutoryApplicabilityPage() {
         if (!ids.length) return
         setSaving(true)
         try {
-            const res = await fetch("/api/employees/statutory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeIds: ids, ...patch }) })
+            if (!effChoice) throw new Error("Pick the month this change applies from.")
+            const res = await fetch("/api/employees/statutory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeIds: ids, ...patch, ...effChoice }) })
             const d = await res.json().catch(() => ({}))
             if (!res.ok) throw new Error(d?.error || "Could not save")
+            // A change from a later month shows as "changes from …"; reload to show it.
+            const laterMonth = openMonth && (effChoice.effectiveYear * 12 + effChoice.effectiveMonth) > (openMonth.year * 12 + openMonth.month)
+            if (laterMonth) load()
             // Mirror the server rules locally: no PF → no pension; pension only with PF.
-            setRows(prev => prev.map(r => {
+            else setRows(prev => prev.map(r => {
                 if (!ids.includes(r.id)) return r
                 const next = { ...r, ...patch }
                 if (patch.pfApplicable === false) next.pensionApplicable = false
@@ -153,6 +162,13 @@ export default function StatutoryApplicabilityPage() {
                 </select>
             </div>
 
+            {canEdit && (
+                <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5">
+                    <EffectiveMonthPicker compact prefix="Changes apply from" onChange={setEffChoice} />
+                    <span className="text-[11.5px] text-[var(--text3)]">Switches below show {openMonth ? `the open payroll month (${["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][openMonth.month]} ${openMonth.year})` : "the open payroll month"}. Earlier months keep their switches.</span>
+                </div>
+            )}
+
             {canEdit && selected.size > 0 && (
                 <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-[12px] border border-[var(--accent)] bg-[var(--surface)] px-3.5 py-2.5 shadow-[var(--shadow-lg)]">
                     <span className="text-[13px] font-semibold text-[var(--text)] mr-1">{selected.size} selected:</span>
@@ -200,6 +216,7 @@ export default function StatutoryApplicabilityPage() {
                                 <td className="px-3 py-2">
                                     <p className="font-medium text-[var(--text)]">{r.name}</p>
                                     <p className="text-[11.5px] text-[var(--text3)]">{r.employeeId}{r.compliance === "CALL" ? " · CALL" : ""}</p>
+                                    {r.upcoming && <p className="text-[11px] font-medium text-[#1d4ed8]">From {["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][r.upcoming.fromMonth]} {r.upcoming.fromYear}: PF {r.upcoming.flags.pfApplicable ? "on" : "off"} · EPS {r.upcoming.flags.pensionApplicable ? "on" : "off"} · ESIC {r.upcoming.flags.esicApplicable ? "on" : "off"}</p>}
                                 </td>
                                 <td className="px-3 py-2 text-[var(--text2)]">{r.designation || "—"}</td>
                                 <td className="px-3 py-2 text-[var(--text2)]">{r.site?.name || "—"}</td>

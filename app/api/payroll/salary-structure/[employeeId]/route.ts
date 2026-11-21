@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { checkEffectiveMonth, openPayrollMonth } from "@/lib/payroll-change-control"
 import { refreshArrears, logRevisions, salaryFigures } from "@/lib/salary-arrears"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -6,7 +7,7 @@ import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { calcFullMonthCosts } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
-import { rulesForToday } from "@/lib/payroll-rules"
+import { rulesForPeriod } from "@/lib/payroll-rules"
 import { monthKey, monthInIST } from "@/lib/salary-revision"
 
 // Reading needs a salary permission — this returns an individual's full pay
@@ -43,6 +44,12 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
         complianceType, hra: hraInput, bonus: bonusInput,
     } = body
 
+    // Change control: the month this change starts (open payroll month by default).
+    const open = await openPayrollMonth()
+    const eff = body.effectiveMonth != null && body.effectiveYear != null ? { month: Number(body.effectiveMonth), year: Number(body.effectiveYear) } : open
+    const effProblem = await checkEffectiveMonth(eff, { isAdmin: (session.user as any)?.role === "ADMIN" }, body.backdateReason)
+    if (effProblem) return new NextResponse(effProblem, { status: 400 })
+
     const isCALL = complianceType === "CALL"
     const hra = isCALL ? 0 : (Number(hraInput) || 0)
     const bonus = isCALL ? 0 : (Number(bonusInput) || 0)
@@ -51,14 +58,14 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
     // compute it with the shared engine + the company's configured rules
     // (the old inline math used a flat ₹1,950 employer PF regardless of basic).
     const [{ rules: baseRules }, emp] = await Promise.all([
-        getPayrollRules(),
+        getPayrollRules(eff),
         prisma.employee.findUnique({
             where: { id: params.employeeId },
             select: { gender: true, isHandicap: true, dateOfJoining: true },
         }),
     ])
-    // Structure previews show the rules in force this month (Oct 2026 revision).
-    const rules = rulesForToday(baseRules)
+    // CTC uses the rules in force in the month this change starts.
+    const rules = rulesForPeriod(baseRules, eff.month, eff.year)
     const costs = calcFullMonthCosts({
         basic: Number(basic) || 0,
         da: Number(da) || 0,
@@ -81,7 +88,19 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
     // past months falling back to the NEW live figures.
     let histEntry: { year: number; month: number; before: Record<string, unknown> | null; after: Record<string, unknown> } | null = null
     const sal = await prisma.$transaction(async tx => {
-        const sal = await tx.employeeSalary.upsert({
+        // The live row shows what's in force now; a change starting after this
+        // calendar month leaves it alone (payroll reads the dated revision).
+        const nowCal = monthInIST()
+        const futureStart = monthKey(eff.year, eff.month) > monthKey(nowCal.year, nowCal.month)
+        const liveData = {
+            basic: Number(basic) || 0, da: Number(da) || 0, washing: Number(washing) || 0, conveyance: Number(conveyance) || 0,
+            leaveWithWages: Number(leaveWithWages) || 0, otherAllowance: Number(otherAllowance) || 0,
+            otRatePerHour: Number(otRatePerHour) || rules.defaults.otRatePerHour,
+            canteenRatePerDay: Number(canteenRatePerDay) || rules.defaults.canteenRatePerDay,
+            hra, bonus, ctcMonthly, ctcAnnual: ctcMonthly * 12, status: status || "APPROVED",
+            complianceType: complianceType === "CALL" ? "CALL" : "OR",
+        }
+        const sal = futureStart && before ? { ...before, ...liveData } : await tx.employeeSalary.upsert({
             where: { employeeId: params.employeeId },
             create: {
                 employeeId: params.employeeId,
@@ -130,7 +149,7 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
         // no revision fall back to the live row, which this edit has just
         // overwritten — so without a baseline, a September re-run would pay
         // October's new figures.
-        const { year: curYear, month: curMonth } = monthInIST()
+        const { year: curYear, month: curMonth } = eff
         const earlier = await tx.salaryRevision.findFirst({
             where: {
                 employeeId: params.employeeId,

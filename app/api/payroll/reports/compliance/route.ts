@@ -1,4 +1,4 @@
-import { statutoryFlagsFor } from "@/lib/employee-statutory"
+import { statutoryFlagsForMonth } from "@/lib/employee-statutory"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -199,7 +199,7 @@ async function handle(req: Request, ctx: { draft: number }): Promise<NextRespons
         // Company-configured rates/ceilings — report columns must mirror the
         // rules the amounts were computed with.
         // ...as they applied to the month being filed (Oct 2026 revision).
-        const { rules: baseRules } = await getPayrollRules()
+        const { rules: baseRules } = await getPayrollRules({ month, year })
         const rules = rulesForPeriod(baseRules, month, year)
         const fmtPct = (n: number) => `${parseFloat(n.toFixed(2))}%`
         const pfErTotalPct = rules.pf.employer.epsPct + rules.pf.employer.epfPct +
@@ -234,7 +234,7 @@ async function handle(req: Request, ctx: { draft: number }): Promise<NextRespons
 
         // PF Pension Applicability per member (Employee Master). Read at filing
         // time; no row / no table = pension applicable, the old behaviour.
-        const statutory = await statutoryFlagsFor(payrolls.map(p => p.employee.id))
+        const statutory = await statutoryFlagsForMonth(payrolls.map(p => p.employee.id), { month, year })
         for (const p of payrolls) p.pensionApplicable = statutory.get(p.employee.id)?.pensionApplicable ?? true
 
         ctx.draft = (payrolls as unknown as { status: string }[]).filter(p => p.status === "DRAFT").length

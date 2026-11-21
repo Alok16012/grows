@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
+import EffectiveMonthPicker, { type EffectiveChoice } from "@/components/payroll/EffectiveMonthPicker"
 import RequirePayrollView from "../_components/RequirePayrollView"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
@@ -140,6 +141,8 @@ function SalaryMasterInner() {
     // next-month one hides until it bites.
     const [effMonth, setEffMonth] = useState(() => new Date().getMonth() + 1)
     const [effYear,  setEffYear]  = useState(() => new Date().getFullYear())
+    // Change control: the month a salary change starts (open payroll month or the next).
+    const [effChoice, setEffChoice] = useState<EffectiveChoice | null>(null)
     // Month whose structure the table shows. Empty = the live structure, which
     // is what this page always was. Pick an earlier month to see what that month
     // is actually paid on — the only way to confirm an increment left the months
@@ -153,8 +156,11 @@ function SalaryMasterInner() {
     // month, as before. It used to be switched off here — with buttons that
     // still looked clickable — so Edit appeared broken for any chosen month.
     const canManage = canManagePerm
-    const editEffective = isHistoricalView ? { effectiveMonth: Number(viewMonth), effectiveYear: Number(viewYear) } : {}
-    const editEffectiveLabel = isHistoricalView ? `${MONTHS_LONG[Number(viewMonth) - 1]} ${viewYear}` : "this month"
+    // Every save (upload, row edit, drawer) starts in the month picked under
+    // "Effective" — the open payroll month or the next (Calculation Settings →
+    // Change control). Viewing an old month no longer dates an edit to it.
+    const editEffective = effChoice ? { effectiveMonth: effChoice.effectiveMonth, effectiveYear: effChoice.effectiveYear, backdateReason: effChoice.backdateReason } : {}
+    const editEffectiveLabel = effChoice ? `${MONTHS_LONG[effChoice.effectiveMonth - 1]} ${effChoice.effectiveYear}` : "the open payroll month"
     const [filterNone, setFilterNone] = useState(false)
     const [filterSite, setFilterSite] = useState("")
     // Quick-change compliance type without entering full edit mode
@@ -393,7 +399,7 @@ function SalaryMasterInner() {
                     headers: { "Content-Type": "application/json" },
                     // The increment is dated, so payroll for an earlier month
                     // keeps paying the structure that was in force then.
-                    body: JSON.stringify({ rows, effectiveMonth: effMonth, effectiveYear: effYear }),
+                    body: JSON.stringify({ rows, effectiveMonth: effMonth, effectiveYear: effYear, backdateReason: effChoice?.backdateReason }),
                 })
                 if (!res.ok) { toast.error(await res.text()); return }
                 const d = await res.json()
@@ -504,15 +510,7 @@ function SalaryMasterInner() {
                         effect from, not a filter on the table below. */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "4px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)" }}>
                         <CalendarRange size={13} style={{ color: "var(--text3)", flexShrink: 0 }} />
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", whiteSpace: "nowrap" }}>Effective</span>
-                        <select value={effMonth} onChange={e => setEffMonth(Number(e.target.value))} aria-label="Effective month"
-                            style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 12, fontWeight: 600, outline: "none", cursor: "pointer" }}>
-                            {MONTHS_LONG.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-                        </select>
-                        <select value={effYear} onChange={e => setEffYear(Number(e.target.value))} aria-label="Effective year"
-                            style={{ border: "none", background: "transparent", color: "var(--text)", fontSize: 12, fontWeight: 600, outline: "none", cursor: "pointer" }}>
-                            {(() => { const y = new Date().getFullYear(); return [y - 1, y, y + 1] })().map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
+                        <EffectiveMonthPicker compact prefix="Effective" onChange={c => { setEffChoice(c); if (c) { setEffMonth(c.effectiveMonth); setEffYear(c.effectiveYear) } }} />
                     </div>
                     <label style={{ ...btnPrimary, background: uploading ? "#a78bfa" : "#7c3aed", cursor: uploading ? "not-allowed" : "pointer" }}
                         title={filterSite

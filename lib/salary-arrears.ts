@@ -1,9 +1,9 @@
 import prisma from "@/lib/prisma"
 import { calcGrowusPayroll } from "@/lib/payroll-calc"
 import { rulesForPeriod } from "@/lib/payroll-rules"
-import { getPayrollRules } from "@/lib/payroll-rules-server"
+import { getRulesResolver } from "@/lib/payroll-rules-server"
 import { revisionsForMonth, monthKey } from "@/lib/salary-revision"
-import { statutoryFlagsFor } from "@/lib/employee-statutory"
+import { statutoryResolver } from "@/lib/employee-statutory"
 import { isMissingTableErr } from "@/lib/asset-workflow"
 
 // Effective dating for salary: a revision applies from its month; finalized
@@ -42,8 +42,8 @@ export async function refreshArrears(employeeIds: string[], from: Snap, createdB
         const due = rows.filter(r => monthKey(r.year, r.month) >= fromKey)
         if (!due.length) return 0
 
-        const { rules: base } = await getPayrollRules()
-        const statutory = await statutoryFlagsFor(ids)
+        const rulesAt = await getRulesResolver()
+        const statutoryAt = await statutoryResolver(ids)
         // The structure in force for each month now — one query per month.
         const inForce = new Map<string, Awaited<ReturnType<typeof revisionsForMonth>>>()
         for (const k of Array.from(new Set(due.map(r => `${r.year}-${r.month}`)))) {
@@ -63,7 +63,7 @@ export async function refreshArrears(employeeIds: string[], from: Snap, createdB
         for (const row of due) {
             const sal: any = inForce.get(`${row.year}-${row.month}`)?.get(row.employeeId) ?? row.employee.employeeSalary
             if (!sal) continue
-            const rules = rulesForPeriod(base, row.month, row.year)
+            const rules = rulesForPeriod(rulesAt({ month: row.month, year: row.year }), row.month, row.year)
             const calc = calcGrowusPayroll({
                 basic: sal.basic ?? row.employee.basicSalary ?? 0, da: sal.da ?? 0, hra: sal.hra ?? 0,
                 washing: sal.washing ?? 0, conveyance: sal.conveyance ?? 0, leaveWithWages: sal.leaveWithWages ?? 0,
@@ -71,7 +71,7 @@ export async function refreshArrears(employeeIds: string[], from: Snap, createdB
                 otRatePerHour: sal.otRatePerHour ?? rules.defaults.otRatePerHour,
                 canteenRatePerDay: sal.canteenRatePerDay ?? rules.defaults.canteenRatePerDay,
                 complianceType: sal.complianceType ?? "OR", isHandicap: row.employee.isHandicap ?? false,
-                ...(statutory.get(row.employeeId) ?? {}),
+                ...statutoryAt(row.employeeId, { month: row.month, year: row.year }),
             }, {
                 monthDays: row.workingDays, workedDays: row.presentDays, otDays: row.otDays,
                 canteenDays: row.canteenDays, canteenAmount: row.canteenAmount, penalty: row.penalty,

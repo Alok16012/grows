@@ -2940,3 +2940,22 @@ model ModuleProgress {
   @@index([employeeId])
   @@index([moduleId])
 }
+
+/// Dated changes to an employee's PF / pension / ESIC switches (change control):
+/// each applies from its month; earlier months keep what was in force then.
+/// EmployeeStatutory stays as the starting point for months before the first change.
+model EmployeeStatutoryChange {
+  id                String   @id @default(uuid())
+  employeeId        String
+  fromYear          Int
+  fromMonth         Int
+  pfApplicable      Boolean
+  pensionApplicable Boolean
+  esicApplicable    Boolean
+  changedBy         String?
+  reason            String?
+  createdAt         DateTime @default(now())
+
+  @@unique([employeeId, fromYear, fromMonth])
+  @@index([employeeId])
+}
