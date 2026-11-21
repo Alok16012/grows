@@ -13,6 +13,7 @@ type S = {
     retraining: { enabled: boolean; beforeDays: number }
     skills: { courseLevel: number; multiskillMinLevel: number; multiskillMinSkills: number; reviewEveryDays: number }
     quiz: { questionsPerAttempt: number; shuffleOptions: boolean }
+    tracking: { enforce: boolean; videoPct: number; minTimePct: number; allPdfPages: boolean; blockSkipAhead: boolean }
 }
 
 function Card({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
@@ -101,6 +102,13 @@ export default function LmsSettingsTab() {
                             <option value="hr">HR (LMS managers)</option><option value="manager">Employee&apos;s manager</option><option value="both">Both</option>
                         </select>
                     </Row>
+                </Card>
+                <Card title="Learning tracking" hint="Make sure people really watch and read before a module counts as done. Reports are on the Engagement tab.">
+                    <Row label="Lock “Mark done” until the rules below are met" hint="Off = rules are only reported, not enforced."><Check value={s.tracking.enforce} onChange={b => set("tracking", { enforce: b })} /></Row>
+                    <Row label="Video that must really be watched" hint="YouTube, Vimeo and .mp4. Skipped parts and replays don't count."><Num value={s.tracking.videoPct} onChange={n => set("tracking", { videoPct: n })} unit="%" /></Row>
+                    <Row label="Active time on a module" hint="Share of the module's planned minutes, counted only while the person is actually on the page."><Num value={s.tracking.minTimePct} onChange={n => set("tracking", { minTimePct: n })} unit="%" /></Row>
+                    <Row label="Every page of a PDF must be seen"><Check value={s.tracking.allPdfPages} onChange={b => set("tracking", { allPdfPages: b })} /></Row>
+                    <Row label="Stop skipping ahead in videos" hint="Jumps back to the furthest point already watched."><Check value={s.tracking.blockSkipAhead} onChange={b => set("tracking", { blockSkipAhead: b })} /></Row>
                 </Card>
                 <Card title="Quiz" hint="A question bank makes copying answers harder: add more questions to a course than you ask each time.">
                     <Row label="Questions per attempt" hint="Each attempt draws this many at random. 0 = all questions."><Num value={s.quiz.questionsPerAttempt} onChange={n => set("quiz", { questionsPerAttempt: n })} unit="qs" /></Row>

@@ -10,6 +10,12 @@ const nextConfig = {
     // never linted; older code still has lint errors that would now fail every
     // Vercel deploy. Turn this off once `npm run lint` is clean.
     eslint: { ignoreDuringBuilds: true },
+    // pdfjs-dist (LMS PDF viewer) has an optional Node-only "canvas" import;
+    // the browser build must not try to bundle it.
+    webpack: (config) => {
+        config.resolve.alias = { ...(config.resolve.alias || {}), canvas: false }
+        return config
+    },
     experimental: {
         // @react-pdf/renderer ships ESM only. From Next 14.2.4+ the strict
         // default refuses it ("ESM packages need to be imported") when a page

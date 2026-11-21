@@ -26,6 +26,18 @@ export type LmsSettings = {
         escalateAfterDays: number
         escalateTo: "hr" | "manager" | "both"
     }
+    tracking: {
+        /** Lock "Mark done" until the rules below are met (off = only report them). */
+        enforce: boolean
+        /** % of a measurable video (YouTube, Vimeo, .mp4) that must really be watched. */
+        videoPct: number
+        /** % of the module's planned minutes the learner must be active on it. */
+        minTimePct: number
+        /** Every page of a PDF must be opened. */
+        allPdfPages: boolean
+        /** Stop learners skipping ahead past what they have watched. */
+        blockSkipAhead: boolean
+    }
     quiz: {
         /** Question bank: each attempt draws this many random questions. 0 = all questions. */
         questionsPerAttempt: number
@@ -53,6 +65,7 @@ export const DEFAULT_LMS_SETTINGS: LmsSettings = {
     autoAssign: { nightly: true, onChange: true },
     defaults: { dueDays: 14, passingScore: 70, maxAttempts: 3 },
     reminders: { beforeDays: 3, overdueEveryDays: 3, escalateAfterDays: 7, escalateTo: "hr" },
+    tracking: { enforce: true, videoPct: 90, minTimePct: 50, allPdfPages: true, blockSkipAhead: false },
     quiz: { questionsPerAttempt: 0, shuffleOptions: true },
     skills: { courseLevel: 1, multiskillMinLevel: 3, multiskillMinSkills: 2, reviewEveryDays: 90 },
     retraining: { enabled: true, beforeDays: 15 },
@@ -64,7 +77,7 @@ const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d)
 
 export function sanitizeLmsSettings(v: any): LmsSettings {
     const d = DEFAULT_LMS_SETTINGS
-    const a = v?.autoAssign ?? {}, df = v?.defaults ?? {}, r = v?.reminders ?? {}, rt = v?.retraining ?? {}, sk = v?.skills ?? {}, qz = v?.quiz ?? {}
+    const a = v?.autoAssign ?? {}, df = v?.defaults ?? {}, r = v?.reminders ?? {}, rt = v?.retraining ?? {}, sk = v?.skills ?? {}, qz = v?.quiz ?? {}, tr = v?.tracking ?? {}
     return {
         autoAssign: { nightly: bool(a.nightly, d.autoAssign.nightly), onChange: bool(a.onChange, d.autoAssign.onChange) },
         defaults: {
@@ -77,6 +90,13 @@ export function sanitizeLmsSettings(v: any): LmsSettings {
             overdueEveryDays: num(r.overdueEveryDays, d.reminders.overdueEveryDays, 0, 60),
             escalateAfterDays: num(r.escalateAfterDays, d.reminders.escalateAfterDays, 0, 180),
             escalateTo: r.escalateTo === "manager" || r.escalateTo === "both" || r.escalateTo === "hr" ? r.escalateTo : d.reminders.escalateTo,
+        },
+        tracking: {
+            enforce: bool(tr.enforce, d.tracking.enforce),
+            videoPct: num(tr.videoPct, d.tracking.videoPct, 0, 100),
+            minTimePct: num(tr.minTimePct, d.tracking.minTimePct, 0, 200),
+            allPdfPages: bool(tr.allPdfPages, d.tracking.allPdfPages),
+            blockSkipAhead: bool(tr.blockSkipAhead, d.tracking.blockSkipAhead),
         },
         quiz: { questionsPerAttempt: num(qz.questionsPerAttempt, d.quiz.questionsPerAttempt, 0, 100), shuffleOptions: bool(qz.shuffleOptions, d.quiz.shuffleOptions) },
         skills: {

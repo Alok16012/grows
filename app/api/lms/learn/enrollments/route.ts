@@ -27,6 +27,7 @@ export async function GET(req: Request) {
                                 title: true,
                                 content: true,
                                 videoUrl: true,
+                                docUrl: true,
                                 duration: true,
                                 order: true,
                             },
@@ -71,7 +72,7 @@ export async function GET(req: Request) {
             attempts: e.attempts,
             course: {
                 ...e.course,
-                modules: e.course.modules.map(m => ({ ...m, content: m.content || undefined, videoUrl: m.videoUrl || undefined })),
+                modules: e.course.modules.map(m => ({ ...m, content: m.content || undefined, videoUrl: m.videoUrl || undefined, docUrl: m.docUrl || undefined })),
             },
             employeeName: employee ? `${employee.firstName} ${employee.lastName}` : "Employee",
         }))

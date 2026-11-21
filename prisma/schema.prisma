@@ -1964,6 +1964,8 @@ model CourseModule {
   title      String
   content    String?
   videoUrl   String?
+  /// Reading material: a PDF (shown page by page, pages tracked) or a PPT / Drive link (time tracked).
+  docUrl     String?
   duration   Int     @default(15)
   order      Int     @default(0)
   isRequired Boolean @default(true)
@@ -2915,4 +2917,26 @@ model OjtSignoff {
 
   @@index([employeeId])
   @@index([skillId])
+}
+
+/// How a learner actually worked through one module (LMS engagement tracking):
+/// active time, the parts of the video really watched, forward skips, PDF pages seen.
+model ModuleProgress {
+  id             String   @id @default(uuid())
+  enrollmentId   String
+  moduleId       String
+  employeeId     String
+  activeSeconds  Int      @default(0)
+  videoDuration  Float?
+  watchedSeconds Float    @default(0)
+  watchedRanges  Json?    // [[start, end], …] merged, in seconds
+  forwardSkips   Int      @default(0)
+  docPages       Int?
+  pagesSeen      Json?    // [1, 2, 5, …]
+  firstSeenAt    DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+
+  @@unique([enrollmentId, moduleId])
+  @@index([employeeId])
+  @@index([moduleId])
 }

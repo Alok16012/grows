@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         }
 
         const body = await req.json()
-        const { title, content, videoUrl, duration, order, isRequired } = body
+        const { title, content, videoUrl, docUrl, duration, order, isRequired } = body
 
         if (!title) return new NextResponse("title is required", { status: 400 })
 
@@ -52,6 +52,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 title,
                 content: content || null,
                 videoUrl: videoUrl || null,
+                docUrl: docUrl || null,
                 duration: duration ? parseInt(duration) : 15,
                 order: moduleOrder,
                 isRequired: isRequired ?? true,

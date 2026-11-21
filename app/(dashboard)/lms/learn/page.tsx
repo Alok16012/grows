@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
-import ModuleVideo from "@/components/lms/ModuleVideo"
+import TrackedModule from "@/components/lms/TrackedModule"
 import MySkills from "./MySkills"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -37,6 +37,7 @@ type Enrollment = {
             title: string
             content?: string
             videoUrl?: string
+            docUrl?: string
             duration: number
             order: number
         }[]
@@ -689,6 +690,11 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
     const [showCertificate, setShowCertificate] = useState(false)
     const [showFeedback, setShowFeedback] = useState(false)
     const [updatingProgress, setUpdatingProgress] = useState(false)
+    // Engagement tracking: rules + what still blocks "Mark done" per module.
+    const [track, setTrack] = useState<{ rules: any; modules: Record<string, { gaps: string[] }> } | null>(null)
+    useEffect(() => {
+        fetch(`/api/lms/learn/track?enrollmentId=${enrollment.id}`).then(r => r.ok ? r.json() : null).then(d => d && setTrack(d)).catch(() => {})
+    }, [enrollment.id, progress])
 
     const { course } = enrollment
     const doneCount = status === "COMPLETED" ? course.modules.length : Math.round((progress / 100) * course.modules.length)
@@ -787,20 +793,13 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
                                         <h3 className="text-[14px] font-medium text-[var(--text)]">{mod.title}</h3>
                                         {mod.content && <p className="text-[12.5px] text-[var(--text2)] mt-1 whitespace-pre-line leading-relaxed">{mod.content}</p>}
                                         {/* YouTube / Vimeo / Drive / .mp4 plays here; the next module opens with its video ready. */}
-                                        {mod.videoUrl && <ModuleVideo url={mod.videoUrl} title={mod.title} defaultOpen={isNext && !isComplete} />}
+                                        {/* Video + reading material, with engagement tracking and the "Mark done" lock (LMS → Settings → Tracking). */}
+                                        <TrackedModule enrollmentId={enrollment.id} mod={mod} isNext={isNext} isComplete={isComplete}
+                                            initialGaps={track?.modules?.[mod.id]?.gaps ?? []} rules={track?.rules ?? null}
+                                            onDone={() => handleModuleComplete(mod.id)} busy={updatingProgress} />
                                     </div>
                                     {!isComplete && !isNext && (
                                         <span className="h-8 px-3 text-[11.5px] text-[var(--text3)] flex items-center">Locked</span>
-                                    )}
-                                    {isNext && (
-                                        <button
-                                            onClick={() => handleModuleComplete(mod.id)}
-                                            disabled={updatingProgress}
-                                            className="h-8 px-3 text-[12px] bg-[var(--accent)] text-white rounded-[6px] font-medium flex items-center gap-1 disabled:opacity-60"
-                                        >
-                                            {updatingProgress ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
-                                            Mark Done
-                                        </button>
                                     )}
                                 </div>
                             </div>

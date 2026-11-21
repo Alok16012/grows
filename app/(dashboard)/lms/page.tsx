@@ -19,6 +19,7 @@ import { DocumentViewer } from "@/components/DocumentViewer"
 import { StatCard, statGridClass } from "@/components/StatCard"
 import LmsSettingsTab from "./LmsSettingsTab"
 import SkillMatrixTab from "./SkillMatrixTab"
+import EngagementTab from "./EngagementTab"
 import SiteRefresher from "./SiteRefresher"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -46,6 +47,7 @@ type CourseModule = {
     title: string
     content?: string
     videoUrl?: string
+    docUrl?: string
     duration: number
     order: number
     isRequired: boolean
@@ -226,7 +228,7 @@ type CourseForm = {
 }
 
 type ModuleForm = {
-    title: string; content: string; videoUrl: string; duration: string; order: string
+    title: string; content: string; videoUrl: string; docUrl: string; duration: string; order: string
 }
 
 type QuizForm = {
@@ -243,7 +245,7 @@ const EMPTY_COURSE_FORM: CourseForm = {
 }
 
 const EMPTY_MODULE_FORM: ModuleForm = {
-    title: "", content: "", videoUrl: "", duration: "15", order: ""
+    title: "", content: "", videoUrl: "", docUrl: "", duration: "15", order: ""
 }
 
 const EMPTY_QUESTION_FORM: QuestionForm = {
@@ -388,22 +390,32 @@ function CourseModal({ open, onClose, onSaved, course }: {
         }
     }
 
+    // Editing an existing module (add a video / PDF to it) uses the same form.
+    const [editingModuleId, setEditingModuleId] = useState<string | null>(null)
+    const startEditModule = (m: CourseModule) => {
+        setModuleForm({ title: m.title, content: m.content ?? "", videoUrl: m.videoUrl ?? "", docUrl: m.docUrl ?? "", duration: String(m.duration ?? 15), order: String(m.order ?? "") })
+        setEditingModuleId(m.id)
+        setShowModuleForm(true)
+    }
+
     const handleAddModule = async () => {
         if (!moduleForm.title.trim()) { toast.error("Module title is required"); return }
         if (!course) { toast.error("Save the course first"); return }
         setAddingModule(true)
         try {
-            const res = await fetch(`/api/lms/courses/${course.id}/modules`, {
-                method: "POST",
+            const editing = editingModuleId
+            const res = await fetch(editing ? `/api/lms/courses/${course.id}/modules/${editing}` : `/api/lms/courses/${course.id}/modules`, {
+                method: editing ? "PUT" : "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(moduleForm),
+                body: JSON.stringify(editing ? { ...moduleForm, duration: parseInt(moduleForm.duration) || 15, order: moduleForm.order === "" ? undefined : parseInt(moduleForm.order) } : moduleForm),
             })
             if (!res.ok) { toast.error(await res.text()); return }
             const mod = await res.json()
-            setModules(prev => [...prev, mod])
+            setModules(prev => editing ? prev.map(m => m.id === editing ? { ...m, ...mod } : m) : [...prev, mod])
             setModuleForm(EMPTY_MODULE_FORM)
             setShowModuleForm(false)
-            toast.success("Module added")
+            setEditingModuleId(null)
+            toast.success(editing ? "Module saved" : "Module added")
         } catch {
             toast.error("Failed to add module")
         } finally {
@@ -658,8 +670,16 @@ function CourseModal({ open, onClose, onSaved, course }: {
                                         <div className="flex items-center gap-3 mt-1">
                                             <span className="text-[11px] text-[var(--text3)]">⏱ {mod.duration} min</span>
                                             {mod.videoUrl && <span className="text-[11px] text-[var(--accent)]">▶ Video</span>}
+                                            {mod.docUrl && <span className="text-[11px] text-[var(--accent)]">📄 Reading</span>}
                                         </div>
                                     </div>
+                                    <button
+                                        onClick={() => startEditModule(mod)}
+                                        title="Edit module — add a video or PDF"
+                                        className="p-1 text-[var(--text3)] hover:text-[var(--accent)] transition-colors"
+                                    >
+                                        <Edit2 size={14} />
+                                    </button>
                                     <button
                                         onClick={() => handleDeleteModule(mod.id)}
                                         className="p-1 text-[var(--text3)] hover:text-[var(--red)] transition-colors"
@@ -708,6 +728,25 @@ function CourseModal({ open, onClose, onSaved, course }: {
                                         if (v.kind === "link") return <p className="text-[11px] text-[#b45309] -mt-1">This link will open in a new tab. YouTube, Vimeo, Google Drive and .mp4 links play inside the course.</p>
                                         return <p className="text-[11px] text-[var(--success-strong)] -mt-1">✓ Plays inside the course{v.kind === "iframe" ? ` (${v.provider})` : ""}.</p>
                                     })()}
+                                    <div className="flex gap-2">
+                                        <input
+                                            value={moduleForm.docUrl}
+                                            onChange={e => setModuleForm(f => ({ ...f, docUrl: e.target.value }))}
+                                            placeholder="Reading material (optional) — PDF, PPT or Google Drive link"
+                                            className="flex-1 h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]"
+                                        />
+                                        <label className="h-9 px-3 rounded-[8px] border border-[var(--border)] text-[12px] text-[var(--text2)] inline-flex items-center cursor-pointer whitespace-nowrap">
+                                            Upload PDF
+                                            <input type="file" accept="application/pdf" className="hidden" onChange={async e => {
+                                                const file = e.target.files?.[0]; e.target.value = ""
+                                                if (!file) return
+                                                const fd = new FormData(); fd.append("file", file)
+                                                const r = await fetch("/api/upload", { method: "POST", body: fd }); const d = await r.json().catch(() => ({}))
+                                                if (r.ok && d.url) { setModuleForm(f => ({ ...f, docUrl: d.url })); toast.success("PDF uploaded") } else toast.error(d.error || "Upload failed")
+                                            }} />
+                                        </label>
+                                    </div>
+                                    <p className="text-[11px] text-[var(--text3)] -mt-1">A PDF is shown page by page and every page must be seen. PPT / Google Drive links are shown in a viewer and time on the module is recorded.</p>
                                     <div className="grid grid-cols-2 gap-3">
                                         <input
                                             type="number"
@@ -726,7 +765,7 @@ function CourseModal({ open, onClose, onSaved, course }: {
                                     </div>
                                     <div className="flex gap-2 justify-end">
                                         <button
-                                            onClick={() => { setShowModuleForm(false); setModuleForm(EMPTY_MODULE_FORM) }}
+                                            onClick={() => { setShowModuleForm(false); setModuleForm(EMPTY_MODULE_FORM); setEditingModuleId(null) }}
                                             className="h-8 px-4 text-[12px] text-[var(--text2)] hover:text-[var(--text)] border border-[var(--border)] rounded-[6px]"
                                         >
                                             Cancel
@@ -737,7 +776,7 @@ function CourseModal({ open, onClose, onSaved, course }: {
                                             className="h-8 px-4 text-[12px] bg-[var(--accent)] text-white rounded-[6px] font-medium flex items-center gap-2 disabled:opacity-60"
                                         >
                                             {addingModule && <Loader2 size={12} className="animate-spin" />}
-                                            Add Module
+                                            {editingModuleId ? "Save module" : "Add Module"}
                                         </button>
                                     </div>
                                 </div>
@@ -1578,7 +1617,7 @@ export default function LMSPage() {
     const { data: session, status } = useSession()
     const router = useRouter()
 
-    const [activeTab, setActiveTab] = useState<"dashboard" | "courses" | "enrollments" | "compliance" | "ilt" | "policies" | "notifications" | "settings" | "skills">("dashboard")
+    const [activeTab, setActiveTab] = useState<"dashboard" | "courses" | "enrollments" | "compliance" | "ilt" | "policies" | "notifications" | "settings" | "skills" | "engagement">("dashboard")
     const [courses, setCourses] = useState<Course[]>([])
     const [enrollments, setEnrollments] = useState<Enrollment[]>([])
     const [loadingCourses, setLoadingCourses] = useState(true)
@@ -1741,6 +1780,7 @@ export default function LMSPage() {
                         { key: "compliance", label: "Compliance", icon: <AlertTriangle size={14} /> },
                         { key: "notifications", label: "Alerts", icon: <Bell size={14} /> },
                         { key: "skills", label: "Skill matrix", icon: <LayoutGrid size={14} /> },
+                        { key: "engagement", label: "Engagement", icon: <Eye size={14} /> },
                         { key: "settings", label: "Settings", icon: <Settings size={14} /> },
                     ]).map(tab => (
                         <button
@@ -1978,6 +2018,9 @@ export default function LMSPage() {
 
                 {/* ── Skill matrix Tab ── */}
                 {activeTab === "skills" && <SkillMatrixTab />}
+
+                {/* ── Engagement Tab ── */}
+                {activeTab === "engagement" && <EngagementTab />}
 
                 {/* ── Enrollments Tab ── */}
                 {activeTab === "enrollments" && (

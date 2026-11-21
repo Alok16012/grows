@@ -12,14 +12,15 @@ export async function PUT(req: Request, { params }: { params: { id: string; modu
         }
 
         const body = await req.json()
-        const { title, content, videoUrl, duration, order, isRequired } = body
+        const { title, content, videoUrl, docUrl, duration, order, isRequired } = body
 
         const module = await prisma.courseModule.update({
             where: { id: params.moduleId },
             data: {
                 ...(title !== undefined && { title }),
                 ...(content !== undefined && { content }),
-                ...(videoUrl !== undefined && { videoUrl }),
+                ...(videoUrl !== undefined && { videoUrl: videoUrl || null }),
+                ...(docUrl !== undefined && { docUrl: docUrl || null }),
                 ...(duration !== undefined && { duration: parseInt(duration) }),
                 ...(order !== undefined && { order }),
                 ...(isRequired !== undefined && { isRequired }),

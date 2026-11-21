@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { getLmsSettings } from "@/lib/lms-settings"
+import { completionGaps } from "@/lib/lms-tracking"
 import { raiseSkillsFromCourse } from "@/lib/skills"
 import { getServerSession } from "next-auth"
 import prisma from "@/lib/prisma"
@@ -23,7 +25,7 @@ export async function POST(req: Request) {
         const { enrollmentId, moduleId } = await req.json()
         const enrollment = await prisma.courseEnrollment.findUnique({
             where: { id: String(enrollmentId || "") },
-            include: { course: { select: { modules: { orderBy: { order: "asc" }, select: { id: true } }, quiz: { select: { id: true, isActive: true } } } } },
+            include: { course: { select: { modules: { orderBy: { order: "asc" }, select: { id: true, videoUrl: true, docUrl: true, duration: true } }, quiz: { select: { id: true, isActive: true } } } } },
         })
         if (!enrollment || enrollment.employeeId !== me.id) return new NextResponse("Enrollment not found", { status: 404 })
         if (enrollment.status === "COMPLETED") return NextResponse.json(enrollment)
@@ -34,6 +36,14 @@ export async function POST(req: Request) {
         if (idx < 0) return new NextResponse("Module not in this course", { status: 400 })
         if (idx < done) return NextResponse.json(enrollment) // already done
         if (idx > done) return new NextResponse("Finish the earlier modules first", { status: 400 })
+
+        // Engagement rules (LMS → Settings → Tracking): watched enough, spent enough time, read every page.
+        const rules = (await getLmsSettings()).tracking
+        if (rules.enforce) {
+            const tracked = await prisma.moduleProgress.findUnique({ where: { enrollmentId_moduleId: { enrollmentId: enrollment.id, moduleId: mods[idx].id } } }).catch(() => null)
+            const gaps = completionGaps(mods[idx], tracked, rules)
+            if (gaps.length) return new NextResponse(gaps.join(". "), { status: 400 })
+        }
 
         const progress = Math.round(((idx + 1) / mods.length) * 100)
         // A course with no active assessment is complete once its modules are.
