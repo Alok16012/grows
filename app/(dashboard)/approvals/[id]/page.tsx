@@ -8,7 +8,7 @@ import {
     ChevronLeft, CheckCircle2, XCircle, Loader2, Calendar,
     User as UserIcon, Building2, FileText, ExternalLink,
     Check, X, Clock, CornerUpLeft, Share2, Copy, PenTool, Send,
-    Trash2, MapPin, AlertCircle, Inbox
+    Trash2, MapPin, AlertCircle, Inbox, Eye
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -377,6 +377,37 @@ export default function ReviewInspectionPage() {
                                 <ExternalLink className="h-3 w-3" /> Open Maps
                             </a>
                         </div>
+                    )}
+
+                    {/* The inspector's photo of the filled paper form, to check against the entries */}
+                    {inspection.paperFormPhoto ? (
+                        <div className="bg-white border border-[var(--border)] rounded-[14px] p-4 flex flex-col sm:flex-row gap-4 items-start">
+                            {/\.pdf($|\?)/i.test(inspection.paperFormPhoto) ? (
+                                <div className="h-[140px] w-full sm:w-[140px] shrink-0 rounded-[10px] bg-[var(--bg)] border border-[var(--border)] flex items-center justify-center">
+                                    <FileText className="h-8 w-8 text-[var(--border2)]" />
+                                </div>
+                            ) : (
+                                <img src={inspection.paperFormPhoto} alt="Paper form"
+                                    onClick={() => { setPreviewUrl(inspection.paperFormPhoto); setPreviewName("Paper form") }}
+                                    className="h-[140px] w-full sm:w-[140px] shrink-0 rounded-[10px] object-cover cursor-zoom-in border border-[var(--border)]" />
+                            )}
+                            <div className="min-w-0">
+                                <p className="text-[14px] font-semibold text-[var(--text)]">Paper form</p>
+                                <p className="text-[12px] text-[var(--text3)] mt-0.5 mb-3">Photo of the filled paper form the inspector uploaded. Check the entries below against it before approving.</p>
+                                <div className="flex flex-wrap gap-2">
+                                    <button type="button" onClick={() => { setPreviewUrl(inspection.paperFormPhoto); setPreviewName("Paper form") }}
+                                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[8px] border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--bg)]">
+                                        <Eye className="h-3.5 w-3.5" /> View full size
+                                    </button>
+                                    <a href={inspection.paperFormPhoto} target="_blank" rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[8px] border border-[var(--border)] bg-white text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--bg)]">
+                                        <ExternalLink className="h-3.5 w-3.5" /> Open in new tab
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-white border border-dashed border-[var(--border)] rounded-[14px] px-4 py-3 text-[12px] text-[var(--text3)]">No paper form photo was uploaded with this inspection.</div>
                     )}
 
                     {/* Responses header */}
