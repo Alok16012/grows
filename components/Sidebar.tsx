@@ -202,6 +202,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             links: [
                 { name: "Employee Directory", href: "/employees", permission: "employees.view" },
                 { name: "Employee Master Data", href: "/employees/master", permission: "employees.view" },
+                { name: "Org Chart", href: "/employees/org-chart", permission: "employees.view" },
                 { name: "Data Quality", href: "/employees/quality", permission: "employees.view" },
                 { name: "Masters", href: "/employees/masters", permission: "employees.view" },
                 { name: "New Joiners", href: "/employees/new-joiners", permission: "employees.view" },

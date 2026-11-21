@@ -431,7 +431,9 @@ function EmployeeDrawer({
                                 <h3 className="text-[16px] font-semibold text-[var(--text)]">
                                     {employeeFullName(employee)}
                                 </h3>
-                                <p className="text-[12px] font-mono text-[var(--accent-text)] mt-0.5">{employee.employeeId}</p>
+                                <p className="text-[12px] font-mono text-[var(--accent-text)] mt-0.5">{employee.employeeId}
+                                    <a href={`/employees/profile/${employee.id}`} className="ml-2 font-sans text-[11.5px] font-semibold text-[var(--accent)] hover:underline">Open 360 profile →</a>
+                                </p>
                                 {employee.designation && (
                                     <p className="text-[12px] text-[var(--text3)] mt-0.5">{employee.designation}</p>
                                 )}
