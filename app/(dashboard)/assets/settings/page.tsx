@@ -90,6 +90,10 @@ export default function AssetSettingsPage() {
                     <input disabled={ro} type="number" min={0} className={inp} value={s.kits.joinerWindowDays} onChange={e => setS(p => ({ ...p, kits: { joinerWindowDays: Number(e.target.value) || 0 } }))} />
                     <span className="text-[12px] text-[var(--text3)]">days</span>
                 </Row>
+                <Row label="Warranty-ending message" hint="Daily message to asset managers about warranties ending within this many days (Register). 0 = none.">
+                    <input disabled={ro} type="number" min={0} className={inp} value={s.register.warrantyAlertDays} onChange={e => setS(p => ({ ...p, register: { warrantyAlertDays: Number(e.target.value) || 0 } }))} />
+                    <span className="text-[12px] text-[var(--text3)]">days</span>
+                </Row>
                 <Row label="Low-stock message" hint="Daily message to issuers when a size is at or below its reorder level (Kits & sizes → Item groups).">
                     <input disabled={ro} type="checkbox" checked={s.stock.lowStockAlert} onChange={e => setS(p => ({ ...p, stock: { lowStockAlert: e.target.checked } }))} />
                 </Row>
@@ -103,7 +107,7 @@ export default function AssetSettingsPage() {
             <div className={card}>
                 <p className="text-[14px] font-semibold text-[var(--text)]">Recovery (lost / damaged / not returned)</p>
                 <p className="text-[12px] text-[var(--text3)]">Charges are listed under Assets → Recoveries and deducted from salary or in the F&amp;F.</p>
-                <Row label="Charge items at" hint="Each falls back to the other when not set. The recovery cost is set per asset (Kits & sizes → Item groups → Edit, or the asset).">
+                <Row label="Charge items at" hint="Each falls back to the other when not set. The recovery cost is set per asset in Assets → Register → Edit.">
                     <select disabled={ro} value={s.recovery.basis} onChange={e => setS(p => ({ ...p, recovery: { ...p.recovery, basis: e.target.value as AssetSettings["recovery"]["basis"] } }))} className="h-9 rounded-[9px] border border-[var(--border)] px-2.5 text-[13px] bg-white">
                         <option value="purchaseCost">Purchase cost</option>
                         <option value="recoveryCost">Recovery cost set on the asset</option>

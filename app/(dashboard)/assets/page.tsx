@@ -170,6 +170,18 @@ export default function AssetsPage({ searchParams }: { searchParams?: { tab?: st
                         </p>
                     </div>
                     <div className="page-actions">
+                        {(canManage || canIssue || canView) && (
+                            <a href="/assets/register" title="Asset register: details, warranty, value, Excel, QR labels"
+                                className="inline-flex items-center justify-center gap-2 h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] rounded-[10px] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
+                                <FileBarChart2 size={16} /> Register
+                            </a>
+                        )}
+                        {(canManage || canIssue) && (
+                            <a href="/assets/verification" title="Physical verification: count stock against the system"
+                                className="inline-flex items-center justify-center gap-2 h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] rounded-[10px] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
+                                <ClipboardList size={16} /> Verify
+                            </a>
+                        )}
                         {(canManage || canIssue) && (
                             <a href="/assets/kits" title="Uniform / PPE kits, employee sizes, stock by size"
                                 className="inline-flex items-center justify-center gap-2 h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] rounded-[10px] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">

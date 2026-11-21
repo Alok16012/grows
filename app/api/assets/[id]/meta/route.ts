@@ -25,10 +25,19 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         }
         if (body?.trackSerial !== undefined) data.trackSerial = body.trackSerial === true
 
-        // Item group (sizes of one item), in AssetDetail.
-        if (body?.groupName !== undefined) {
-            const groupName = body.groupName?.toString().trim().slice(0, 80) || null
-            await prisma.assetDetail.upsert({ where: { assetId: params.id }, create: { assetId: params.id, groupName }, update: { groupName } })
+        // Item group, recovery cost, warranty, site — in AssetDetail.
+        const detail: { groupName?: string | null; recoveryCost?: number | null; warrantyUntil?: Date | null; siteId?: string | null; siteName?: string | null } = {}
+        if (body?.groupName !== undefined) detail.groupName = body.groupName?.toString().trim().slice(0, 80) || null
+        if (body?.recoveryCost !== undefined) {
+            const n = body.recoveryCost === null || body.recoveryCost === "" ? null : Number(body.recoveryCost)
+            if (n !== null && (!Number.isFinite(n) || n < 0)) return jsonError(400, "Recovery cost must be 0 or more")
+            detail.recoveryCost = n
+        }
+        if (body?.warrantyUntil !== undefined) detail.warrantyUntil = body.warrantyUntil ? new Date(body.warrantyUntil) : null
+        if (body?.siteId !== undefined) { detail.siteId = body.siteId || null; detail.siteName = body.siteName || null }
+        if (Object.keys(detail).length) {
+            await prisma.assetDetail.upsert({ where: { assetId: params.id }, create: { assetId: params.id, ...detail }, update: detail })
+            await audit(prisma, { entity: "AssetDetail", entityId: params.id, action: "UPDATE", userId: session.user.id, after: detail })
         }
         if (!Object.keys(data).length) return NextResponse.json(await prisma.assetMeta.findUnique({ where: { assetId: params.id } }) ?? { assetId: params.id })
         const meta = await prisma.$transaction(async tx => {

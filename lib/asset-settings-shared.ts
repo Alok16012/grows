@@ -15,6 +15,10 @@ export type AssetSettings = {
         /** Daily message to issuers when an item is at or below its reorder level. */
         lowStockAlert: boolean
     }
+    register: {
+        /** Daily message about warranties ending within this many days. 0 = no message. */
+        warrantyAlertDays: number
+    }
     recovery: {
         /** What an item is charged at: its purchase cost, or the recovery cost set on it (each falls back to the other). */
         basis: "purchaseCost" | "recoveryCost"
@@ -30,6 +34,7 @@ export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
     kits: { joinerWindowDays: 30 },
     stock: { lowStockAlert: true },
     recovery: { basis: "purchaseCost", depreciationPctPerYear: 0, autoChargeLostDamaged: true },
+    register: { warrantyAlertDays: 30 },
 }
 
 const num = (v: unknown, d: number, min = 0, max = 365) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : d }
@@ -43,6 +48,7 @@ export function sanitizeAssetSettings(v: any): AssetSettings {
         },
         kits: { joinerWindowDays: num(v?.kits?.joinerWindowDays, d.kits.joinerWindowDays) },
         stock: { lowStockAlert: typeof v?.stock?.lowStockAlert === "boolean" ? v.stock.lowStockAlert : d.stock.lowStockAlert },
+        register: { warrantyAlertDays: num(v?.register?.warrantyAlertDays, d.register.warrantyAlertDays) },
         recovery: {
             basis: v?.recovery?.basis === "recoveryCost" ? "recoveryCost" : "purchaseCost",
             depreciationPctPerYear: num(v?.recovery?.depreciationPctPerYear, d.recovery.depreciationPctPerYear, 0, 100),

@@ -34,5 +34,17 @@ export async function runAssetDaily(now = new Date()) {
         lowStock = low.length
         if (low.length) await notifyApprovers(["assets.issue", "assets.manage"], { title: "Low stock", message: low.slice(0, 8).map(l => `${l.name}: ${l.available} left (reorder at ${l.reorderLevel})`).join("; ") + (low.length > 8 ? "…" : ""), type: "asset", link: "/assets?tab=stock" })
     }
-    return { reminded, overdue, lowStock }
+    // Warranties ending soon (Assets → Register).
+    let warranties = 0
+    if (s.register.warrantyAlertDays > 0) {
+        const until = new Date(now.getTime() + s.register.warrantyAlertDays * 86_400_000)
+        const ending = await prisma.assetDetail.findMany({ where: { warrantyUntil: { gte: now, lte: until } }, select: { assetId: true, warrantyUntil: true } })
+        if (ending.length) {
+            const names = new Map((await prisma.asset.findMany({ where: { id: { in: ending.map(e => e.assetId) }, isActive: true }, select: { id: true, name: true, assetCode: true } })).map(a => [a.id, `${a.name} (${a.assetCode})`]))
+            const list = ending.filter(e => names.has(e.assetId))
+            warranties = list.length
+            if (list.length) await notifyApprovers(["assets.manage"], { title: "Warranties ending soon", message: list.slice(0, 8).map(e => `${names.get(e.assetId)}: ${e.warrantyUntil!.toISOString().slice(0, 10)}`).join("; ") + (list.length > 8 ? "…" : ""), type: "asset", link: "/assets/register" })
+        }
+    }
+    return { reminded, overdue, lowStock, warranties }
 }
