@@ -512,9 +512,12 @@ export function otRuleFor(ot: PayrollRules["ot"], siteId?: string | null): { for
  */
 export function otRatePerHourFor(ot: PayrollRules["ot"], siteId: string | null | undefined,
     parts: Record<OtPart, number>, ownRate: number, employeeId?: string | null): number {
+    // A rate typed for the employee (Employee OT window) wins over the site rule.
+    const typed = employeeId ? ot.manualRates?.[employeeId] : undefined
+    if (typed && typed > 0) return typed
     const { formula: f, siteRate } = otRuleFor(ot, siteId)
     if (!f) return ownRate
-    if (f.kind === "MANUAL_RATE") return (employeeId && ot.manualRates?.[employeeId]) || ownRate
+    if (f.kind === "MANUAL_RATE") return ownRate
     if (f.kind === "MANUAL_AMOUNT") return ownRate
     if (f.kind === "FIXED") return siteRate ?? (f.fixedRate && f.fixedRate > 0 ? f.fixedRate : ownRate)
     const base = f.parts.reduce((a, p) => a + (Number(parts[p]) || 0), 0)

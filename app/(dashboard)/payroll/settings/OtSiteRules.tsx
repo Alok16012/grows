@@ -98,7 +98,7 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
                     style={{ ...iconBtn, width: "auto", padding: "0 12px", gap: 6, fontSize: 12.5, fontWeight: 700, color: "var(--accent)", borderColor: "var(--accent)" }}>
                     <ListChecks size={14} /> Bulk change
                 </button>
-                {siteId && siteId !== ALL && isManualOt(byId.get(rule)) && (
+                {siteId && siteId !== ALL && (
                     <button type="button" onClick={() => setManualFor({ site: { id: siteId, name: nameOf.get(siteId) ?? "" }, kind: byId.get(rule)?.kind ?? null })} title="Set this site's employees' OT — type it or upload Excel"
                     style={{ ...iconBtn, width: "auto", height: 28, padding: "0 9px", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#7c3aed", borderColor: "#c4b5fd", background: "#f5f3ff" }}>
                     <Users size={13} /> Set employee OT
@@ -119,7 +119,7 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
                             <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", borderBottom: "1px solid var(--border)", fontSize: 12.5 }}>
                                 <span style={{ flex: "1 1 40%", fontWeight: 600, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
                                 <span style={{ flex: "1 1 45%", color: "var(--text2)" }}>{o.formula ? otFormulaLabel(o.formula) : "—"}</span>
-                                {isManualOt(o.formula) && <button type="button" onClick={() => setManualFor({ site: { id: o.id, name: o.name }, kind: o.formula?.kind ?? null })} title="Set this site's employees' OT — type it or upload Excel"
+                                {<button type="button" onClick={() => setManualFor({ site: { id: o.id, name: o.name }, kind: o.formula?.kind ?? null })} title="Set this site's employees' OT — type it or upload Excel"
                     style={{ ...iconBtn, width: "auto", height: 28, padding: "0 9px", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#7c3aed", borderColor: "#c4b5fd", background: "#f5f3ff" }}>
                     <Users size={13} /> Employees
                 </button>}
@@ -203,7 +203,7 @@ function OtRulesPopup({ ot, onChange, onClose }: { ot: Ot; onChange: (patch: Par
                                 {isManualOt(f) ? (
                                     <p style={{ margin: 0, fontSize: 12, color: "var(--text2)" }}>
                                         {f.kind === "MANUAL_RATE"
-                                            ? "Each employee's ₹/hour OT rate is typed or uploaded (Excel) per site — use \"Employee OT\" on a site with this rule. Kept until changed."
+                                            ? "Each employee's ₹/hour OT rate is typed or uploaded (Excel) — use \"Employee OT\" on the site. A rate typed for an employee is used on any rule; this option makes everyone else at the site use their own rate. Kept until changed."
                                             : "Each employee's ₹ OT amount is typed or uploaded (Excel) for each payroll month — use \"Employee OT\" on a site with this rule."}
                                         {" "}Anyone left blank gets OT days × their own rate.
                                     </p>

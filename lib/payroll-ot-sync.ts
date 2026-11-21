@@ -21,6 +21,9 @@ export function ruleOtRate(rules: PayrollRules, siteId: string | null | undefine
     basic: number; da: number; hra: number; washing: number; conveyance: number; leaveWithWages: number
     bonus: number; otherAllowance: number; complianceType: string | null; otRatePerHour: number
 }): number | null {
+    // A rate typed for the employee wins over the site rule.
+    const typed = rules.ot.manualRates?.[employeeId]
+    if (typed && typed > 0) return Math.round(typed * 100) / 100
     const { formula: f, siteRate } = otRuleFor(rules.ot, siteId)
     if (!f) return null
     if (f.kind === "MANUAL_AMOUNT") return null
@@ -44,7 +47,7 @@ export async function syncOtRatesToStructures(opts: { employeeIds?: string[] } =
     try {
         if (opts.employeeIds && !opts.employeeIds.length) return 0
         const { rules } = await getPayrollRules()
-        const hasRules = Object.keys(rules.ot.sites ?? {}).length > 0 || rules.ot.defaultRule !== "FIXED"
+        const hasRules = Object.keys(rules.ot.sites ?? {}).length > 0 || Object.keys(rules.ot.manualRates ?? {}).length > 0 || rules.ot.defaultRule !== "FIXED"
             || rules.ot.formulas?.find(f => f.id === rules.ot.defaultRule)?.fixedRate
         if (!hasRules) return 0 // nothing sets a rate: every structure keeps its own
         const sals = await prisma.employeeSalary.findMany({

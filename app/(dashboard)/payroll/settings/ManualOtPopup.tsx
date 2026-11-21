@@ -164,7 +164,7 @@ export default function ManualOtPopup({ site, ot, ruleKind, onChange, onClose }:
                     <div>
                         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--text)" }}>Manual OT — {site.name}</h3>
                         <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "var(--text3)" }}>
-                            {active ? <>This site uses <b>{active === "rate" ? "rate per employee" : "monthly amount per employee"}</b>. </> : <>Set this site&apos;s OT rule to a Manual OT option for these values to be used. </>}
+                            {active ? <>This site uses <b>{active === "rate" ? "rate per employee" : "monthly amount per employee"}</b>. </> : null}<b>A rate typed here is used for that employee whatever the site&apos;s rule.</b> Monthly amounts are used only when the site&apos;s rule is &quot;Manual OT — monthly amount&quot;. 
                             Employees left blank get OT days × their own rate (Salary Master).
                         </p>
                     </div>
