@@ -73,6 +73,7 @@ export default withAuth(
                 ["/admin/users", ["users.view", "users.manage"]],
                 ["/admin/roles", ["roles.view"]],
                 ["/admin/audit", ["audit.view"]],
+                ["/admin/access", ["users.view", "users.manage", "audit.view"]],
                 ["/admin/whatsapp", ["whatsapp.view", "whatsapp.edit"]],
                 ["/admin/communication", ["whatsapp.view", "whatsapp.edit"]],
             ]

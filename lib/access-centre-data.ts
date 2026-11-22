@@ -40,7 +40,7 @@ export async function activity(now = new Date()) {
     }).sort((a, b) => b.idleDays - a.idleDays)
     const band = (lo: number, hi: number) => rows.filter(r => !r.neverSeen && r.idleDays >= lo && r.idleDays < hi).length
     return {
-        trackingSince: since.toISOString().slice(0, 10),
+        trackingSince: new Date(since.getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10),
         summary: { logins: rows.length, last7: band(0, 7), d7to30: band(7, 30), d30to90: band(30, 90), over90: rows.filter(r => !r.neverSeen && r.idleDays >= 90).length, neverSeen: rows.filter(r => r.neverSeen).length, app: rows.filter(r => r.via === "app").length, web: rows.filter(r => r.via === "web").length },
         rows,
     }
