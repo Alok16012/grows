@@ -249,6 +249,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             title: "Workplace",
             icon: Megaphone,
             links: [
+                { name: "Tasks", href: "/tasks" },
                 { name: "Announcements", href: "/announcements", permission: "announcements.view" },
                 { name: "Helpdesk", href: "/helpdesk", permission: "helpdesk.view" },
                 // Requesters / approvers / store staff work here without assets.view.

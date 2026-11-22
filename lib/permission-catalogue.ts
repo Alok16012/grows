@@ -59,6 +59,9 @@ export const MODULES: ModuleDef[] = [
     // export = download survey responses.
     { key: "polls",         label: "Polls",                   group: "Operations and analytics", actions: ["view", "create", "edit", "delete"] },
     { key: "surveys",       label: "Surveys",                 group: "Operations and analytics", actions: ["view", "create", "edit", "delete", "export"] },
+    // Everyone sees and works their own tasks (assigned to or by them) without a permission.
+    // view = team board over their data scope, create = assign tasks, edit = edit / reassign / cancel others' tasks, approve = confirm tasks needing approval.
+    { key: "tasks",         label: "Tasks",                   group: "Operations and analytics", actions: ["view", "create", "edit", "approve"] },
     { key: "helpdesk",      label: "Helpdesk",                group: "Operations and analytics", actions: ["view", "create", "edit"] },
     { key: "reports",       label: "Analytics and reports",   group: "Operations and analytics", actions: ["view", "export"] },
 
