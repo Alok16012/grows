@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { can } from "@/lib/can"
 import { Loader2, Search, Printer, Eye, CheckCircle2, RefreshCw, ChevronRight, MapPin, Building2, Clock, FileText, IndianRupee } from "lucide-react"
 import { printHTML } from "@/lib/print-html"
+import { SendPayslipsPanel } from "@/components/payroll/SendPayslipsPanel"
 import PayslipViewerModal from "../_components/PayslipViewerModal"
 
 const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"]
@@ -306,6 +307,9 @@ ${autoPrint ? "<script>window.onload=()=>window.print()</script>" : ""}
                     <RefreshCw size={12} style={{ color: "var(--text3)" }} />
                 </button>
             </div>
+
+            {/* Send payslips to employees, site by site (shows them in My Profile / the app) */}
+            <SendPayslipsPanel month={month} year={year} focusSiteId={selSiteId || undefined} />
 
             {/* Two-panel — the site rail stacks above the list on mobile */}
             <div className="flex flex-col md:flex-row items-stretch md:items-start" style={{ gap: 12 }}>
