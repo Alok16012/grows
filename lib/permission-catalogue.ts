@@ -62,7 +62,11 @@ export const MODULES: ModuleDef[] = [
     // Everyone sees and works their own tasks (assigned to or by them) without a permission.
     // view = team board over their data scope, create = assign tasks, edit = edit / reassign / cancel others' tasks, approve = confirm tasks needing approval.
     { key: "tasks",         label: "Tasks",                   group: "Operations and analytics", actions: ["view", "create", "edit", "approve"] },
-    { key: "helpdesk",      label: "Helpdesk",                group: "Operations and analytics", actions: ["view", "create", "edit"] },
+    // Call Dialer. create = use the dialer (pair a phone, click-to-call, own calls and sales leads),
+    // view = team dashboard, live view and everyone's calls, edit = edit / reassign any sales lead and the settings, export = download.
+    // Recruiters (recruitment.view) and HR (employees.view) can click-to-call their own people without it.
+    { key: "dialer",        label: "Call Dialer & sales leads", group: "Operations and analytics", actions: ["view", "create", "edit", "export"] },
+    { key: "helpdesk",      label: "Helpdesk",              group: "Operations and analytics", actions: ["view", "create", "edit"] },
     { key: "reports",       label: "Analytics and reports",   group: "Operations and analytics", actions: ["view", "export"] },
 
     { key: "company",       label: "Company profile and documents", group: "Configuration", actions: ["view", "create", "edit", "delete"] },

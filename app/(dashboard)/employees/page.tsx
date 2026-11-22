@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
 import { EMPLOYMENT_TYPES as CANONICAL_EMPLOYMENT_TYPES } from "@/lib/employment-type"
+import { CallButton } from "@/components/dialer/CallButton"
 import {
     Plus, Search, UserCheck, X, Loader2, Users,
     Calendar, TrendingDown, Edit2, Eye, ChevronDown,
@@ -129,7 +130,7 @@ function getMonthName(m: number) {
 
 // ─── Info Item ────────────────────────────────────────────────────────────────
 
-function InfoItem({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
+function InfoItem({ label, value, icon }: { label: string; value: React.ReactNode; icon?: React.ReactNode }) {
     return (
         <div className="flex items-start gap-2 p-3 rounded-[10px] bg-[var(--surface2)]/40 border border-[var(--border)]">
             {icon && <span className="text-[var(--text3)] mt-0.5 shrink-0">{icon}</span>}
@@ -512,7 +513,7 @@ function EmployeeDrawer({
                             <div className="grid grid-cols-2 gap-2">
                                 <InfoItem label="Date of Birth" value={emp.dateOfBirth ? format(new Date(emp.dateOfBirth), "dd MMM yyyy") : "—"} icon={<Calendar size={13} />} />
                                 <InfoItem label="Gender" value={emp.gender || "—"} icon={<User size={13} />} />
-                                <InfoItem label="Phone" value={emp.phone} icon={<Phone size={13} />} />
+                                <InfoItem label="Phone" value={emp.phone ? <span className="inline-flex items-center gap-1.5">{emp.phone}<CallButton phone={emp.phone} targetType="EMPLOYEE" targetId={emp.id} name={`${emp.firstName} ${emp.lastName ?? ""}`.trim()} className="h-6 px-1.5 rounded-[6px] border border-[var(--border)] text-[var(--text2)] hover:text-green-700 inline-flex items-center" /></span> : "—"} icon={<Phone size={13} />} />
                                 <InfoItem label="Alt. Phone" value={emp.alternatePhone || "—"} icon={<Phone size={13} />} />
                                 <InfoItem label="Email" value={emp.email || "—"} icon={<Mail size={13} />} />
                                 <InfoItem label="Aadhar" value={maskAadhar(emp.aadharNumber)} icon={<FileText size={13} />} />

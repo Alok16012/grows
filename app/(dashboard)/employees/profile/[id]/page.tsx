@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Loader2 } from "lucide-react"
+import { CallButton } from "@/components/dialer/CallButton"
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const inr = (n: number | null | undefined) => n == null ? "—" : "₹" + Math.round(n).toLocaleString("en-IN")
@@ -49,7 +50,7 @@ export default function Employee360({ params }: { params: { id: string } }) {
                 <div className="text-[12.5px] space-y-1 min-w-[200px]">
                     <Row k="Joined" v={`${day(e.dateOfJoining)} (${tenure(e.dateOfJoining)})`} />
                     <Row k="Reports to" v={d.manager ? (d.manager.employeeId ? <Link className="text-[var(--accent)]" href={`/employees/profile/${d.manager.employeeId}`}>{d.manager.name}</Link> : d.manager.name) : <span className="text-amber-700">not set</span>} />
-                    <Row k="Mobile" v={e.phone ?? "—"} />
+                    <Row k="Mobile" v={e.phone ? <span className="inline-flex items-center gap-1.5">{e.phone}<CallButton phone={e.phone} targetType="EMPLOYEE" targetId={e.id} name={name} className="h-6 px-1.5 rounded-[6px] border border-[var(--border)] text-[var(--text2)] hover:text-green-700 inline-flex items-center" /></span> : "—"} />
                 </div>
             </div>
             {d.exit && d.exit.status !== "CANCELLED" && <p className="rounded-[10px] bg-amber-50 border border-amber-200 px-4 py-2 text-[12.5px] text-amber-800">Exit: {String(d.exit.status).replace(/_/g, " ").toLowerCase()}{d.exit.lastWorkingDate ? ` · last working day ${day(d.exit.lastWorkingDate)}` : ""}</p>}

@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/Sidebar"
 import { TopNav } from "@/components/TopNav"
 import { InspectionStepper } from "@/components/InspectionStepper"
 import { MobileBottomNav } from "@/components/MobileBottomNav"
+import { CallHost } from "@/components/dialer/CallButton"
 import { cn } from "@/lib/utils"
 import { COMPANY } from "@/lib/company"
 
@@ -81,6 +82,8 @@ export default function DashboardLayout({
             </div>
 
             <MobileBottomNav onMore={() => setIsSidebarOpen(true)} />
+            {/* Click-to-call panel (startCall) */}
+            <CallHost />
         </div>
     )
 }

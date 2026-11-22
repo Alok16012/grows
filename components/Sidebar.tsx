@@ -16,6 +16,7 @@ import {
     Wallet,
     TrendingUp,
     Megaphone,
+    PhoneCall,
     SlidersHorizontal,
     CircleUser,
     ChevronDown,
@@ -185,6 +186,15 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "Inspection Reports", href: "/reports", permission: "reports.view" },
                 // Defect library, cross-customer Pareto and lot / batch traceability.
                 { name: "Quality", href: "/quality", permissionAny: ["reports.view", "approvals.view", "projects.view"] },
+            ],
+        },
+        {
+            // Telecalling: calls placed from each person's paired phone, synced back with talk time.
+            title: "Sales & Calls",
+            icon: PhoneCall,
+            links: [
+                { name: "Call Dialer", href: "/dialer", permissionAny: ["dialer.create", "dialer.view", "dialer.edit", "recruitment.view", "employees.view"], matchPrefixes: ["/dialer"] },
+                { name: "Sales Leads", href: "/dialer?tab=leads", permissionAny: ["dialer.create", "dialer.view", "dialer.edit"] },
             ],
         },
         {

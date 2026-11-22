@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Phone, Plus, X } from "lucide-react"
 import { STAGE_LABEL, REQUEST_STATUS, REQUEST_REASONS, INTERVIEW_STATUS, INTERVIEW_RESULT, type RecruitmentSettings } from "@/lib/recruitment"
 import { InterviewResult } from "@/components/recruitment/InterviewResult"
+import { CallButton } from "@/components/dialer/CallButton"
 
 const box = "h-9 rounded-[9px] border border-[var(--border)] px-2.5 text-[13px] bg-white"
 const btn = "h-9 px-4 rounded-[9px] bg-[var(--accent)] text-white text-[13px] font-semibold disabled:opacity-50 inline-flex items-center gap-1.5"
@@ -86,7 +87,7 @@ function Person({ l, extra }: { l: any; extra?: React.ReactNode }) {
                 <Link href={`/recruitment?lead=${l.id}`} className="text-[13px] font-semibold hover:text-[var(--accent)]">{l.candidateName}</Link>
                 <p className="text-[11.5px] text-[var(--text3)] truncate">{l.position} · {STAGE_LABEL[l.status] ?? l.status}{l.assignee?.name ? ` · ${l.assignee.name}` : ""}</p>
             </div>
-            <div className="flex items-center gap-2 shrink-0 text-[11.5px]">{extra}<a href={`tel:${l.phone}`} className={btn2} aria-label={`Call ${l.candidateName}`}><Phone size={12} /></a></div>
+            <div className="flex items-center gap-2 shrink-0 text-[11.5px]">{extra}<CallButton phone={l.phone} targetType="CANDIDATE" targetId={l.id} name={l.candidateName} className={btn2} /></div>
         </div>
     )
 }

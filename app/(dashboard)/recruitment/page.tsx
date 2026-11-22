@@ -25,6 +25,7 @@ import {
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { JobLinkOffer, InterviewRounds } from "@/components/recruitment/CandidateExtras"
 import { OpenFromQuery } from "@/components/OpenFromQuery"
+import { startCall } from "@/components/dialer/CallButton"
 import Link from "next/link"
 import { StatCard, statGridClass } from "@/components/StatCard"
 import { EmployeeModal, Employee as EmpType } from "@/components/EmployeeModal"
@@ -97,9 +98,10 @@ function waNumber(phone?: string | null) {
 }
 
 // Open the real Call / WhatsApp / Email channel for a candidate.
-function openContactChannel(type: string, phone?: string | null, email?: string | null) {
+function openContactChannel(type: string, phone?: string | null, email?: string | null, lead?: { id: string; candidateName?: string }) {
     if (type === "call" && phone) {
-        window.open(`tel:${phone.replace(/\s/g, "")}`)
+        // Rings the caller's paired phone (Growus Dialer); without the dialer permission it falls back to tel:.
+        startCall({ phone: phone.replace(/\s/g, ""), targetType: "CANDIDATE", targetId: lead?.id, name: lead?.candidateName })
     } else if (type === "whatsapp") {
         const num = waNumber(phone)
         if (num) window.open(`https://wa.me/${num}`, "_blank", "noopener")
@@ -2642,7 +2644,7 @@ function DetailDrawer({
                                     {ACTIVITY_TYPES.map(t => {
                                         const Icon = t.icon
                                         return (
-                                            <button key={t.key} onClick={() => { onActivityTypeChange(t.key); openContactChannel(t.key, lead.phone, lead.email) }}
+                                            <button key={t.key} onClick={() => { onActivityTypeChange(t.key); openContactChannel(t.key, lead.phone, lead.email, lead) }}
                                                 className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border transition-all"
                                                 style={activityType === t.key
                                                     ? { background: t.color, color: "#fff", borderColor: t.color }

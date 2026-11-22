@@ -3328,3 +3328,109 @@ model WorkTaskComment {
 
   @@index([taskId])
 }
+
+/// Call Dialer: a sales prospect (company / contact we want as a client). Prod table: scripts/dialer.sql.
+model SalesLead {
+  id            String    @id @default(uuid())
+  leadNo        String    @unique
+  company       String?
+  contactName   String
+  designation   String?
+  phone         String
+  /// last 10 digits of phone, for matching calls
+  phoneKey      String
+  altPhone      String?
+  email         String?
+  city          String?
+  industry      String?
+  service       String?
+  source        String?
+  /// NEW | CONTACTED | INTERESTED | MEETING | PROPOSAL | WON | LOST
+  stage         String    @default("NEW")
+  expectedValue Float?
+  assignedTo    String?
+  nextFollowUp  DateTime?
+  lastCalledAt  DateTime?
+  lastOutcome   String?
+  callCount     Int       @default(0)
+  notes         String?
+  lostReason    String?
+  wonAt         DateTime?
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([phoneKey])
+  @@index([assignedTo, stage])
+  @@index([nextFollowUp])
+}
+
+/// A phone paired to a login with the Growus Dialer app. The app authenticates with a device token (only its hash is stored).
+model DialerDevice {
+  id          String    @id @default(uuid())
+  userId      String
+  tokenHash   String    @unique
+  deviceName  String?
+  simNumber   String?
+  appVersion  String?
+  active      Boolean   @default(true)
+  lastSeenAt  DateTime?
+  lastSyncAt  DateTime?
+  onCall      Boolean   @default(false)
+  onCallSince DateTime?
+  callPhone   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, active])
+}
+
+/// "Call" clicked in the ERP: the user's paired phone picks it up and dials.
+model DialRequest {
+  id         String    @id @default(uuid())
+  userId     String
+  phone      String
+  /// SALES_LEAD | CANDIDATE | EMPLOYEE | UNKNOWN
+  targetType String    @default("UNKNOWN")
+  targetId   String?
+  targetName String?
+  /// PENDING | DIALING | DONE | FAILED | CANCELLED | EXPIRED
+  status     String    @default("PENDING")
+  deviceId   String?
+  pickedAt   DateTime?
+  callLogId  String?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, status, createdAt])
+}
+
+/// One call from a paired phone's call log (outgoing, incoming or missed), matched to a sales lead, candidate or employee.
+model CallLog {
+  id            String    @id @default(uuid())
+  userId        String
+  deviceId      String?
+  /// userId:startedAt(ms):phoneKey — the same call synced twice is stored once
+  callKey       String    @unique
+  phone         String
+  phoneKey      String
+  /// OUTGOING | INCOMING | MISSED | REJECTED
+  direction     String
+  connected     Boolean   @default(false)
+  startedAt     DateTime
+  durationSec   Int       @default(0)
+  targetType    String    @default("UNKNOWN")
+  targetId      String?
+  targetName    String?
+  dialRequestId String?
+  outcome       String?
+  notes         String?
+  followUpAt    DateTime?
+  /// CALL_LOG (synced from phone) | MANUAL
+  source        String    @default("CALL_LOG")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId, startedAt])
+  @@index([startedAt])
+  @@index([targetType, targetId])
+  @@index([phoneKey])
+}
