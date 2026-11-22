@@ -18,6 +18,7 @@ import crypto from "crypto"
 import { recordSiteChange, actorOf } from "@/lib/site-history"
 import { accessFrom } from "@/lib/access"
 import { getChecklistSettings } from "@/lib/onboarding-checklist-server"
+import { applyAutoRoleSafe } from "@/lib/auto-role-server"
 import { assertCanAssignRole, RuleError } from "@/lib/role-rules"
 
 type Sv = string | number | undefined
@@ -344,6 +345,7 @@ export async function POST(req: Request) {
                 await prisma.onboardingRecord.create({ data: { employeeId: newEmp.id, status: "IN_PROGRESS", startedAt: new Date() } }).catch(e => console.error("[IMPORT_ONBOARDING_RECORD]", e))
             }
 
+            if (newEmp) await applyAutoRoleSafe(newEmp.id, { reason: "bulk import", actor: { id: session!.user.id, name: session!.user.name ?? null } })
             let warning: string | undefined
 
             // Site deployment

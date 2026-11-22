@@ -4,6 +4,7 @@ import { guard, auditLater, requestMeta, employeeScope, hiddenFields, maskValue 
 import { computeQuality, savePeopleSettings } from "@/lib/people-quality-server"
 import { dupKey, FIXABLE, Q_FIELD } from "@/lib/people-quality"
 import { normalizeEmploymentType } from "@/lib/employment-type"
+import { applyAutoRoleSafe } from "@/lib/auto-role-server"
 import { resolveManagerId } from "@/lib/employee-manager"
 
 export const dynamic = "force-dynamic"
@@ -57,6 +58,7 @@ export async function PATCH(req: Request) {
     }
 
     await prisma.employee.update({ where: { id: emp.id }, data: { [field]: value } as any })
+    if (field === "designation" && value !== emp.designation) await applyAutoRoleSafe(emp.id, { oldDesignation: emp.designation ?? null, reason: `designation changed to ${value ?? "—"}`, actor: { id: g.access.userId, name: g.access.name } })
     const sensitive = ["aadharNumber", "panNumber", "bankAccountNumber", "uan", "pfNumber", "esiNumber"].includes(field)
     auditLater({
         actorId: g.access.userId, actorName: g.access.name, action: "employee.quality_fix", targetType: "Employee", targetId: emp.id,

@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma"
 import { NO_PASSWORD } from "@/lib/credentials"
 import { validateDateOfBirth, validateJoiningAge } from "@/lib/validation"
 import { getChecklistSettings } from "@/lib/onboarding-checklist-server"
+import { applyAutoRoleSafe } from "@/lib/auto-role-server"
 import { recordSiteChange, actorOf } from "@/lib/site-history"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -225,6 +226,7 @@ export async function POST(req: Request) {
                 },
             })
 
+            await applyAutoRoleSafe(employee.id, { reason: "CLMS import", actor: { id: session!.user.id, name: session!.user.name ?? null } })
             // Create OnboardingRecord
             await prisma.onboardingRecord.create({
                 data: {

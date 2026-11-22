@@ -7,6 +7,7 @@ import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
 import { checkAccess } from "@/lib/permissions"
 import { resetLogin } from "@/lib/login-security"
 import { accessFrom, auditLater, requestMeta, bumpAccessVersion } from "@/lib/access"
+import { applyAutoRoleSafe } from "@/lib/auto-role-server"
 import { assertCanAssignRole, assertKeepsAnAdmin, assertMayChangeLogin, RuleError } from "@/lib/role-rules"
 
 // Update (or create) the login for a single employee: login id, role, status.
@@ -89,6 +90,7 @@ export async function PATCH(
                 },
             })
             await prisma.employee.update({ where: { id: employee.id }, data: { userId: user.id } })
+            await applyAutoRoleSafe(employee.id, { reason: "login created" })
             auditLater({ actorId: access.userId, actorName: access.name, action: "user.create", targetType: "User", targetId: user.id, targetName: user.name, summary: `${user.name}: login created from Employee Logins`, after: { role: customRoleId || null, status: user.isActive ? "Active" : "Disabled" }, ...meta })
             return NextResponse.json({ created: true, email })
         }

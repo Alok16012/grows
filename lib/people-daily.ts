@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import { notifyApprovers } from "@/lib/hr-notify"
 import { applyDueMovements } from "@/lib/employee-movement"
 import { runDueLetters } from "@/lib/letter-schedule-server"
+import { assignMissingRoles } from "@/lib/auto-role-server"
 import { remindWaitingJoiners } from "@/lib/join-server"
 
 export async function runPeopleDaily(now = new Date()) {
@@ -14,5 +15,7 @@ export async function runPeopleDaily(now = new Date()) {
     let letters: Awaited<ReturnType<typeof runDueLetters>> | { error: string }
     try { letters = await runDueLetters(now) } catch (e) { console.error("[PEOPLE_DAILY_LETTERS]", e); letters = { error: "letters failed" } }
     const joinersWaiting = await remindWaitingJoiners(now).catch(e => { console.error("[PEOPLE_DAILY_JOINERS]", e); return -1 })
-    return { applied, waiting, letters, joinersWaiting }
+    // Safety net: any login still without a role gets its designation's role.
+    const rolesGiven = await assignMissingRoles().catch(e => { console.error("[PEOPLE_DAILY_ROLES]", e); return -1 })
+    return { applied, waiting, letters, joinersWaiting, rolesGiven }
 }

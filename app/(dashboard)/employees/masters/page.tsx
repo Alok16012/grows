@@ -48,6 +48,7 @@ export default function MastersPage() {
                 <Link href="/employees" className="inline-flex items-center gap-1 text-[12.5px] text-[var(--text3)] hover:text-[var(--text)]"><ArrowLeft className="h-3.5 w-3.5" /> Employees</Link>
                 <h1 className="text-[22px] font-bold text-[var(--text)] mt-1">Employee masters</h1>
                 <p className="text-[12.5px] text-[var(--text3)]">{d.raw.length} designation spellings in use · {d.master.length} standard · {d.noDepartment} active employees without a department · {mixedTypes.reduce((s, t) => s + t.count, 0)} with an old employment-type spelling</p>
+                <p className="text-[12.5px] mt-1"><Link href="/employees/roles" className="text-[var(--accent)] font-semibold">Login role for each designation →</Link></p>
             </div>
             <div className="flex gap-1 border-b border-[var(--border)]">
                 {([["designations", "Designations"], ["departments", "Departments"], ["types", "Employment types"]] as const).map(([k, l]) => (

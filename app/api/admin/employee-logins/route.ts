@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { buildLoginEmail, hasOwnPassword, NO_PASSWORD } from "@/lib/credentials"
+import { applyAutoRoleSafe } from "@/lib/auto-role-server"
 import { checkAccess } from "@/lib/permissions"
 
 // Bulk login generation writes to Supabase in a loop; give it the max
@@ -169,6 +170,7 @@ export async function POST() {
                     },
                 })
                 await prisma.employee.update({ where: { id: e.id }, data: { userId: user.id } })
+                await applyAutoRoleSafe(e.id, { reason: "login created" })
                 created++
             } catch (err) {
                 console.error("BULK_LOGIN_FAIL", e.id, err)

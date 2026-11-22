@@ -7,6 +7,7 @@ import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
 import { generateEmployeeCode } from "@/lib/employee-code"
 import { approvalGate } from "@/lib/onboarding-checklist-server"
 
+import { applyAutoRoleSafe } from "@/lib/auto-role-server"
 import { accessFrom, maskEmployee, lockedFieldNames, auditLater } from "@/lib/access"
 
 // Provision a login (User account) for an approved employee if they don't have
@@ -174,6 +175,8 @@ export async function PUT(
             })
 
             const _login = await ensureLogin(onboardingRecord.employeeId)
+            // Login role from the designation (People → Masters → Login roles).
+            await applyAutoRoleSafe(onboardingRecord.employeeId, { reason: "onboarding approved", actor: { id: session.user.id, name: session.user.name ?? null } })
 
             const record = await prisma.onboardingRecord.update({
                 where: { id: params.id },

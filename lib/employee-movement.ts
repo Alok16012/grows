@@ -5,6 +5,7 @@
 import prisma from "@/lib/prisma"
 import { recordSiteChange } from "@/lib/site-history"
 import { standardDesignation } from "@/lib/people-masters-server"
+import { applyAutoRoleSafe } from "@/lib/auto-role-server"
 import { assignAfterEmployeeChange } from "@/lib/lms-auto"
 
 export type MoveValues = { siteId?: string | null; designation?: string | null; departmentId?: string | null; managerId?: string | null }
@@ -36,6 +37,7 @@ export async function applyMovement(id: string, actor: { id: string | null; name
     }
     await prisma.employeeMovement.update({ where: { id }, data: { status: "APPLIED", appliedAt: new Date(), fromValues: before as any } })
     if (data.designation || data.departmentId || to.siteId) await assignAfterEmployeeChange([m.employeeId], actor.id).catch(() => {})
+    if (data.designation && data.designation !== before.designation) await applyAutoRoleSafe(m.employeeId, { oldDesignation: before.designation, reason: `${m.type.toLowerCase()} to ${data.designation}`, actor })
     return true
 }
 

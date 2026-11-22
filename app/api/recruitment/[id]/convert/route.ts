@@ -14,6 +14,7 @@ import {
 } from "@/lib/validation"
 import { Role } from "@prisma/client"
 import crypto from "crypto"
+import { applyAutoRoleSafe } from "@/lib/auto-role-server"
 import { recordSiteChange, actorOf } from "@/lib/site-history"
 
 // POST /api/recruitment/[id]/convert
@@ -278,6 +279,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             })
             recordSiteChange({ action: "deployment.assign", employeeId: employee.id, siteId: targetSiteId, startDate: deployStart, source: "Recruitment", ...actorOf(session), req })
         }
+
+        await applyAutoRoleSafe(employee.id, { reason: "candidate converted", actor: { id: session.user.id, name: session.user.name ?? null } })
 
         // ── Mark lead as converted ────────────────────────────────────────────
         await prisma.lead.update({

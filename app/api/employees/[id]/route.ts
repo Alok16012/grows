@@ -18,6 +18,7 @@ import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
 import { pickPhotoUrl } from "@/lib/employee-photo"
 import { recordSiteChange, recordSiteChanges, actorOf } from "@/lib/site-history"
 import { getChecklistSettings, missingRequiredDocs } from "@/lib/onboarding-checklist-server"
+import { applyAutoRoleSafe } from "@/lib/auto-role-server"
 import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar, validatePAN,
@@ -206,6 +207,7 @@ export async function PUT(
         if (bankName !== undefined) updateData.bankName = bankName
         if (photo !== undefined) updateData.photo = photo
         // People → Masters: the standard spelling when the designation list knows it.
+        const oldDesignation = designation !== undefined ? (await prisma.employee.findUnique({ where: { id: params.id }, select: { designation: true } }))?.designation ?? null : undefined
         if (designation !== undefined) updateData.designation = await standardDesignation(designation)
         if (departmentId !== undefined) updateData.departmentId = departmentId || null
         if (branchId !== undefined) updateData.branchId = branchId || null
@@ -483,6 +485,11 @@ export async function PUT(
 
         // A new designation / department / branch can bring new required courses.
         if (designation !== undefined || departmentId !== undefined || branchId !== undefined) await assignAfterEmployeeChange([employee.id], session?.user?.id ?? null)
+        // A new designation moves the login to that designation's role — unless this
+        // same save set a role by hand (People → Masters → Login roles).
+        if (designation !== undefined && updateData.designation !== oldDesignation && !roleChanges) {
+            await applyAutoRoleSafe(employee.id, { oldDesignation, reason: `designation changed to ${updateData.designation ?? "—"}`, actor: { id: session?.user?.id ?? null, name: session?.user?.name ?? null } })
+        }
 
         return NextResponse.json({ ...maskEmployee(employee, access), ...(pendingApproval.length ? { pendingApproval } : {}) })
     } catch (error) {
