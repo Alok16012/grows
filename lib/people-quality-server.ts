@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma"
 import { employeeScope, hiddenFields, type Access } from "@/lib/access"
 import { postedSites } from "@/lib/attendance-guard"
-import { checkEmployee, dupKey, Q_FIELDS, sanitizePeopleSettings, type PeopleSettings } from "@/lib/people-quality"
+import { checkEmployee, dupKey, Q_FIELDS, sanitizePeopleSettings, VIRTUAL_FIELDS, DOC_FIELDS, type PeopleSettings } from "@/lib/people-quality"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { esicEligibilityBase, rulesForToday } from "@/lib/payroll-rules"
 import { statutoryFlagsFor } from "@/lib/employee-statutory"
@@ -23,7 +23,7 @@ export async function savePeopleSettings(input: unknown, userId: string): Promis
 }
 
 /** Computed, not columns. */
-const VIRTUAL = new Set(["salaryStructure"])
+const VIRTUAL = VIRTUAL_FIELDS
 const SELECT = Object.fromEntries([...Q_FIELDS.filter(f => !VIRTUAL.has(f.key)).map(f => [f.key, true]), ["id", true], ["employeeId", true], ["firstName", true], ["lastName", true], ["status", true], ["isKycVerified", true], ["isHandicap", true]]) as Record<string, true>
 
 /**
@@ -85,6 +85,14 @@ export async function computeQuality(access: Access) {
         prisma.department.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
         payrollFacts(emps),
     ])
+    // Uploaded documents. A profile photo counts as the photo document.
+    const docRows = await prisma.employeeDocument.findMany({ where: { employeeId: { in: emps.map(e => e.id) } }, select: { employeeId: true, type: true } })
+    const docsOf = new Map<string, Set<string>>()
+    for (const r of docRows) docsOf.set(r.employeeId, new Set([...(docsOf.get(r.employeeId) ?? []), r.type.toUpperCase()]))
+    for (const e of emps) {
+        const have = docsOf.get(e.id) ?? new Set<string>()
+        for (const k of Object.keys(DOC_FIELDS)) e[`doc_${k}`] = have.has(k) || (k === "PHOTO" && !!e.photo) ? "On file" : null
+    }
     for (const e of emps) {
         const f = facts.get(e.id)
         e.salaryStructure = f?.hasSalary ? "Set" : null
@@ -124,6 +132,7 @@ export async function computeQuality(access: Access) {
             avgPct: rows.length ? Math.round(rows.reduce((s, r) => s + r.pct, 0) / rows.length) : 100,
             withMissing: rows.filter(r => r.issues.some(i => i.kind === "missing")).length,
             withInvalid: rows.filter(r => r.issues.some(i => i.kind === "invalid")).length,
+            employeesMissingDocs: rows.filter(r => r.issues.some(i => i.field.startsWith("doc_"))).length,
             duplicateGroups: duplicates.reduce((s, d) => s + d.groups.length, 0),
             kycNotVerified: rows.filter(r => !r.kycVerified).length,
             missingByField, invalidByField,

@@ -1006,6 +1006,12 @@ export default function ProfilePage() {
             setDesignation(d?.designation || "")
         }).catch(() => setIsEmployee(false))
     }, [])
+    // Notification links land on a tab: /profile?tab=letters, ?tab=documents, ?tab=assets …
+    useEffect(() => {
+        const t = new URLSearchParams(window.location.search).get("tab")
+        if (t && ["attendance", "documents", "letters", "onboarding", "payslip", "assets", "policies"].includes(t)) setActiveTab(t as typeof activeTab)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]

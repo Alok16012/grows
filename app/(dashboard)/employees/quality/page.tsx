@@ -8,14 +8,14 @@ import Link from "next/link"
 import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import { ArrowLeft, Bell, Download, Loader2, Settings2, X } from "lucide-react"
-import { Q_FIELDS, Q_FIELD, SELF_SERVICE_FIELDS, type PeopleSettings } from "@/lib/people-quality"
+import { Q_FIELDS, Q_FIELD, SELF_SERVICE_FIELDS, VIRTUAL_FIELDS, DOC_FIELDS, type DocField, type PeopleSettings } from "@/lib/people-quality"
 import { EMPLOYMENT_TYPES } from "@/lib/employment-type"
 
 type Issue = { field: string; label: string; kind: "missing" | "invalid"; message: string; locked: boolean }
 type Row = { id: string; code: string; name: string; employmentType: string; siteId: string | null; site: string | null; kycVerified: boolean; pct: number; esicNotNeeded: boolean; values: Record<string, any>; issues: Issue[]; duplicates: string[] }
 type Data = {
     settings: PeopleSettings; departments: { id: string; name: string }[]; locked: string[]; canEdit: boolean
-    summary: { total: number; complete: number; avgPct: number; withMissing: number; withInvalid: number; duplicateGroups: number; kycNotVerified: number; missingByField: Record<string, number>; invalidByField: Record<string, number> }
+    summary: { total: number; complete: number; avgPct: number; withMissing: number; withInvalid: number; employeesMissingDocs?: number; duplicateGroups: number; kycNotVerified: number; missingByField: Record<string, number>; invalidByField: Record<string, number> }
     bySite: { site: string; employees: number; avgPct: number; complete: number; issues: number }[]
     employees: Row[]
     duplicates: { field: string; label: string; groups: { employees: { id: string; code: string; name: string; status: string }[] }[] }[]
@@ -47,7 +47,7 @@ export default function DataQualityPage() {
             (!t || r.name.toLowerCase().includes(t) || r.code.toLowerCase().includes(t))
             && (!site || (r.site ?? "No site") === site)
             && (!etype || r.employmentType === etype || (etype === "Full-time" && /full/i.test(r.employmentType)) || (etype === "Contract" && /contract/i.test(r.employmentType)))
-            && (!field || r.issues.some(i => i.field === field) || (field === "__dup" && r.duplicates.length > 0))
+            && (!field || r.issues.some(i => i.field === field) || (field === "__dup" && r.duplicates.length > 0) || (field === "__docs" && r.issues.some(i => i.field.startsWith("doc_"))))
             && (!kind || (kind === "dup" ? r.duplicates.length > 0 : kind === "kyc" ? !r.kycVerified : r.issues.some(i => i.kind === kind)))
             && (kind || field || r.issues.length || r.duplicates.length))
     }, [d, q, site, etype, field, kind])
@@ -88,6 +88,7 @@ Each one sees only the fields missing from their own record. People reminded rec
         ["Wrong format", s.withInvalid, "employees", () => { setTab("employees"); setKind("invalid"); setField("") }],
         ["Duplicates", s.duplicateGroups, "shared Aadhaar / PAN / UAN …", () => setTab("duplicates")],
         ["KYC not verified", s.kycNotVerified, "employees", () => { setTab("employees"); setKind("kyc"); setField("") }],
+        ...(d.settings.requiredDocs.length ? [["Documents missing", s.employeesMissingDocs ?? 0, "Aadhaar / PAN / photo / bank proof", () => { setTab("employees"); setKind("missing"); setField("__docs") }] as [string, number, string, () => void]] : []),
         ...(d.settings.requireSalary ? [["No salary structure", s.missingByField.salaryStructure ?? 0, "payroll can't pay them", () => { setTab("employees"); setKind(""); setField("salaryStructure") }] as [string, number, string, () => void]] : []),
     ]
     return (
@@ -125,7 +126,7 @@ Each one sees only the fields missing from their own record. People reminded rec
                         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name or code" className={`${box} flex-1 min-w-[180px]`} />
                         <select value={site} onChange={e => setSite(e.target.value)} className={box} aria-label="Site"><option value="">All sites</option>{sites.map(x => <option key={x}>{x}</option>)}</select>
                         <select value={etype} onChange={e => setEtype(e.target.value)} className={box} aria-label="Employment type"><option value="">All types</option>{EMPLOYMENT_TYPES.map(x => <option key={x}>{x}</option>)}</select>
-                        <select value={field} onChange={e => setField(e.target.value)} className={box} aria-label="Field"><option value="">Any field</option>{Q_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}<option value="__dup">Any duplicate</option></select>
+                        <select value={field} onChange={e => setField(e.target.value)} className={box} aria-label="Field"><option value="">Any field</option>{Q_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}<option value="__docs">Any document missing</option><option value="__dup">Any duplicate</option></select>
                         <select value={kind} onChange={e => setKind(e.target.value)} className={box} aria-label="Problem"><option value="">Any problem</option><option value="missing">Missing</option><option value="invalid">Wrong format</option><option value="dup">Duplicate</option><option value="kyc">KYC not verified</option></select>
                         <span className="text-[12px] text-[var(--text3)]">{rows.length} employee(s)</span>
                     </div>
@@ -141,7 +142,9 @@ Each one sees only the fields missing from their own record. People reminded rec
                                         <td className={td}><Bar pct={r.pct} /></td>
                                         <td className={td}>
                                             <div className="flex flex-wrap gap-1">
-                                                {r.issues.map((i, k) => i.field === "salaryStructure" ? (
+                                                {r.issues.map((i, k) => i.field.startsWith("doc_") ? (
+                                                    <Link key={k} href={`/employees?id=${r.id}`} title="Upload it on the employee's Documents, or send a reminder so they upload it in My Profile" className="px-2 py-0.5 rounded-full text-[11.5px] font-medium border bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100">{i.label.replace(" (upload)", "")} missing →</Link>
+                                                ) : i.field === "salaryStructure" ? (
                                                     <Link key={k} href="/payroll/salary-master" title="Set it in Payroll → Salary master" className="px-2 py-0.5 rounded-full text-[11.5px] font-medium border bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100">Salary structure missing →</Link>
                                                 ) : (
                                                     <button key={k} disabled={!d.canEdit || i.locked || i.field === "photo"} onClick={() => setFix({ row: r, issue: i })} title={i.locked ? "You can't see this field" : i.field === "photo" ? "Add the photo on the employee's profile" : i.message}
@@ -283,13 +286,14 @@ function SettingsModal({ settings, canEdit, onClose, onSaved }: { settings: Peop
     const [dups, setDups] = useState(settings.duplicatesAmong)
     const [esicOnly, setEsicOnly] = useState(settings.esicOnlyEligible)
     const [needSalary, setNeedSalary] = useState(settings.requireSalary)
+    const [docsReq, setDocsReq] = useState<DocField[]>(settings.requiredDocs)
     const [cooldown, setCooldown] = useState(String(settings.reminderCooldownHours))
     const [busy, setBusy] = useState(false)
     const toggle = (t: string, k: string) => setReq(r => ({ ...r, [t]: r[t].includes(k) ? r[t].filter(x => x !== k) : [...r[t], k] }))
     async function save() {
         setBusy(true)
         try {
-            const r = await fetch("/api/employees/quality", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...settings, required: req, duplicatesAmong: dups, esicOnlyEligible: esicOnly, requireSalary: needSalary, reminderCooldownHours: Number(cooldown) }) })
+            const r = await fetch("/api/employees/quality", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...settings, requiredDocs: docsReq, required: req, duplicatesAmong: dups, esicOnlyEligible: esicOnly, requireSalary: needSalary, reminderCooldownHours: Number(cooldown) }) })
             if (!r.ok) throw new Error("Could not save")
             toast.success("Settings saved"); onSaved()
         } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
@@ -301,7 +305,7 @@ function SettingsModal({ settings, canEdit, onClose, onSaved }: { settings: Peop
                 <table className="w-full">
                     <thead><tr><th className={th}>Field</th>{types.map(t => <th key={t} className={`${th} !text-center`}>{t === "default" ? "Other types" : t}</th>)}</tr></thead>
                     <tbody>
-                        {Q_FIELDS.filter(f => f.key !== "salaryStructure").map(f => (
+                        {Q_FIELDS.filter(f => !VIRTUAL_FIELDS.has(f.key)).map(f => (
                             <tr key={f.key}><td className={td}>{f.label} <span className="text-[11px] text-[var(--text3)]">{f.group}</span></td>
                                 {types.map(t => <td key={t} className={`${td} text-center`}><input type="checkbox" disabled={!canEdit} checked={req[t].includes(f.key)} onChange={() => toggle(t, f.key)} aria-label={`${f.label} required for ${t}`} /></td>)}
                             </tr>
@@ -313,6 +317,7 @@ function SettingsModal({ settings, canEdit, onClose, onSaved }: { settings: Peop
             <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" disabled={!canEdit} checked={needSalary} onChange={e => setNeedSalary(e.target.checked)} /> Every employee needs a salary structure <span className="text-[11.5px] text-[var(--text3)]">(Payroll → Salary master)</span></label>
             <label className="flex items-center gap-2 text-[13px]">Remind the same employee again after
                 <input type="number" min={0} max={720} disabled={!canEdit} value={cooldown} onChange={e => setCooldown(e.target.value)} className={`${box} w-20`} aria-label="Reminder cooldown in hours" /> hours</label>
+            <div className="text-[13px]"><p className="mb-1">Documents every employee must have uploaded:</p><div className="flex flex-wrap gap-x-4 gap-y-1">{(Object.keys(DOC_FIELDS) as DocField[]).map(k => <label key={k} className="flex items-center gap-1.5"><input type="checkbox" disabled={!canEdit} checked={docsReq.includes(k)} onChange={e => setDocsReq(x => e.target.checked ? [...x, k] : x.filter(y => y !== k))} /> {DOC_FIELDS[k]}</label>)}</div><p className="text-[11.5px] text-[var(--text3)] mt-0.5">A profile photo counts as the photo.</p></div>
             <label className="flex items-center gap-2 text-[13px]">Look for duplicates among
                 <select disabled={!canEdit} value={dups} onChange={e => setDups(e.target.value as PeopleSettings["duplicatesAmong"])} className={box}><option value="active">active employees</option><option value="all">everyone, including leavers</option></select>
             </label>

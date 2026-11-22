@@ -41,7 +41,8 @@ export async function POST(req: Request) {
         const userId = userOf.get(r.id)
         if (!userId) { noLogin++; continue }
         if (recent.has(userId)) { cooling++; continue }
-        notes.push({ userId, type: TYPE, link: "/profile", title: "Please complete your profile", message: `HR needs these details from you: ${gaps.join(", ")}. Open My Profile to add them.` })
+        const docGap = r.issues.some(i => i.field.startsWith("doc_"))
+        notes.push({ userId, type: TYPE, link: docGap ? "/profile?tab=documents" : "/profile", title: "Please complete your profile", message: `HR needs these details from you: ${gaps.join(", ")}. Open My Profile to add them.` })
         sent++
     }
     if (notes.length) await prisma.notification.createMany({ data: notes })

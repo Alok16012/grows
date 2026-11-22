@@ -9,7 +9,7 @@ import { normalizeEmploymentType, EMPLOYMENT_TYPES } from "@/lib/employment-type
 export type QField = {
     key: string
     label: string
-    group: "Personal" | "Contact" | "KYC" | "Statutory" | "Bank" | "Employment"
+    group: "Personal" | "Contact" | "KYC" | "Statutory" | "Bank" | "Employment" | "Documents"
     type?: "text" | "date" | "select" | "manager" | "department"
     options?: string[]
     validate?: (v: string) => FieldError
@@ -47,14 +47,24 @@ export const Q_FIELDS: QField[] = [
     { key: "employmentType", label: "Employment type", group: "Employment", type: "select", options: [...EMPLOYMENT_TYPES] },
     // Set in Payroll → Salary master; required when settings.requireSalary is on.
     { key: "salaryStructure", label: "Salary structure", group: "Employment" },
+    // Uploaded KYC documents (EmployeeDocument); required per settings.requiredDocs.
+    { key: "doc_AADHAAR", label: "Aadhaar card (upload)", group: "Documents" },
+    { key: "doc_PAN", label: "PAN card (upload)", group: "Documents" },
+    { key: "doc_PHOTO", label: "Photo (upload)", group: "Documents" },
+    { key: "doc_BANK_DETAILS", label: "Bank passbook / cheque (upload)", group: "Documents" },
 ]
+/** Documents every employee should have on file (keys of settings.requiredDocs). */
+export const DOC_FIELDS = { AADHAAR: "Aadhaar card", PAN: "PAN card", PHOTO: "Photo", BANK_DETAILS: "Bank passbook / cheque" } as const
+export type DocField = keyof typeof DOC_FIELDS
+/** Computed by the server, not employee columns. */
+export const VIRTUAL_FIELDS = new Set(["salaryStructure", ...Object.keys(DOC_FIELDS).map(k => `doc_${k}`)])
 export const Q_FIELD = new Map(Q_FIELDS.map(f => [f.key, f]))
 /** Fields set somewhere else: the photo on the profile, the salary in the salary master. */
-export const NOT_FIXABLE_HERE = new Set(["photo", "salaryStructure"])
+export const NOT_FIXABLE_HERE = new Set(["photo", ...VIRTUAL_FIELDS])
 /** Fields the data-quality fix may write. */
 export const FIXABLE = new Set(Q_FIELDS.filter(f => !NOT_FIXABLE_HERE.has(f.key)).map(f => f.key))
 /** Fields the employee can fill in My Profile (a reminder can ask them to). */
-export const SELF_SERVICE_FIELDS = ["photo", "address", "pincode", "permanentAddress", "emergencyContact1Name", "emergencyContact1Phone", "bloodGroup", "maritalStatus", "email"]
+export const SELF_SERVICE_FIELDS = ["doc_AADHAAR", "doc_PAN", "doc_PHOTO", "doc_BANK_DETAILS", "photo", "address", "pincode", "permanentAddress", "emergencyContact1Name", "emergencyContact1Phone", "bloodGroup", "maritalStatus", "email"]
 
 export type PeopleSettings = {
     /** Required fields per employment type; "default" for any type not listed. */
@@ -65,6 +75,8 @@ export type PeopleSettings = {
     esicOnlyEligible: boolean
     /** Every employee needs a salary structure (basic above zero). */
     requireSalary: boolean
+    /** Documents every employee must have uploaded. */
+    requiredDocs: DocField[]
     /** Hours before the same employee can be reminded again to complete their profile. */
     reminderCooldownHours: number
     approval: {
@@ -89,6 +101,7 @@ export const DEFAULT_PEOPLE_SETTINGS: PeopleSettings = {
     duplicatesAmong: "active",
     esicOnlyEligible: true,
     requireSalary: true,
+    requiredDocs: ["AADHAAR", "PAN", "PHOTO", "BANK_DETAILS"],
     reminderCooldownHours: 24,
     approval: {
         fields: ["bankAccountNumber", "bankIFSC", "bankName", "panNumber", "aadharNumber", "nameAsPerAadhar", "uan", "pfNumber", "esiNumber", "firstName", "lastName", "dateOfBirth"],
@@ -102,7 +115,7 @@ export function sanitizePeopleSettings(v: any): PeopleSettings {
     const src = v?.required && typeof v.required === "object" ? v.required : d.required
     for (const [type, list] of Object.entries(src as Record<string, unknown>)) {
         if (type !== "default" && !(EMPLOYMENT_TYPES as readonly string[]).includes(type)) continue
-        if (Array.isArray(list)) required[type] = Array.from(new Set(list.filter((k): k is string => typeof k === "string" && Q_FIELD.has(k) && k !== "salaryStructure")))
+        if (Array.isArray(list)) required[type] = Array.from(new Set(list.filter((k): k is string => typeof k === "string" && Q_FIELD.has(k) && !VIRTUAL_FIELDS.has(k))))
     }
     if (!required.default) required.default = d.required.default
     const ap = v?.approval ?? {}
@@ -111,6 +124,7 @@ export function sanitizePeopleSettings(v: any): PeopleSettings {
         required, duplicatesAmong: v?.duplicatesAmong === "all" ? "all" : "active",
         esicOnlyEligible: typeof v?.esicOnlyEligible === "boolean" ? v.esicOnlyEligible : d.esicOnlyEligible,
         requireSalary: typeof v?.requireSalary === "boolean" ? v.requireSalary : d.requireSalary,
+        requiredDocs: Array.isArray(v?.requiredDocs) ? Array.from(new Set<DocField>(v.requiredDocs.filter((x: unknown): x is DocField => typeof x === "string" && x in DOC_FIELDS))) : d.requiredDocs,
         reminderCooldownHours: Number.isFinite(Number(v?.reminderCooldownHours)) && v?.reminderCooldownHours !== null && v?.reminderCooldownHours !== "" ? Math.min(720, Math.max(0, Math.round(Number(v.reminderCooldownHours)))) : d.reminderCooldownHours,
         approval: {
             fields: Array.isArray(ap.fields) ? Array.from(new Set(ap.fields.filter(okField))) : d.approval.fields,
@@ -124,7 +138,7 @@ export function sanitizePeopleSettings(v: any): PeopleSettings {
 export function requiredFor(s: PeopleSettings, employmentType: string | null | undefined): string[] {
     const t = normalizeEmploymentType(employmentType)
     const list = s.required[t] ?? s.required.default
-    return s.requireSalary ? [...list, "salaryStructure"] : list
+    return [...list, ...(s.requireSalary ? ["salaryStructure"] : []), ...s.requiredDocs.map(k => `doc_${k}`)]
 }
 
 const isBlank = (v: unknown) => v === null || v === undefined || (typeof v === "string" && v.trim() === "")
