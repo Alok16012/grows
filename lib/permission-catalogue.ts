@@ -62,6 +62,7 @@ export const MODULES: ModuleDef[] = [
     { key: "helpdesk",      label: "Helpdesk",                group: "Operations and analytics", actions: ["view", "create", "edit"] },
     { key: "reports",       label: "Analytics and reports",   group: "Operations and analytics", actions: ["view", "export"] },
 
+    { key: "company",       label: "Company profile and documents", group: "Configuration", actions: ["view", "create", "edit", "delete"] },
     { key: "departments",   label: "Departments",             group: "Configuration",  actions: ["view", "create", "edit", "delete"] },
     { key: "users",         label: "Users",                   group: "Configuration",  actions: ["view", "create", "edit", "export", "import"] },
     { key: "roles",         label: "Roles",                   group: "Configuration",  actions: ["view", "create", "edit", "delete"] },

@@ -3183,3 +3183,27 @@ model UserActivity {
 
   @@index([lastSeenAt])
 }
+
+/// Company profile → documents: the company's own registrations, licences, contracts …
+model CompanyDocument {
+  id         String    @id @default(uuid())
+  category   String
+  title      String
+  docNumber  String?
+  issuedOn   DateTime?
+  expiresOn  DateTime?
+  fileUrl    String
+  fileName   String
+  notes      String?
+  /// EVERYONE (all logins) | STAFF (company.view) | RESTRICTED (company.edit)
+  visibility String    @default("STAFF")
+  version    Int       @default(1)
+  replacesId String?
+  isArchived Boolean   @default(false)
+  uploadedBy String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([category])
+  @@index([expiresOn])
+}

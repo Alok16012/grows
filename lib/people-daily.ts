@@ -9,6 +9,7 @@ import { assignMissingRoles } from "@/lib/auto-role-server"
 import { disableIdleLogins, alertFailures, remindReview } from "@/lib/access-centre-data"
 import { runExitDaily } from "@/lib/exit-flow"
 import { remindChallans } from "@/lib/challans"
+import { remindExpiringDocs } from "@/lib/company-profile-server"
 import { remindWaitingJoiners } from "@/lib/join-server"
 
 export async function runPeopleDaily(now = new Date()) {
@@ -20,11 +21,13 @@ export async function runPeopleDaily(now = new Date()) {
     const joinersWaiting = await remindWaitingJoiners(now).catch(e => { console.error("[PEOPLE_DAILY_JOINERS]", e); return -1 })
     // Safety net: any login still without a role gets its designation's role.
     const rolesGiven = await assignMissingRoles().catch(e => { console.error("[PEOPLE_DAILY_ROLES]", e); return -1 })
+    // Company documents expiring.
+    const companyDocs = await remindExpiringDocs(now).catch(e => { console.error("[PEOPLE_DAILY_COMPANY_DOCS]", e); return -1 })
     // Statutory challans due soon / overdue.
     const challans = await remindChallans(now).catch(e => { console.error("[PEOPLE_DAILY_CHALLANS]", e); return -1 })
     // Exits: leave on the last working day; clearance ticks itself.
     const exits = await runExitDaily(now).catch(e => { console.error("[PEOPLE_DAILY_EXITS]", e); return null })
     // Access centre: idle logins, failed sign-in alerts, access review reminder.
     const access = await Promise.all([disableIdleLogins(now), alertFailures(now), remindReview(now)]).catch(e => { console.error("[PEOPLE_DAILY_ACCESS]", e); return null })
-    return { applied, waiting, letters, joinersWaiting, rolesGiven, access, exits, challans }
+    return { applied, waiting, letters, joinersWaiting, rolesGiven, access, exits, challans, companyDocs }
 }

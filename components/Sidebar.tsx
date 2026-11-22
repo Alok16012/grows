@@ -261,6 +261,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             title: "Settings",
             icon: SlidersHorizontal,
             links: [
+                { name: "Company Profile", href: "/company", group: "Organisation" },
                 { name: "Departments", href: "/departments", group: "Organisation" },
                 { name: "Wage Rule Book", href: "/admin/rule-book", group: "Organisation" },
                 { name: "System Users", href: "/admin/users", permissionAny: ["users.view", "users.manage"], group: "Users & Access" },
