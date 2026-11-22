@@ -11,6 +11,8 @@ export async function GET(req: Request) {
     const a = g.access
     return NextResponse.json({
         me: a.userId, name: a.name, canUse: canUse(a), canSeeTeam: canSeeTeam(a), canEditAny: canEditAny(a), canSales: canSales(a),
-        canExport: a.isAdmin || has(a, "dialer.export"), appUrl: (await getDialerSettings()).appUrl,
+        canExport: a.isAdmin || has(a, "dialer.export"),
+        // No link set in Settings → the APK served by the ERP itself.
+        appUrl: (await getDialerSettings()).appUrl || "/downloads/growus-dialer.apk",
     })
 }

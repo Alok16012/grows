@@ -42,7 +42,7 @@ export function SettingsPanel() {
                 <div className="grid sm:grid-cols-3 gap-3">
                     {n("minConnectedSec", "Connected if talk ≥ (seconds)", "Shorter calls count as not connected (voicemail, cut at once).")}
                     {n("idleAfterMin", "Idle after (minutes)", "Live view shows a caller as idle after this long without a call.")}
-                    <div><label className={lbl}>App download link</label><input disabled={!canEdit} className={`${box} w-full`} placeholder="https://…/growus-dialer.apk" value={s.appUrl} onChange={e => setS({ ...s, appUrl: e.target.value })} /><p className="text-[11px] text-[var(--text3)] mt-1">Shown on the My phone tab.</p></div>
+                    <div><label className={lbl}>App download link</label><input disabled={!canEdit} className={`${box} w-full`} placeholder="https://…/growus-dialer.apk" value={s.appUrl} onChange={e => setS({ ...s, appUrl: e.target.value })} /><p className="text-[11px] text-[var(--text3)] mt-1">Shown on the My phone tab. Leave empty to use the app served by the ERP (/downloads/growus-dialer.apk).</p></div>
                 </div>
                 <div className="mt-3 space-y-2 text-[13px]">
                     <label className="flex items-center gap-2"><input type="checkbox" disabled={!canEdit} checked={s.syncIncoming} onChange={e => setS({ ...s, syncIncoming: e.target.checked })} /> Sync incoming and missed calls too (outgoing calls always sync)</label>

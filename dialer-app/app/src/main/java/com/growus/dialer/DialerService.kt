@@ -14,7 +14,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
-import android.os.Looper
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
@@ -148,7 +147,7 @@ class DialerService : Service() {
                 stateCallback = cb
             } else {
                 @Suppress("DEPRECATION")
-                val l = object : PhoneStateListener(Looper.getMainLooper()) { @Deprecated("old API") override fun onCallStateChanged(state: Int, phoneNumber: String?) = onState(state) }
+                val l = object : PhoneStateListener() { @Deprecated("old API") override fun onCallStateChanged(state: Int, phoneNumber: String?) = onState(state) }
                 @Suppress("DEPRECATION")
                 tm.listen(l, PhoneStateListener.LISTEN_CALL_STATE)
                 stateCallback = l
