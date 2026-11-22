@@ -55,6 +55,16 @@ export type PeopleSettings = {
     required: Record<string, string[]>
     /** Flag duplicates of these fields across employees (active only, or everyone ever). */
     duplicatesAmong: "active" | "all"
+    approval: {
+        /** Fields whose changes need approval by someone else (People → Change requests). */
+        fields: string[]
+        /** The employee changing them in My Profile needs approval. */
+        selfService: boolean
+        /** HR changing them in the employee form needs a second person. */
+        hrChanges: boolean
+        /** Admins change them directly. */
+        adminBypass: boolean
+    }
 }
 
 const BASE_REQUIRED = ["dateOfBirth", "gender", "phone", "address", "aadharNumber", "panNumber", "bankAccountNumber", "bankIFSC", "designation", "departmentId", "managerId", "dateOfJoining", "emergencyContact1Phone", "photo"]
@@ -65,6 +75,10 @@ export const DEFAULT_PEOPLE_SETTINGS: PeopleSettings = {
         "Contract": [...BASE_REQUIRED, "uan", "esiNumber"],
     },
     duplicatesAmong: "active",
+    approval: {
+        fields: ["bankAccountNumber", "bankIFSC", "bankName", "panNumber", "aadharNumber", "nameAsPerAadhar", "uan", "pfNumber", "esiNumber", "firstName", "lastName", "dateOfBirth"],
+        selfService: true, hrChanges: false, adminBypass: true,
+    },
 }
 
 export function sanitizePeopleSettings(v: any): PeopleSettings {
@@ -76,7 +90,17 @@ export function sanitizePeopleSettings(v: any): PeopleSettings {
         if (Array.isArray(list)) required[type] = Array.from(new Set(list.filter((k): k is string => typeof k === "string" && Q_FIELD.has(k))))
     }
     if (!required.default) required.default = d.required.default
-    return { required, duplicatesAmong: v?.duplicatesAmong === "all" ? "all" : "active" }
+    const ap = v?.approval ?? {}
+    const okField = (k: unknown): k is string => typeof k === "string" && /^[a-zA-Z]{2,40}$/.test(k)
+    return {
+        required, duplicatesAmong: v?.duplicatesAmong === "all" ? "all" : "active",
+        approval: {
+            fields: Array.isArray(ap.fields) ? Array.from(new Set(ap.fields.filter(okField))) : d.approval.fields,
+            selfService: typeof ap.selfService === "boolean" ? ap.selfService : d.approval.selfService,
+            hrChanges: typeof ap.hrChanges === "boolean" ? ap.hrChanges : d.approval.hrChanges,
+            adminBypass: typeof ap.adminBypass === "boolean" ? ap.adminBypass : d.approval.adminBypass,
+        },
+    }
 }
 
 export function requiredFor(s: PeopleSettings, employmentType: string | null | undefined): string[] {

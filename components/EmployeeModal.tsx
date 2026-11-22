@@ -497,6 +497,9 @@ export function EmployeeModal({
                 throw new Error(msg)
             }
             const data = await res.json()
+            if (Array.isArray(data?.pendingApproval) && data.pendingApproval.length) {
+                toast.info(`${data.pendingApproval.join(", ")} sent for approval (People → Change requests). Everything else is saved.`, { duration: 7000 })
+            }
             const empId = data.id || existingId
 
             if (!draftEmpId && empId) setDraftEmpId(empId)

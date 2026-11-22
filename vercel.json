@@ -33,6 +33,10 @@
     {
       "path": "/api/cron/asset-daily",
       "schedule": "50 3 * * *"
+    },
+    {
+      "path": "/api/cron/people-daily",
+      "schedule": "55 18 * * *"
     }
   ]
 }

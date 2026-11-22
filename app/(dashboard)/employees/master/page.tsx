@@ -448,6 +448,10 @@ function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => v
                 })
             })
             if (!res.ok) throw new Error(await res.text())
+            const savedEmp = await res.clone().json().catch(() => ({}))
+            if (Array.isArray(savedEmp?.pendingApproval) && savedEmp.pendingApproval.length) {
+                toast.info(`${savedEmp.pendingApproval.join(", ")} sent for approval (People → Change requests). Everything else is saved.`, { duration: 7000 })
+            }
             if (statutoryDirty && statutory?.installed) {
                 const sr = await fetch(`/api/employees/${emp.id}/statutory`, {
                     method: "PUT",

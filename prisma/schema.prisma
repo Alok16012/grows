@@ -3107,3 +3107,45 @@ model EmployeeStatutoryChange {
   @@unique([employeeId, fromYear, fromMonth])
   @@index([employeeId])
 }
+
+/// A change to sensitive employee fields waiting for approval (People → Change
+/// requests). Made by HR or by the employee (My Profile). scripts/people-phase4.sql.
+model EmployeeChangeRequest {
+  id            String    @id @default(uuid())
+  requestNo     String    @unique // CR-0001
+  employeeId    String
+  requestedBy   String // userId
+  source        String    @default("HR") // HR | SELF
+  changes       Json      @default("[]") // [{ field, label, from, to }]
+  reason        String?
+  attachmentUrl String?
+  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED
+  decidedBy     String?
+  decidedAt     DateTime?
+  decisionNote  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+/// A transfer / promotion / designation, department or manager change with an
+/// effective date (People → Movements); applied on that date by the daily job.
+model EmployeeMovement {
+  id            String    @id @default(uuid())
+  employeeId    String
+  type          String // TRANSFER | PROMOTION | REDESIGNATION | DEPARTMENT | MANAGER
+  effectiveDate DateTime
+  fromValues    Json?
+  toValues      Json // { siteId?, designation?, departmentId?, managerId? }
+  status        String    @default("SCHEDULED") // SCHEDULED | APPLIED | CANCELLED
+  note          String?
+  createdBy     String?
+  appliedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@index([employeeId])
+  @@index([status, effectiveDate], map: "EmployeeMovement_due_idx")
+}

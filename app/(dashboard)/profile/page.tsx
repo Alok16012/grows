@@ -127,7 +127,10 @@ function MyDetailsTab() {
                 body: JSON.stringify(data),
             })
             if (!res.ok) throw new Error(await res.text())
-            toast.success("Details saved!")
+            const saved = await res.json().catch(() => ({}))
+            if (Array.isArray(saved?.pendingApproval) && saved.pendingApproval.length) {
+                toast.success(`Saved. ${saved.pendingApproval.join(", ")} will change once HR approves it.`, { duration: 7000 })
+            } else toast.success("Details saved!")
         } catch (e) {
             toast.error((e as Error).message || "Save failed")
         } finally { setSaving(false) }

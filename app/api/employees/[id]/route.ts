@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { holdForApproval, createChangeRequest } from "@/lib/employee-change"
 import { standardDesignation } from "@/lib/people-masters-server"
 import { assignAfterEmployeeChange } from "@/lib/lms-auto"
 import { normalizeEmploymentType } from "@/lib/employment-type"
@@ -351,9 +352,19 @@ export async function PUT(
             }
         }
 
+        // People → Change requests: sensitive fields wait for a second person when
+        // the setting says so (admins may be allowed straight through).
+        const current = await prisma.employee.findUnique({ where: { id: params.id } })
+        const { data: writeNow, held } = await holdForApproval(current ?? {}, updateData, { source: "HR", isAdmin: access.isAdmin })
+        let pendingApproval: string[] = []
+        if (held.length) {
+            await createChangeRequest({ employeeId: params.id, requestedBy: session.user.id, requesterName: session.user.name ?? "HR", source: "HR", changes: held })
+            pendingApproval = held.map(h => h.label)
+        }
+
         const employee = await prisma.employee.update({
             where: { id: params.id },
-            data: updateData,
+            data: writeNow,
         })
 
         if (isLeaving && leavingDate) {
@@ -459,7 +470,7 @@ export async function PUT(
         // A new designation / department / branch can bring new required courses.
         if (designation !== undefined || departmentId !== undefined || branchId !== undefined) await assignAfterEmployeeChange([employee.id], session?.user?.id ?? null)
 
-        return NextResponse.json(maskEmployee(employee, access))
+        return NextResponse.json({ ...maskEmployee(employee, access), ...(pendingApproval.length ? { pendingApproval } : {}) })
     } catch (error) {
         if (error instanceof RuleError) return NextResponse.json({ error: error.message }, { status: error.status })
         console.error("[EMPLOYEE_PUT]", error)

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { holdForApproval, createChangeRequest } from "@/lib/employee-change"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { pickPhotoUrl } from "@/lib/employee-photo"
@@ -119,9 +120,14 @@ export async function PATCH(req: Request) {
         }
     }
 
+    // Bank, PAN, Aadhaar, UAN, name … (People → Change requests settings) go to
+    // HR for approval instead of changing at once.
+    const { data: writeNow, held } = await holdForApproval(emp, data, { source: "SELF", isAdmin: false })
+    if (held.length) await createChangeRequest({ employeeId: emp.id, requestedBy: session.user.id, requesterName: session.user.name ?? "Employee", source: "SELF", changes: held, reason: typeof body?.changeReason === "string" ? body.changeReason.slice(0, 300) : null })
+
     const updated = await prisma.employee.update({
         where: { id: emp.id },
-        data,
+        data: writeNow,
     })
 
     // Keep User name in sync if firstName/lastName changed
@@ -132,5 +138,5 @@ export async function PATCH(req: Request) {
         })
     }
 
-    return NextResponse.json(ownRecord(updated))
+    return NextResponse.json({ ...ownRecord(updated), ...(held.length ? { pendingApproval: held.map(h => h.label) } : {}) })
 }
