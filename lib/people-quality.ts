@@ -45,16 +45,28 @@ export const Q_FIELDS: QField[] = [
     { key: "managerId", label: "Reporting manager", group: "Employment", type: "manager" },
     { key: "dateOfJoining", label: "Date of joining", group: "Employment", type: "date" },
     { key: "employmentType", label: "Employment type", group: "Employment", type: "select", options: [...EMPLOYMENT_TYPES] },
+    // Set in Payroll → Salary master; required when settings.requireSalary is on.
+    { key: "salaryStructure", label: "Salary structure", group: "Employment" },
 ]
 export const Q_FIELD = new Map(Q_FIELDS.map(f => [f.key, f]))
-/** Fields the data-quality fix may write (photo is uploaded on the profile). */
-export const FIXABLE = new Set(Q_FIELDS.filter(f => f.key !== "photo").map(f => f.key))
+/** Fields set somewhere else: the photo on the profile, the salary in the salary master. */
+export const NOT_FIXABLE_HERE = new Set(["photo", "salaryStructure"])
+/** Fields the data-quality fix may write. */
+export const FIXABLE = new Set(Q_FIELDS.filter(f => !NOT_FIXABLE_HERE.has(f.key)).map(f => f.key))
+/** Fields the employee can fill in My Profile (a reminder can ask them to). */
+export const SELF_SERVICE_FIELDS = ["photo", "address", "pincode", "permanentAddress", "emergencyContact1Name", "emergencyContact1Phone", "bloodGroup", "maritalStatus", "email"]
 
 export type PeopleSettings = {
     /** Required fields per employment type; "default" for any type not listed. */
     required: Record<string, string[]>
     /** Flag duplicates of these fields across employees (active only, or everyone ever). */
     duplicatesAmong: "active" | "all"
+    /** ESIC number only required when payroll would deduct ESIC (same limit and per-employee switch). */
+    esicOnlyEligible: boolean
+    /** Every employee needs a salary structure (basic above zero). */
+    requireSalary: boolean
+    /** Hours before the same employee can be reminded again to complete their profile. */
+    reminderCooldownHours: number
     approval: {
         /** Fields whose changes need approval by someone else (People → Change requests). */
         fields: string[]
@@ -75,6 +87,9 @@ export const DEFAULT_PEOPLE_SETTINGS: PeopleSettings = {
         "Contract": [...BASE_REQUIRED, "uan", "esiNumber"],
     },
     duplicatesAmong: "active",
+    esicOnlyEligible: true,
+    requireSalary: true,
+    reminderCooldownHours: 24,
     approval: {
         fields: ["bankAccountNumber", "bankIFSC", "bankName", "panNumber", "aadharNumber", "nameAsPerAadhar", "uan", "pfNumber", "esiNumber", "firstName", "lastName", "dateOfBirth"],
         selfService: true, hrChanges: false, adminBypass: true,
@@ -87,13 +102,16 @@ export function sanitizePeopleSettings(v: any): PeopleSettings {
     const src = v?.required && typeof v.required === "object" ? v.required : d.required
     for (const [type, list] of Object.entries(src as Record<string, unknown>)) {
         if (type !== "default" && !(EMPLOYMENT_TYPES as readonly string[]).includes(type)) continue
-        if (Array.isArray(list)) required[type] = Array.from(new Set(list.filter((k): k is string => typeof k === "string" && Q_FIELD.has(k))))
+        if (Array.isArray(list)) required[type] = Array.from(new Set(list.filter((k): k is string => typeof k === "string" && Q_FIELD.has(k) && k !== "salaryStructure")))
     }
     if (!required.default) required.default = d.required.default
     const ap = v?.approval ?? {}
     const okField = (k: unknown): k is string => typeof k === "string" && /^[a-zA-Z]{2,40}$/.test(k)
     return {
         required, duplicatesAmong: v?.duplicatesAmong === "all" ? "all" : "active",
+        esicOnlyEligible: typeof v?.esicOnlyEligible === "boolean" ? v.esicOnlyEligible : d.esicOnlyEligible,
+        requireSalary: typeof v?.requireSalary === "boolean" ? v.requireSalary : d.requireSalary,
+        reminderCooldownHours: Number.isFinite(Number(v?.reminderCooldownHours)) && v?.reminderCooldownHours !== null && v?.reminderCooldownHours !== "" ? Math.min(720, Math.max(0, Math.round(Number(v.reminderCooldownHours)))) : d.reminderCooldownHours,
         approval: {
             fields: Array.isArray(ap.fields) ? Array.from(new Set(ap.fields.filter(okField))) : d.approval.fields,
             selfService: typeof ap.selfService === "boolean" ? ap.selfService : d.approval.selfService,
@@ -105,16 +123,19 @@ export function sanitizePeopleSettings(v: any): PeopleSettings {
 
 export function requiredFor(s: PeopleSettings, employmentType: string | null | undefined): string[] {
     const t = normalizeEmploymentType(employmentType)
-    return s.required[t] ?? s.required.default
+    const list = s.required[t] ?? s.required.default
+    return s.requireSalary ? [...list, "salaryStructure"] : list
 }
 
 const isBlank = (v: unknown) => v === null || v === undefined || (typeof v === "string" && v.trim() === "")
 
 export type Issue = { field: string; label: string; kind: "missing" | "invalid"; message: string }
 
-/** Missing required fields and wrong formats for one employee. */
+/** Missing required fields and wrong formats for one employee.
+ *  `e.esicNotNeeded` (set by the server from payroll rules) drops the ESIC number
+ *  from the required list when settings.esicOnlyEligible is on. */
 export function checkEmployee(e: Record<string, any>, s: PeopleSettings): { issues: Issue[]; requiredCount: number; filled: number } {
-    const req = requiredFor(s, e.employmentType)
+    const req = requiredFor(s, e.employmentType).filter(k => !(k === "esiNumber" && s.esicOnlyEligible && e.esicNotNeeded === true))
     const issues: Issue[] = []
     let filled = 0
     for (const key of req) {

@@ -7,12 +7,12 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { createPortal } from "react-dom"
 import { toast } from "sonner"
-import { ArrowLeft, Download, Loader2, Settings2, X } from "lucide-react"
-import { Q_FIELDS, Q_FIELD, type PeopleSettings } from "@/lib/people-quality"
+import { ArrowLeft, Bell, Download, Loader2, Settings2, X } from "lucide-react"
+import { Q_FIELDS, Q_FIELD, SELF_SERVICE_FIELDS, type PeopleSettings } from "@/lib/people-quality"
 import { EMPLOYMENT_TYPES } from "@/lib/employment-type"
 
 type Issue = { field: string; label: string; kind: "missing" | "invalid"; message: string; locked: boolean }
-type Row = { id: string; code: string; name: string; employmentType: string; siteId: string | null; site: string | null; kycVerified: boolean; pct: number; values: Record<string, any>; issues: Issue[]; duplicates: string[] }
+type Row = { id: string; code: string; name: string; employmentType: string; siteId: string | null; site: string | null; kycVerified: boolean; pct: number; esicNotNeeded: boolean; values: Record<string, any>; issues: Issue[]; duplicates: string[] }
 type Data = {
     settings: PeopleSettings; departments: { id: string; name: string }[]; locked: string[]; canEdit: boolean
     summary: { total: number; complete: number; avgPct: number; withMissing: number; withInvalid: number; duplicateGroups: number; kycNotVerified: number; missingByField: Record<string, number>; invalidByField: Record<string, number> }
@@ -36,6 +36,7 @@ export default function DataQualityPage() {
     const [q, setQ] = useState(""), [site, setSite] = useState(""), [etype, setEtype] = useState(""), [field, setField] = useState(""), [kind, setKind] = useState("")
     const [fix, setFix] = useState<{ row: Row; issue: Issue } | null>(null)
     const [settingsOpen, setSettingsOpen] = useState(false)
+    const [reminding, setReminding] = useState(false)
     const load = useCallback(() => { fetch("/api/employees/quality").then(r => r.json()).then(setD).catch(() => toast.error("Couldn't load")) }, [])
     useEffect(() => { load() }, [load])
 
@@ -60,6 +61,24 @@ export default function DataQualityPage() {
         const buf = await wb.xlsx.writeBuffer(); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([buf])); a.download = `Employee_Data_Quality_${new Date().toISOString().slice(0, 10)}.xlsx`; a.click()
     }
 
+    // In-app reminder to the filtered employees who have gaps they can fill in My Profile.
+    const selfGap = (r: Row) => r.issues.some(i => SELF_SERVICE_FIELDS.includes(i.field))
+    async function remind() {
+        const targets = rows.filter(selfGap)
+        if (!targets.length) { toast.info("No one in this list has a gap they can fill themselves (photo, address, emergency contact …)"); return }
+        if (!confirm(`Send an in-app reminder to ${targets.length} employee(s) to complete My Profile?
+
+Each one sees only the fields missing from their own record. People reminded recently are skipped.`)) return
+        setReminding(true)
+        try {
+            const r = await fetch("/api/employees/quality/remind", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeIds: targets.map(x => x.id) }) })
+            const j = await r.json().catch(() => ({}))
+            if (!r.ok) throw new Error(j?.error || "Could not send")
+            const skipped = [j.noLogin && `${j.noLogin} without a login`, j.cooling && `${j.cooling} reminded in the last ${j.cooldownHours} h`].filter(Boolean).join(", ")
+            toast.success(`Reminder sent to ${j.sent} employee(s)${skipped ? ` — skipped ${skipped}` : ""}`)
+        } catch (e: any) { toast.error(e.message) } finally { setReminding(false) }
+    }
+
     if (!d) return <div className="p-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-[var(--text3)]" /></div>
     const s = d.summary
     const cards: [string, string | number, string, () => void][] = [
@@ -69,6 +88,7 @@ export default function DataQualityPage() {
         ["Wrong format", s.withInvalid, "employees", () => { setTab("employees"); setKind("invalid"); setField("") }],
         ["Duplicates", s.duplicateGroups, "shared Aadhaar / PAN / UAN …", () => setTab("duplicates")],
         ["KYC not verified", s.kycNotVerified, "employees", () => { setTab("employees"); setKind("kyc"); setField("") }],
+        ...(d.settings.requireSalary ? [["No salary structure", s.missingByField.salaryStructure ?? 0, "payroll can't pay them", () => { setTab("employees"); setKind(""); setField("salaryStructure") }] as [string, number, string, () => void]] : []),
     ]
     return (
         <div className="max-w-[1300px] mx-auto p-4 md:p-6 space-y-4">
@@ -78,12 +98,13 @@ export default function DataQualityPage() {
                     <h1 className="text-[22px] font-bold text-[var(--text)] mt-1">Employee data quality</h1>
                     <p className="text-[12.5px] text-[var(--text3)]">{s.total} active / onboarding employees. Click a gap to fix it here.</p>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={() => setSettingsOpen(true)} className="h-10 px-4 rounded-[10px] border border-[var(--border)] bg-white text-[13px] font-semibold text-[var(--text2)] inline-flex items-center gap-1.5"><Settings2 size={15} /> Required fields</button>
+                <div className="flex gap-2 flex-wrap">
+                    {d.canEdit && <button onClick={remind} disabled={reminding} title="In-app reminder to the employees in the list below to fill what they can in My Profile" className="h-10 px-4 rounded-[10px] border border-[var(--border)] bg-white text-[13px] font-semibold text-[var(--text2)] inline-flex items-center gap-1.5 disabled:opacity-50">{reminding ? <Loader2 size={15} className="animate-spin" /> : <Bell size={15} />} Remind to complete profile</button>}
+                    <button onClick={() => setSettingsOpen(true)} className="h-10 px-4 rounded-[10px] border border-[var(--border)] bg-white text-[13px] font-semibold text-[var(--text2)] inline-flex items-center gap-1.5"><Settings2 size={15} /> Settings</button>
                     <button onClick={exportXlsx} className="h-10 px-4 rounded-[10px] bg-[var(--accent)] text-white text-[13px] font-semibold inline-flex items-center gap-1.5"><Download size={15} /> Excel</button>
                 </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
                 {cards.map(([l, v, sub, go]) => (
                     <button key={l} onClick={go} className="text-left bg-white border border-[var(--border)] rounded-[12px] p-3 hover:border-[var(--accent)]">
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text3)]">{l}</p>
@@ -120,12 +141,15 @@ export default function DataQualityPage() {
                                         <td className={td}><Bar pct={r.pct} /></td>
                                         <td className={td}>
                                             <div className="flex flex-wrap gap-1">
-                                                {r.issues.map((i, k) => (
+                                                {r.issues.map((i, k) => i.field === "salaryStructure" ? (
+                                                    <Link key={k} href="/payroll/salary-master" title="Set it in Payroll → Salary master" className="px-2 py-0.5 rounded-full text-[11.5px] font-medium border bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100">Salary structure missing →</Link>
+                                                ) : (
                                                     <button key={k} disabled={!d.canEdit || i.locked || i.field === "photo"} onClick={() => setFix({ row: r, issue: i })} title={i.locked ? "You can't see this field" : i.field === "photo" ? "Add the photo on the employee's profile" : i.message}
                                                         className={`px-2 py-0.5 rounded-full text-[11.5px] font-medium border disabled:cursor-default ${i.kind === "missing" ? "bg-amber-50 text-amber-800 border-amber-200 enabled:hover:bg-amber-100" : "bg-red-50 text-red-700 border-red-200 enabled:hover:bg-red-100"}`}>
                                                         {i.kind === "missing" ? i.label : `${i.label}: wrong`}
                                                     </button>
                                                 ))}
+                                                {r.esicNotNeeded && d.settings.esicOnlyEligible && <span title="Above the ESIC limit in payroll settings, or ESIC switched off for them" className="px-2 py-0.5 rounded-full text-[11.5px] font-medium border bg-gray-50 text-gray-500 border-gray-200">ESIC not applicable</span>}
                                                 {r.duplicates.map(x => <span key={x} className="px-2 py-0.5 rounded-full text-[11.5px] font-medium border bg-violet-50 text-violet-700 border-violet-200">Duplicate {x}</span>)}
                                                 {!r.kycVerified && <span className="px-2 py-0.5 rounded-full text-[11.5px] font-medium border bg-gray-50 text-gray-600 border-gray-200">KYC not verified</span>}
                                             </div>
@@ -257,24 +281,27 @@ function SettingsModal({ settings, canEdit, onClose, onSaved }: { settings: Peop
     const types = ["default", ...EMPLOYMENT_TYPES]
     const [req, setReq] = useState<Record<string, string[]>>(() => Object.fromEntries(types.map(t => [t, settings.required[t] ?? settings.required.default])))
     const [dups, setDups] = useState(settings.duplicatesAmong)
+    const [esicOnly, setEsicOnly] = useState(settings.esicOnlyEligible)
+    const [needSalary, setNeedSalary] = useState(settings.requireSalary)
+    const [cooldown, setCooldown] = useState(String(settings.reminderCooldownHours))
     const [busy, setBusy] = useState(false)
     const toggle = (t: string, k: string) => setReq(r => ({ ...r, [t]: r[t].includes(k) ? r[t].filter(x => x !== k) : [...r[t], k] }))
     async function save() {
         setBusy(true)
         try {
-            const r = await fetch("/api/employees/quality", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ required: req, duplicatesAmong: dups }) })
+            const r = await fetch("/api/employees/quality", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...settings, required: req, duplicatesAmong: dups, esicOnlyEligible: esicOnly, requireSalary: needSalary, reminderCooldownHours: Number(cooldown) }) })
             if (!r.ok) throw new Error("Could not save")
-            toast.success("Required fields saved"); onSaved()
+            toast.success("Settings saved"); onSaved()
         } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
     }
     return (
-        <Shell title="Required fields" onClose={onClose} wide>
+        <Shell title="Data quality settings" onClose={onClose} wide>
             <p className="text-[12.5px] text-[var(--text3)]">Which fields each employment type must have. “Other types” applies to any type without its own column.</p>
             <div className="overflow-x-auto">
                 <table className="w-full">
                     <thead><tr><th className={th}>Field</th>{types.map(t => <th key={t} className={`${th} !text-center`}>{t === "default" ? "Other types" : t}</th>)}</tr></thead>
                     <tbody>
-                        {Q_FIELDS.map(f => (
+                        {Q_FIELDS.filter(f => f.key !== "salaryStructure").map(f => (
                             <tr key={f.key}><td className={td}>{f.label} <span className="text-[11px] text-[var(--text3)]">{f.group}</span></td>
                                 {types.map(t => <td key={t} className={`${td} text-center`}><input type="checkbox" disabled={!canEdit} checked={req[t].includes(f.key)} onChange={() => toggle(t, f.key)} aria-label={`${f.label} required for ${t}`} /></td>)}
                             </tr>
@@ -282,6 +309,10 @@ function SettingsModal({ settings, canEdit, onClose, onSaved }: { settings: Peop
                     </tbody>
                 </table>
             </div>
+            <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" disabled={!canEdit} checked={esicOnly} onChange={e => setEsicOnly(e.target.checked)} /> ESIC number required only when payroll deducts ESIC <span className="text-[11.5px] text-[var(--text3)]">(same limit and per-employee switch as payroll)</span></label>
+            <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" disabled={!canEdit} checked={needSalary} onChange={e => setNeedSalary(e.target.checked)} /> Every employee needs a salary structure <span className="text-[11.5px] text-[var(--text3)]">(Payroll → Salary master)</span></label>
+            <label className="flex items-center gap-2 text-[13px]">Remind the same employee again after
+                <input type="number" min={0} max={720} disabled={!canEdit} value={cooldown} onChange={e => setCooldown(e.target.value)} className={`${box} w-20`} aria-label="Reminder cooldown in hours" /> hours</label>
             <label className="flex items-center gap-2 text-[13px]">Look for duplicates among
                 <select disabled={!canEdit} value={dups} onChange={e => setDups(e.target.value as PeopleSettings["duplicatesAmong"])} className={box}><option value="active">active employees</option><option value="all">everyone, including leavers</option></select>
             </label>
