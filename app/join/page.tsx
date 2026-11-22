@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, createContext, useContext } from "react"
+import { tr, JOIN_LANGS, type JoinLang } from "@/lib/join-i18n"
+import { DEFAULT_JOIN_SETTINGS, type JoinSettings } from "@/lib/join-settings"
 import { COMPANY } from "@/lib/company"
 import {
     Loader2, CheckCircle2, Copy, Check, AlertCircle,
@@ -95,18 +97,27 @@ const inp: React.CSSProperties = {
 }
 const sel: React.CSSProperties = { ...inp, cursor: "pointer" }
 
-function Lbl({ text, required }: { text: string; required?: boolean }) {
+// Form language (English / Hindi / Marathi) — labels, section titles and
+// "Required" translate themselves from lib/join-i18n.
+const LangCtx = createContext<JoinLang>("en")
+
+function Lbl({ text: en, required }: { text: string; required?: boolean }) {
+    const text = tr(useContext(LangCtx), en)
     return (
         <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 5 }}>
             {text}{required && <span style={{ color: "var(--red)", marginLeft: 2 }}>*</span>}
         </div>
     )
 }
-function Err({ msg }: { msg?: string }) {
-    if (!msg) return null
+function Err({ msg: en }: { msg?: string }) {
+    const lang = useContext(LangCtx)
+    if (!en) return null
+    const msg = tr(lang, en)
     return <div data-field-error style={{ fontSize: 11, color: "var(--red)", marginTop: 3 }}>{msg}</div>
 }
-function SecTitle({ children }: { children: React.ReactNode }) {
+function SecTitle({ children: c }: { children: React.ReactNode }) {
+    const lang = useContext(LangCtx)
+    const children = typeof c === "string" ? tr(lang, c) : c
     return <div style={{ gridColumn: "1 / -1", fontSize: 11, fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.6px", paddingBottom: 6, borderBottom: "1px solid var(--border)", marginTop: 4 }}>{children}</div>
 }
 
@@ -142,6 +153,13 @@ export default function JoinPage() {
     // A Join link (?l=code) fixes the recruiter and, if set, the site / designation / type.
     const [link, setLink] = useState<{ code: string; siteId: string | null; designation: string | null; employmentType: string | null; closed: string | null } | null>(null)
     const startedRef = useRef(false)
+    // Which optional fields / documents are required, and the languages offered (Join link settings).
+    const [cfg, setCfg] = useState<JoinSettings["form"]>(DEFAULT_JOIN_SETTINGS.form)
+    const req = (k: JoinSettings["form"]["required"][number]) => cfg.required.includes(k)
+    const docReq = (type: string) => (cfg.docs as string[]).includes(type)
+    const [lang, setLangState] = useState<JoinLang>("en")
+    const T = (s: string) => tr(lang, s)
+    const setLang = (l: JoinLang) => { setLangState(l); try { localStorage.setItem("joinLang", l) } catch { /* private mode */ } }
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
@@ -165,6 +183,10 @@ export default function JoinPage() {
                 }
                 const opts: { designation: string; onboardingPolicies: number }[] = Array.isArray(d?.designations) ? d.designations : []
                 setDesignationOpts(opts)
+                if (d?.form) {
+                    setCfg(d.form)
+                    try { const saved = localStorage.getItem("joinLang") as JoinLang | null; if (saved && d.form.languages?.includes(saved)) setLangState(saved) } catch { /* private mode */ }
+                }
                 if (d?.link?.code) {
                     setLink(d.link)
                     if (d.link.siteId) set("siteId", d.link.siteId)
@@ -276,6 +298,8 @@ export default function JoinPage() {
             if (!form.pincode.trim())   e.pincode   = "Required"
             else put("pincode", validatePincode(form.pincode))
             put("permanentPincode", validatePincode(form.permanentPincode))
+            for (const k of ["email", "alternatePhone", "fathersName", "bloodGroup", "maritalStatus", "nameAsPerAadhar"] as const) if (req(k) && !String(form[k] ?? "").trim()) e[k] = "Required"
+            if (req("permanentAddress") && !form.sameAsCurrent && !form.permanentAddress.trim()) e.permanentAddress = "Required"
             if (!form.emergencyContact1Name.trim())  e.emergencyContact1Name  = "Required"
             if (!form.emergencyContact1Phone.trim()) e.emergencyContact1Phone = "Required"
             else put("emergencyContact1Phone", validatePhone(form.emergencyContact1Phone))
@@ -296,8 +320,11 @@ export default function JoinPage() {
             else put("bankIFSC", validateIFSC(form.bankIFSC))
             if (!form.aadharNumber.trim())      e.aadharNumber      = "Required"
             else put("aadharNumber", validateAadhaar(form.aadharNumber))
-            if (!form.panNumber.trim())         e.panNumber         = "Required"
+            if (!form.panNumber.trim()) { if (req("panNumber")) e.panNumber = "Required" }
             else put("panNumber", validatePAN(form.panNumber))
+            if (req("uan") && !form.uan.trim()) e.uan = "Required"
+            if (req("pfNumber") && !form.pfNumber.trim()) e.pfNumber = "Required"
+            if (req("esiNumber") && !form.esiNumber.trim()) e.esiNumber = "Required"
             put("uan", validateUAN(form.uan))
             put("pfNumber", validatePFNumber(form.pfNumber))
             put("esiNumber", validateESIC(form.esiNumber))
@@ -417,7 +444,7 @@ export default function JoinPage() {
         // onboarding token), so at this point a chosen file only has `file` set —
         // checking `url` here would always report every document as missing.
         const missingDocs = DOC_TYPES
-            .filter(d => d.required)
+            .filter(d => docReq(d.type))
             .filter(d => !docs.some(x => x.type === d.type && (x.file || x.url)))
         if (missingDocs.length > 0) {
             setTab("documents")
@@ -475,7 +502,7 @@ export default function JoinPage() {
             // upload needs the onboarding token), so without this the applicant
             // saw "You're all set" while HR received a profile with no KYC at
             // all. Keep them on the form so they can retry.
-            const requiredTypes = new Set(DOC_TYPES.filter(d => d.required).map(d => d.type))
+            const requiredTypes = new Set(DOC_TYPES.filter(d => docReq(d.type)).map(d => d.type))
             const failedRequired = filledDocs.filter(
                 (d, i) => !uploadResults[i] && requiredTypes.has(d.type)
             )
@@ -558,6 +585,7 @@ export default function JoinPage() {
     // ─────────────────────────────────────────────────────────────────────────
 
     return (
+        <LangCtx.Provider value={lang}>
         <div style={{ minHeight: "100vh", background: "var(--bg)", padding: "32px 16px" }}>
             <div style={{ width: "100%", maxWidth: 720, margin: "0 auto" }}>
 
@@ -570,8 +598,18 @@ export default function JoinPage() {
                             </svg>
                         </div>
                     </div>
-                    <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: "0 0 4px" }}>Employee Onboarding Form</h1>
-                    <p style={{ fontSize: 13, color: "var(--text2)", margin: 0 }}>Fill in your details carefully. Fields marked <span style={{ color: "var(--red)" }}>*</span> are required.</p>
+                    <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: "0 0 4px" }}>{T("Employee Onboarding Form")}</h1>
+                    <p style={{ fontSize: 13, color: "var(--text2)", margin: 0 }}>{T("Fill in your details carefully. Fields marked")} <span style={{ color: "var(--red)" }}>*</span> {T("are required.")}</p>
+                    {cfg.languages.length > 1 && (
+                        <div role="group" aria-label={T("Language")} style={{ display: "inline-flex", gap: 4, marginTop: 10, padding: 3, borderRadius: 99, border: "1px solid var(--border)", background: "var(--surface)" }}>
+                            {cfg.languages.map(l => (
+                                <button key={l} type="button" onClick={() => setLang(l)} aria-pressed={lang === l}
+                                    style={{ border: "none", borderRadius: 99, padding: "5px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", background: lang === l ? "var(--accent)" : "transparent", color: lang === l ? "#fff" : "var(--text2)" }}>
+                                    {JOIN_LANGS[l]}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     {link?.closed && <p role="alert" style={{ fontSize: 13, fontWeight: 600, color: "var(--red)", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 10, padding: "10px 12px", margin: "12px 0 0" }}>{link.closed}</p>}
                 </div>
 
@@ -592,7 +630,7 @@ export default function JoinPage() {
                                         ? <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:15, height:15, borderRadius:"50%", background:"var(--accent)", flexShrink:0 }}><Check size={9} color="white" /></span>
                                         : <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:15, height:15, borderRadius:"50%", background: active ? "var(--accent)" : "var(--border2)", fontSize:8, fontWeight:800, color: active ? "white" : "var(--text3)", flexShrink:0 }}>{i+1}</span>
                                     }
-                                    {t.label}
+                                    {T(t.label)}
                                 </button>
                             )
                         })}
@@ -615,7 +653,7 @@ export default function JoinPage() {
 
                                 {/* ── Work Site & HR — shown first ── */}
                                 <div style={{ padding: "16px", borderRadius: 14, background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)" }}>
-                                    <p style={{ fontSize: 11, fontWeight: 700, color: "#818cf8", textTransform: "uppercase", letterSpacing: "0.6px", margin: "0 0 12px" }}>Posting & Assignment</p>
+                                    <p style={{ fontSize: 11, fontWeight: 700, color: "#818cf8", textTransform: "uppercase", letterSpacing: "0.6px", margin: "0 0 12px" }}>{T("Posting & Assignment")}</p>
                                     <div style={{ ...g2 }}>
                                         <div>
                                             <Lbl text="Work Site" required />
@@ -720,21 +758,21 @@ export default function JoinPage() {
                                             <Err msg={errors.dateOfBirth} />
                                         </div>
                                         <div>
-                                            <Lbl text="Blood Group" />
+                                            <Lbl text="Blood Group" required={req("bloodGroup")} />
                                             <select style={sel} value={form.bloodGroup} onChange={e => set("bloodGroup", e.target.value)}>
                                                 <option value="">Select</option>
                                                 {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(b => <option key={b}>{b}</option>)}
                                             </select>
                                         </div>
                                         <div>
-                                            <Lbl text="Marital Status" />
+                                            <Lbl text="Marital Status" required={req("maritalStatus")} />
                                             <select style={sel} value={form.maritalStatus} onChange={e => set("maritalStatus", e.target.value)}>
                                                 <option value="">Select</option>
                                                 <option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option>
                                             </select>
                                         </div>
                                         <div>
-                                            <Lbl text="Father's Name" />
+                                            <Lbl text="Father's Name" required={req("fathersName")} />
                                             <input style={inp} placeholder="Ram Kumar Sharma" value={form.fathersName} onChange={e => set("fathersName", e.target.value)} />
                                         </div>
                                         <div>
@@ -750,7 +788,7 @@ export default function JoinPage() {
                                             <input style={inp} placeholder="General / OBC / SC / ST" value={form.caste} onChange={e => set("caste", e.target.value)} />
                                         </div>
                                         <div>
-                                            <Lbl text="Name as per Aadhaar" />
+                                            <Lbl text="Name as per Aadhaar" required={req("nameAsPerAadhar")} />
                                             <input style={inp} placeholder="Exactly as printed on Aadhaar" value={form.nameAsPerAadhar} onChange={e => set("nameAsPerAadhar", e.target.value)} />
                                         </div>
                                     </div>
@@ -768,12 +806,12 @@ export default function JoinPage() {
                                             <Err msg={errors.phone} />
                                         </div>
                                         <div>
-                                            <Lbl text="Email Address" />
+                                            <Lbl text="Email Address" required={req("email")} />
                                             <input style={{ ...inp, borderColor: errors.email ? "var(--red)" : undefined }} type="email" placeholder="you@example.com" value={form.email} onChange={e => { set("email", e.target.value); clrErr("email") }} />
                                             <Err msg={errors.email} />
                                         </div>
                                         <div>
-                                            <Lbl text="Alternate Phone" />
+                                            <Lbl text="Alternate Phone" required={req("alternatePhone")} />
                                             <input style={{ ...inp, borderColor: errors.alternatePhone ? "var(--red)" : undefined }} placeholder="9876543210" maxLength={10} value={form.alternatePhone} onChange={e => { set("alternatePhone", e.target.value.replace(/\D/g,"")); clrErr("alternatePhone") }} />
                                             <Err msg={errors.alternatePhone} />
                                         </div>
@@ -945,7 +983,7 @@ export default function JoinPage() {
                                             <Err msg={errors.aadharNumber} />
                                         </div>
                                         <div>
-                                            <Lbl text="PAN Number" required />
+                                            <Lbl text="PAN Number" required={req("panNumber")} />
                                             <input style={{ ...inp, textTransform: "uppercase", borderColor: errors.panNumber ? "var(--red)" : undefined }} placeholder="ABCDE1234F" maxLength={10} value={form.panNumber} onChange={e => { set("panNumber", e.target.value.toUpperCase()); clrErr("panNumber") }} />
                                             <Err msg={errors.panNumber} />
                                         </div>
@@ -958,7 +996,7 @@ export default function JoinPage() {
                                     </p>
                                     <div style={{ ...g2, marginTop: 14 }}>
                                         <div>
-                                            <Lbl text="UAN Number" />
+                                            <Lbl text="UAN Number" required={req("uan")} />
                                             <input style={{ ...inp, borderColor: errors.uan ? "var(--red)" : undefined }} placeholder="12-digit UAN" maxLength={12} value={form.uan} onChange={e => { set("uan", e.target.value.replace(/\D/g,"")); clrErr("uan") }} />
                                             <Err msg={errors.uan} />
                                         </div>
@@ -966,7 +1004,7 @@ export default function JoinPage() {
                                             {/* A PF account number is not a UAN — it is shorter and can
                                                 contain letters and slashes, so it gets its own field
                                                 rather than being rejected by the 12-digit UAN rule. */}
-                                            <Lbl text="PF Number" />
+                                            <Lbl text="PF Number" required={req("pfNumber")} />
                                             {/* A PF number starts with five letters, so the old
                                                 replace(/\D/g,"") deleted them as they were typed
                                                 and no valid value could ever be entered here. */}
@@ -974,7 +1012,7 @@ export default function JoinPage() {
                                             <Err msg={errors.pfNumber} />
                                         </div>
                                         <div>
-                                            <Lbl text="ESIC Number" />
+                                            <Lbl text="ESIC Number" required={req("esiNumber")} />
                                             <input style={{ ...inp, borderColor: errors.esiNumber ? "var(--red)" : undefined }} placeholder="10-digit ESIC number" maxLength={10} value={form.esiNumber} onChange={e => { set("esiNumber", e.target.value.replace(/\D/g,"")); clrErr("esiNumber") }} />
                                             <Err msg={errors.esiNumber} />
                                         </div>
@@ -1015,8 +1053,8 @@ export default function JoinPage() {
                                                         </div>
                                                         <div style={{ flex: 1, minWidth: 0 }}>
                                                             <div style={{ fontSize: 13, fontWeight: 600, color: doc.url ? "var(--accent-text)" : "var(--text)", display: "flex", alignItems: "center", gap: 4 }}>
-                                                                {docDef.label}
-                                                                {docDef.required && <span style={{ color: "var(--red)", fontSize: 11 }}>*</span>}
+                                                                {T(docDef.label)}
+                                                                {docReq(docDef.type) && <span style={{ color: "var(--red)", fontSize: 11 }}>*</span>}
                                                             </div>
                                                             {doc.file && <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.file.name}</div>}
                                                             {doc.error && <div style={{ fontSize: 11, color: "var(--red)", marginTop: 1 }}>{doc.error}</div>}
@@ -1112,7 +1150,7 @@ export default function JoinPage() {
                     <div style={{ padding: "16px 28px", borderTop: "1px solid var(--border)", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <button onClick={goBack} disabled={tabIdx <= firstOpenIdx}
                             style={{ display: "flex", alignItems: "center", gap: 4, padding: "8px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: tabIdx <= firstOpenIdx ? "var(--text3)" : "var(--text2)", fontSize: 13, fontWeight: 600, cursor: tabIdx <= firstOpenIdx ? "not-allowed" : "pointer", opacity: tabIdx <= firstOpenIdx ? 0.5 : 1 }}>
-                            <ChevronLeft size={15} /> Back
+                            <ChevronLeft size={15} /> {T("Back")}
                         </button>
 
                         <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
@@ -1124,18 +1162,18 @@ export default function JoinPage() {
                         {tab === "documents" ? (
                             <button onClick={handleSubmit} disabled={loading}
                                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 22px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1 }}>
-                                {loading ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <>Save &amp; continue <ChevronRight size={15} /></>}
+                                {loading ? <><Loader2 size={14} className="animate-spin" /> {T("Saving…")}</> : <>{T("Save & continue")} <ChevronRight size={15} /></>}
                             </button>
                         ) : isLast ? (
                             <button onClick={finish} disabled={!policyProgress || policyProgress.loading || !policyProgress.allSigned}
                                 title={policyProgress && !policyProgress.allSigned ? "Sign every policy first" : undefined}
                                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 22px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: policyProgress?.allSigned && !policyProgress.loading ? "pointer" : "not-allowed", opacity: policyProgress?.allSigned && !policyProgress.loading ? 1 : 0.5 }}>
-                                <CheckCircle2 size={14} /> Submit
+                                <CheckCircle2 size={14} /> {T("Submit")}
                             </button>
                         ) : (
                             <button onClick={goNext}
                                 style={{ display: "flex", alignItems: "center", gap: 4, padding: "8px 20px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                                Next <ChevronRight size={15} />
+                                {T("Next")} <ChevronRight size={15} />
                             </button>
                         )}
                     </div>
@@ -1146,5 +1184,6 @@ export default function JoinPage() {
                 </p>
             </div>
         </div>
+        </LangCtx.Provider>
     )
 }

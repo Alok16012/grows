@@ -9,7 +9,8 @@ import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import { ArrowLeft, Check, Copy, Loader2, Plus, QrCode, X } from "lucide-react"
 import { EMPLOYMENT_TYPES } from "@/lib/employment-type"
-import { JOIN_DUP_FIELDS, type JoinSettings, type JoinDupField } from "@/lib/join-settings"
+import { JOIN_DUP_FIELDS, JOIN_OPTIONAL_FIELDS, JOIN_DOCS, type JoinSettings, type JoinDupField, type JoinOptionalField, type JoinDoc } from "@/lib/join-settings"
+import { JOIN_LANGS, type JoinLang } from "@/lib/join-i18n"
 
 type JL = {
     id: string; code: string; name: string; recruiterId: string; recruiter: string; siteId: string | null; site: string | null; designation: string | null; employmentType: string | null
@@ -180,8 +181,19 @@ function Settings() {
     const dup = (k: JoinDupField, on: boolean) => setS(x => x && ({ ...x, duplicates: { ...x.duplicates, fields: on ? [...x.duplicates.fields, k] : x.duplicates.fields.filter(f => f !== k) } }))
     const al = (p: Partial<JoinSettings["alerts"]>) => setS(x => x && ({ ...x, alerts: { ...x.alerts, ...p } }))
     const card = "bg-white border border-[var(--border)] rounded-[12px] p-4 space-y-2"
+    const fm = (p: Partial<JoinSettings["form"]>) => setS(x => x && ({ ...x, form: { ...x.form, ...p } }))
+    const toggle = <T extends string>(list: T[], k: T, on: boolean) => on ? Array.from(new Set([...list, k])) : list.filter(x => x !== k)
     return (
         <div className="space-y-3 max-w-3xl">
+            <div className={card}>
+                <p className="text-[13px] font-semibold">What the form asks for</p>
+                <p className="text-[12px] text-[var(--text3)]">Name, mobile, address, site, designation, joining date, bank and Aadhaar are always required. Tick the others the candidate must fill:</p>
+                <div className="grid sm:grid-cols-3 gap-x-4 gap-y-1">{(Object.keys(JOIN_OPTIONAL_FIELDS) as JoinOptionalField[]).map(k => <label key={k} className="flex items-center gap-2 text-[13px]"><input type="checkbox" disabled={!canEdit} checked={s.form.required.includes(k)} onChange={e => fm({ required: toggle(s.form.required, k, e.target.checked) })} /> {JOIN_OPTIONAL_FIELDS[k]}</label>)}</div>
+                <p className="text-[12px] text-[var(--text3)] pt-1">Documents that must be uploaded:</p>
+                <div className="grid sm:grid-cols-3 gap-x-4 gap-y-1">{(Object.keys(JOIN_DOCS) as JoinDoc[]).map(k => <label key={k} className="flex items-center gap-2 text-[13px]"><input type="checkbox" disabled={!canEdit} checked={s.form.docs.includes(k)} onChange={e => fm({ docs: toggle(s.form.docs, k, e.target.checked) })} /> {JOIN_DOCS[k]}</label>)}</div>
+                <p className="text-[12px] text-[var(--text3)] pt-1">Languages the candidate can switch to:</p>
+                <div className="flex flex-wrap gap-x-5 gap-y-1">{(Object.keys(JOIN_LANGS) as JoinLang[]).map(k => <label key={k} className="flex items-center gap-2 text-[13px]"><input type="checkbox" disabled={!canEdit || k === "en"} checked={s.form.languages.includes(k)} onChange={e => fm({ languages: toggle(s.form.languages, k, e.target.checked) })} /> {JOIN_LANGS[k]}</label>)}</div>
+            </div>
             <div className={card}>
                 <p className="text-[13px] font-semibold">Already registered?</p>
                 <p className="text-[12px] text-[var(--text3)]">Mobile and email are always checked. Also block a form whose number matches an employee already on record:</p>

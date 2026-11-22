@@ -13,6 +13,7 @@ import {
 import crypto from "crypto"
 import { getJoinSettings, findJoinMatch, alertBlockedJoin, alertNewJoiner, DUPLICATE_MESSAGE } from "@/lib/join-server"
 import { findLink, linkState, bumpLink } from "@/lib/join-links"
+import { JOIN_OPTIONAL_FIELDS } from "@/lib/join-settings"
 import { recordSiteChange, actorOf } from "@/lib/site-history"
 
 // Public route — returns site + HR lists so the /join form can render
@@ -54,8 +55,9 @@ export async function GET(req: Request) {
                 .catch(e => { console.error("[JOIN_GET designations]", e); return [] }),
         ])
         const state = link ? linkState(link) : null
+        const form = (await getJoinSettings().catch(() => null))?.form ?? null
         return NextResponse.json({
-            sites, hrUsers, referrer, designations,
+            sites, hrUsers, referrer, designations, form,
             link: link ? { code: link.code, siteId: link.siteId, designation: link.designation, employmentType: link.employmentType, closed: state && !state.ok ? state.reason : null } : null,
         })
     } catch (error) {
@@ -157,6 +159,14 @@ export async function POST(req: Request) {
         // The join form reads `data.message || data.error` off the JSON body.
         if (errors) return NextResponse.json(validationResponse(errors), { status: 400 })
 
+        // Optional fields HR made required (Join links → Form settings), and PAN
+        // when it is switched to optional.
+        const joinSettings = await getJoinSettings()
+        for (const k of joinSettings.form.required) {
+            const v = k === "permanentAddress" && body.sameAsCurrent ? "same" : body[k]
+            if (!String(v ?? "").trim()) return NextResponse.json({ error: `${JOIN_OPTIONAL_FIELDS[k]} is required` }, { status: 400 })
+        }
+
         // Store and dedupe on the same canonical form of the number.
         const normalizedPhone = normalizePhone(phone)
 
@@ -165,7 +175,6 @@ export async function POST(req: Request) {
         // 2026 came in because only mobile/email were checked. The message is the
         // same whoever matched (a public form reveals nothing about the record);
         // HR is told, and an ex-employee coming back becomes a rejoin request.
-        const joinSettings = await getJoinSettings()
         const match = await findJoinMatch({ phone: normalizedPhone, email, aadharNumber, panNumber, bankAccountNumber, uan }, joinSettings)
         if (match) {
             await alertBlockedJoin(match, { firstName, lastName, phone: normalizedPhone, designation, siteId, dateOfJoining, hrId }, joinSettings).catch(e => console.error("[JOIN_ALERT_BLOCKED]", e))
