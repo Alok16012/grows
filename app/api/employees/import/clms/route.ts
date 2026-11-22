@@ -6,6 +6,7 @@ import { checkAccess } from "@/lib/permissions"
 import prisma from "@/lib/prisma"
 import { NO_PASSWORD } from "@/lib/credentials"
 import { validateDateOfBirth, validateJoiningAge } from "@/lib/validation"
+import { getChecklistSettings } from "@/lib/onboarding-checklist-server"
 import { recordSiteChange, actorOf } from "@/lib/site-history"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -41,6 +42,7 @@ export async function POST(req: Request) {
     // Fetch all branches once
     const allBranches = await prisma.branch.findMany({ select: { id: true, name: true } })
 
+    const checklist = await getChecklistSettings()
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i]
         const rowNum = i + 2
@@ -217,7 +219,7 @@ export async function POST(req: Request) {
                     safetyShoesDate: parseDate(row["SafetyShoesIssuedDate"]),
                     // System
                     branchId: branch.id,
-                    status: "ACTIVE",
+                    status: (checklist.importAs === "ACTIVE" ? "ACTIVE" : "ONBOARDING") as any,
                     employmentType: normalizeEmploymentType(str(row["EmployementType"])) || "Full-time",
                     userId,
                 },

@@ -134,18 +134,21 @@ export async function PUT(
             // `force` approves anyway when the settings allow it (approvers, admins
             // only, or nobody) — e.g. documents collected on paper.
             const gate = await approvalGate(onboardingRecord.employeeId)
+            // Missing KYC documents are never bypassed unless the setting allows it.
+            const docsBlock = gate.docMissing.length > 0 && !gate.docsBypass
             if (gate.reasons.length && !body.force) {
                 const isAdmin = (session.user as any)?.role === "ADMIN"
-                const canForce = gate.override === "approvers" || (gate.override === "admins" && isAdmin)
+                const canForce = !docsBlock && (gate.override === "approvers" || (gate.override === "admins" && isAdmin))
                 return NextResponse.json({
                     error: "Checks not passed",
                     reasons: gate.reasons,
                     canForce,
-                    message: `Cannot approve yet — ${gate.reasons.join("; ")}.${canForce ? "" : " Finish these first (approving anyway is switched off in the checklist settings)."}`,
+                    message: `Cannot approve yet — ${gate.reasons.join("; ")}.${canForce ? "" : docsBlock ? ` Documents are required: upload ${gate.docMissing.join(", ")} first.` : " Finish these first (approving anyway is switched off in the checklist settings)."}`,
                 }, { status: 400 })
             }
             if (gate.reasons.length && body.force) {
                 const isAdmin = (session.user as any)?.role === "ADMIN"
+                if (docsBlock) return NextResponse.json({ error: "Documents missing", message: `Cannot approve without documents — upload ${gate.docMissing.join(", ")} first.` }, { status: 403 })
                 if (gate.override === "none" || (gate.override === "admins" && !isAdmin)) return NextResponse.json({ error: "Approving with open checks is not allowed", message: "Approving with open checks is not allowed for you — finish the checklist first." }, { status: 403 })
                 auditLater({ actorId: session.user.id, actorName: session.user.name ?? null, action: "onboarding.approve_override", targetType: "Employee", targetId: onboardingRecord.employeeId, targetName: onboardingRecord.employee?.employeeId ?? null, summary: `Approved with open checks: ${gate.reasons.join("; ")}` })
             }

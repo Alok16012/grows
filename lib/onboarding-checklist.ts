@@ -44,6 +44,10 @@ export type ChecklistSettings = {
     tasks: CheckTask[]
     /** Who may approve with checks still open: approvers, only admins, or nobody. */
     override: "approvers" | "admins" | "none"
+    /** Missing KYC documents can be bypassed with "approve anyway" (off = never). */
+    docsBypass: boolean
+    /** Excel / CLMS imports start as Onboarding (documents + approval) or straight Active. */
+    importAs: "ONBOARDING" | "ACTIVE"
     /** Block approval when Aadhaar / PAN / bank / mobile match another employee. */
     blockDuplicates: boolean
     /** Warn when the joining date is more than this many days in the past (0 = off). */
@@ -77,6 +81,8 @@ export const DEFAULT_CHECKLIST: ChecklistSettings = {
         t("login", "Employee can log in", "HR", "LOGIN", false, 1),
     ],
     override: "approvers",
+    docsBypass: false,
+    importAs: "ONBOARDING",
     blockDuplicates: true,
     oldJoiningDays: 30,
     stuckAfterDays: 3,
@@ -104,6 +110,8 @@ export function sanitizeChecklist(v: any): ChecklistSettings {
     return {
         tasks,
         override: v?.override === "admins" || v?.override === "none" ? v.override : "approvers",
+        docsBypass: v?.docsBypass === true,
+        importAs: v?.importAs === "ACTIVE" ? "ACTIVE" : "ONBOARDING",
         blockDuplicates: typeof v?.blockDuplicates === "boolean" ? v.blockDuplicates : d.blockDuplicates,
         oldJoiningDays: int(v?.oldJoiningDays, d.oldJoiningDays, 0, 3650),
         stuckAfterDays: int(v?.stuckAfterDays, d.stuckAfterDays, 1, 90),

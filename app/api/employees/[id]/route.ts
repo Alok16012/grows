@@ -17,6 +17,7 @@ import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import { deleteEmployeesAndLogins } from "@/lib/employee-delete"
 import { pickPhotoUrl } from "@/lib/employee-photo"
 import { recordSiteChange, recordSiteChanges, actorOf } from "@/lib/site-history"
+import { getChecklistSettings, missingRequiredDocs } from "@/lib/onboarding-checklist-server"
 import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar, validatePAN,
@@ -331,6 +332,19 @@ export async function PUT(
                 where: { id: params.id },
                 select: { status: true, notes: true, dateOfLeaving: true },
             })
+            if (status === "ACTIVE" && before && before.status !== "ACTIVE" && before.status !== "ON_LEAVE") {
+                // Nobody becomes Active without their KYC documents. Someone still in
+                // onboarding is approved in Onboarding (code, login, checks); a person
+                // rejoining needs the documents on file first.
+                if (before.status === "ONBOARDING") {
+                    return new NextResponse("This person is still in onboarding — approve them in Onboarding (documents and checks are verified there) instead of changing the status here.", { status: 409 })
+                }
+                const cs = await getChecklistSettings()
+                const missingDocs = cs.docsBypass ? [] : await missingRequiredDocs(params.id, cs)
+                if (missingDocs.length) {
+                    return new NextResponse(`Cannot make this person Active without documents — upload ${missingDocs.join(", ")} first.`, { status: 409 })
+                }
+            }
             if (status === "ACTIVE") {
                 isRejoining = !!before && TERMINAL_STATUSES.includes(before.status)
                 // Someone who is back should not carry a leaving date — unless this

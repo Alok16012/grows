@@ -17,6 +17,7 @@ import { generateEmployeeCode } from "@/lib/employee-code"
 import crypto from "crypto"
 import { recordSiteChange, actorOf } from "@/lib/site-history"
 import { accessFrom } from "@/lib/access"
+import { getChecklistSettings } from "@/lib/onboarding-checklist-server"
 import { assertCanAssignRole, RuleError } from "@/lib/role-rules"
 
 type Sv = string | number | undefined
@@ -91,6 +92,7 @@ export async function POST(req: Request) {
     const importer = accessFrom(session!)
     // People → Masters: imported designations take the standard spelling.
     const designationMaster = await getDesignations()
+    const checklist = await getChecklistSettings()
     const refusals = new Map<string, string | null>()
     const roleRefusal = async (roleId: string) => {
         if (!refusals.has(roleId)) {
@@ -244,6 +246,7 @@ export async function POST(req: Request) {
             // rows don't burn a number in the sequence.
             const finalId = await nextCode()
 
+            const importStatus = (r: typeof row) => checklist.importAs === "ACTIVE" || dt(r.dateOfLeaving) ? "ACTIVE" : "ONBOARDING"
             const newEmp = await prisma.employee.create({
                 select: { id: true },
                 data: {
@@ -256,7 +259,9 @@ export async function POST(req: Request) {
                     alternatePhone: strN(row.alternatePhone),
                     designation:   await standardDesignation(strN(row.designation), designationMaster),
                     employmentType: normalizeEmploymentType(str(row.employmentType)) || "Full-time",
-                    status:        "ACTIVE",
+                    // Imported people start in Onboarding (documents + approval) unless
+                    // the checklist settings say otherwise; leavers keep the old behaviour.
+                    status:        importStatus(row) as any,
                     onboardingToken,
                     dateOfJoining: dt(row.dateOfJoining),
                     dateOfLeaving: dt(row.dateOfLeaving),
@@ -332,6 +337,11 @@ export async function POST(req: Request) {
                         approvedBy:       session!.user.id,
                     },
                 })
+            }
+
+            // Imported into Onboarding: same checklist and approval as everyone else.
+            if (importStatus(row) === "ONBOARDING") {
+                await prisma.onboardingRecord.create({ data: { employeeId: newEmp.id, status: "IN_PROGRESS", startedAt: new Date() } }).catch(e => console.error("[IMPORT_ONBOARDING_RECORD]", e))
             }
 
             let warning: string | undefined

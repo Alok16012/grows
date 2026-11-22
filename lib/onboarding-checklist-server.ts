@@ -135,11 +135,23 @@ export async function setTaskDone(employeeId: string, taskId: string, done: bool
     else await prisma.onboardingTask.create({ data: { ...data, onboardingId: rec.id, employeeId, description: TPL(taskId), category: t.owner, order: 100 + s.tasks.indexOf(t), isRequired: t.beforeApproval } })
 }
 
+/**
+ * KYC documents this person must have before becoming Active — the checklist's
+ * "before approval" document tasks that apply to them. One rule for approval,
+ * the employee form's status change and rejoining.
+ */
+export async function missingRequiredDocs(employeeId: string, settings?: ChecklistSettings): Promise<string[]> {
+    const s = settings ?? await getChecklistSettings()
+    const [c] = Array.from((await evaluateChecklists([employeeId], s)).values())
+    return (c?.blocking ?? []).filter(b => b.auto?.startsWith("DOC_")).map(b => b.title)
+}
+
 /** Why approval should wait: open "before approval" tasks, duplicate KYC, an old joining date. */
 export async function approvalGate(employeeId: string, now = new Date()) {
     const s = await getChecklistSettings()
     const [c] = Array.from((await evaluateChecklists([employeeId], s, now)).values())
     const reasons: string[] = []
+    const docMissing = (c?.blocking ?? []).filter(b => b.auto?.startsWith("DOC_")).map(b => b.title)
     if (c?.blocking.length) reasons.push(`still open: ${c.blocking.map(b => b.title).join(", ")}`)
     const e = await prisma.employee.findUnique({ where: { id: employeeId }, select: { aadharNumber: true, panNumber: true, bankAccountNumber: true, phone: true, dateOfJoining: true } })
     if (e && s.blockDuplicates) {
@@ -150,7 +162,7 @@ export async function approvalGate(employeeId: string, now = new Date()) {
         const days = Math.floor((now.getTime() - e.dateOfJoining.getTime()) / 86_400_000)
         if (days > s.oldJoiningDays) reasons.push(`joining date is ${days} days ago — check it is right`)
     }
-    return { reasons, override: s.override, checklist: c ?? null }
+    return { reasons, docMissing, docsBypass: s.docsBypass, override: s.override, checklist: c ?? null }
 }
 
 export type BoardCard = {
