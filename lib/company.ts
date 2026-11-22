@@ -34,8 +34,8 @@ export const COMPANY = {
     reportName: env(process.env.NEXT_PUBLIC_REPORT_COMPANY_NAME) ?? "GROWUS AUTO INDIA",
     tagline: "Pioneer in outsourcing",
     supportLine: "Contact your HR or admin.",
-    developerCredit: "Blinks AI",
-    developerUrl: "https://blinks-ai.com",
+    developerCredit: "Softgress",
+    developerUrl: "https://softgress.com",
     version: (pkg as { version?: string }).version ?? "0.0.0",
 } as const
 
