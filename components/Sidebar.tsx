@@ -302,7 +302,8 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
 
         // The universal dashboard is available to every user who
         // holds at least one permission — it self-adapts to them.
-        if (link.href === "/dashboard") return userPermissions.length > 0
+        // Tasks: everyone signed in has a "My tasks" list.
+        if (link.href === "/dashboard" || link.href === "/tasks") return userPermissions.length > 0
 
         // Everything is gated PURELY by custom-role permissions.
         // No hardcoded role (MANAGER/HR_MANAGER/INSPECTION_BOY/CLIENT)
