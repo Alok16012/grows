@@ -263,7 +263,7 @@ export default function ExitPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" style={{ marginBottom: 24 }}>
         <div className="min-w-0">
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.5px" }}>Exit Management</h1>
-          <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 4 }}>Manage employee exits, clearance &amp; F&amp;F settlements.</p>
+          <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 4 }}>Manage employee exits, clearance &amp; F&amp;F settlements. <a href="/exit/settings" style={{ color: "var(--accent)", fontWeight: 600 }}>Settings &amp; past leavers →</a></p>
         </div>
         <div className="page-actions">
         <button
@@ -1314,7 +1314,22 @@ function FnFTab({
     reference: "",
   })
   const canEdit = can(session, "exit.manage")
+  const canApprove = can(session, "exit.approve") || canEdit
   const paid = !!exit.fnfPaidAt
+  // F&F approval (Exit settings) and the letters issued after payment.
+  const [flow, setFlow] = useState<{ approval: { approvedAt?: string | null; approvedByName?: string | null; approvedNet?: number | null; preparedBy?: string | null }; letters: { docNumber: string; status: string; type: { name: string } }[]; me: string } | null>(null)
+  const loadFlow = useCallback(() => { fetch(`/api/exit/flow?exitId=${exit.id}`).then(r => r.ok ? r.json() : null).then(setFlow).catch(() => {}) }, [exit.id])
+  useEffect(() => { loadFlow() }, [loadFlow])
+  const approveFnf = async () => {
+    if (!confirm("Approve this F&F statement? Any later change will need approving again.")) return
+    setSaving(true)
+    try {
+      const r = await fetch("/api/exit/flow", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "approveFnf", exitId: exit.id }) })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j?.error || "Could not approve")
+      toast.success("F&F approved"); loadFlow()
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not approve") } finally { setSaving(false) }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1476,6 +1491,27 @@ function FnFTab({
             </select>
             <button onClick={addAdjustment} disabled={saving} style={{ padding: "0 14px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Add</button>
           </div>
+        </div>
+      )}
+
+      {!paid && flow && (
+        <div style={{ padding: 14, marginBottom: 12, borderRadius: 12, border: "1px solid var(--border)", background: flow.approval?.approvedAt ? "#f0fdf4" : "#fffbeb", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 13 }}>
+            {flow.approval?.approvedAt
+              ? <>Approved by <b>{flow.approval.approvedByName}</b> on {fmtDate(flow.approval.approvedAt)} for <b>{fmtINR(flow.approval.approvedNet)}</b>{data && flow.approval.approvedNet != null && Math.round(data.net) !== Math.round(flow.approval.approvedNet) && <span style={{ color: "#b45309" }}> — the amount has changed since; approve again</span>}</>
+              : <>Not approved yet — the F&amp;F must be approved before the payment is recorded.</>}
+          </div>
+          {canApprove && (!flow.approval?.approvedAt || (data && flow.approval.approvedNet != null && Math.round(data.net) !== Math.round(flow.approval.approvedNet))) && (
+            <button onClick={approveFnf} disabled={saving} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#15803d", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Approve F&amp;F</button>
+          )}
+        </div>
+      )}
+
+      {paid && flow && (
+        <div style={{ padding: 12, marginBottom: 12, borderRadius: 12, border: "1px solid var(--border)", fontSize: 13 }}>
+          {flow.letters.length
+            ? <>Letters issued: {flow.letters.map(l => `${l.type.name} (${l.docNumber}${l.status === "PENDING_APPROVAL" ? ", waiting for approval" : ""})`).join(", ")} — in Letters &amp; Documents.</>
+            : <>No exit letters issued — set the letter types in <a href="/exit/settings" style={{ color: "var(--accent)" }}>Exit settings</a>.</>}
         </div>
       )}
 

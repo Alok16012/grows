@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { getExitSettings, offboardForExit, syncClearance } from "@/lib/exit-flow"
 import { notifyEmployee } from "@/lib/hr-notify"
 
 const DEFAULT_CLEARANCE = [
@@ -102,7 +103,8 @@ export async function POST(req: Request) {
 
     // Without an explicit last working day, it's the end of the notice period.
     const resigned = new Date(resignationDate)
-    const notice = noticePeriodDays !== undefined && noticePeriodDays !== "" ? Math.max(0, parseInt(String(noticePeriodDays)) || 0) : 30
+    const exitSettings = await getExitSettings()
+    const notice = noticePeriodDays !== undefined && noticePeriodDays !== "" ? Math.max(0, parseInt(String(noticePeriodDays)) || 0) : exitSettings.defaultNoticeDays
     const lwd = lastWorkingDate ? new Date(lastWorkingDate) : new Date(resigned.getTime() + notice * 86400000)
     if (lwd < resigned) return new NextResponse("Last working day can't be before the resignation date", { status: 400 })
 
@@ -117,12 +119,8 @@ export async function POST(req: Request) {
         initiatedBy: session!.user.id,
         status: "INITIATED",
         clearanceTasks: {
-          create: DEFAULT_CLEARANCE.map(t => ({
-            title: t.title,
-            department: t.department,
-            order: t.order,
-            status: "PENDING",
-          })),
+          create: (exitSettings.clearance.length ? exitSettings.clearance.map((c, i) => ({ title: c.title, department: c.owner, order: i + 1 })) : DEFAULT_CLEARANCE.map(t => ({ title: t.title, department: t.department, order: t.order })))
+            .map(t => ({ ...t, status: "PENDING" })),
         },
       },
       include: {
@@ -140,6 +138,15 @@ export async function POST(req: Request) {
       },
     })
 
+    // Last working day today or earlier (e.g. Terminate): the person has left now.
+    const endOfToday = new Date(new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10) + "T23:59:59+05:30")
+    let leftNow = false
+    if (lwd <= endOfToday) {
+      leftNow = await offboardForExit(exit.id, { id: session!.user.id, name: session!.user.name ?? null }, req)
+      await prisma.exitRequest.update({ where: { id: exit.id }, data: { status: "CLEARANCE_PENDING" } })
+    }
+    await syncClearance(exit.id, exitSettings).catch(() => {})
+
     await notifyEmployee(employeeId, {
       title: "Exit initiated",
       message: `Your exit has been recorded. Last working day: ${lwd.toISOString().slice(0, 10)}`,
@@ -147,7 +154,7 @@ export async function POST(req: Request) {
       type: "exit", link: "/profile",
     })
 
-    return NextResponse.json(exit)
+    return NextResponse.json({ ...exit, leftNow })
   } catch (error) {
     console.error("[EXIT_POST]", error)
     return new NextResponse("Internal Error", { status: 500 })

@@ -19,6 +19,7 @@ import { pickPhotoUrl } from "@/lib/employee-photo"
 import { recordSiteChange, recordSiteChanges, actorOf } from "@/lib/site-history"
 import { getChecklistSettings, missingRequiredDocs } from "@/lib/onboarding-checklist-server"
 import { applyAutoRoleSafe } from "@/lib/auto-role-server"
+import { getExitSettings } from "@/lib/exit-flow"
 import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar, validatePAN,
@@ -326,6 +327,13 @@ export async function PUT(
         // so a rehired employee came back with no site posting, a stale leaving
         // date, and an exit record that still counted them as gone.
         const TERMINAL_STATUSES: string[] = ["TERMINATED", "RESIGNED", "INACTIVE"]
+        // Resigned / Terminated only through an exit (Exit settings), so clearance
+        // and F&F always happen. Terminate on the Employees list opens an exit.
+        if ((status === "RESIGNED" || status === "TERMINATED") && (await getExitSettings()).mustUseExit
+            && !TERMINAL_STATUSES.includes(String((await prisma.employee.findUnique({ where: { id: params.id }, select: { status: true } }))?.status ?? ""))) {
+            const ex = await prisma.exitRequest.findUnique({ where: { employeeId: params.id }, select: { status: true } })
+            if (!ex || ex.status === "CANCELLED") return new NextResponse("Leaving goes through Exit: use Terminate on the Employees list, or Exit → Initiate exit, so clearance and F&F are recorded.", { status: 409 })
+        }
         const isLeaving = status === "TERMINATED" || status === "RESIGNED"
         let isRejoining = false
         let leavingDate: Date | null = null

@@ -12,6 +12,7 @@ import {
     IndianRupee, Shield, ClipboardList, X, Printer, BookOpen, Download,
     UserCircle2, MapPin, CreditCard, Contact, Camera, LogIn, LogOut, Package, FileSignature
 } from "lucide-react"
+import { ResignationCard } from "@/components/ResignationCard"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateUAN, validateESIC, validateEmail,
@@ -1175,6 +1176,7 @@ export default function ProfilePage() {
             )}
 
             {activeTab === "profile" && <ChangePasswordCard />}
+            {activeTab === "profile" && isEmployee && <ResignationCard />}
 
             {activeTab === "attendance" && <AttendanceTab />}
             {activeTab === "documents"  && <DocsTab />}

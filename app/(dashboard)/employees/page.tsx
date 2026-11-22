@@ -1490,17 +1490,22 @@ function EmployeesPage() {
         if (!terminateDate) { toast.error("Pick a leaving date"); return }
         setTerminating(true)
         try {
-            const res = await fetch(`/api/employees/${terminateTarget.id}`, {
-                method: "PUT",
+            // Opens an exit (clearance + F&F); a leaving date today or earlier marks
+            // them as left at once, a later one on that day.
+            const res = await fetch("/api/exit", {
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    status: "TERMINATED",
-                    dateOfLeaving: terminateDate,
-                    terminationReason: terminateReason.trim() || undefined,
+                    employeeId: terminateTarget.id, exitType: "TERMINATION",
+                    resignationDate: terminateDate, lastWorkingDate: terminateDate,
+                    reason: terminateReason.trim() || undefined,
                 }),
             })
             if (!res.ok) throw new Error(await res.text())
-            toast.success(`${employeeFullName(terminateTarget)} marked as terminated`)
+            const ex = await res.json().catch(() => ({}))
+            toast.success(ex?.leftNow === false && new Date(terminateDate) > new Date()
+                ? `Exit opened for ${employeeFullName(terminateTarget)} — they leave on ${terminateDate}`
+                : `${employeeFullName(terminateTarget)} terminated — clearance and F&F are in Exit`)
             if (drawerEmployee?.id === terminateTarget.id) {
                 setDrawerEmployee(prev => prev ? { ...prev, status: "TERMINATED" } : null)
             }

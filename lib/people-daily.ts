@@ -7,6 +7,7 @@ import { applyDueMovements } from "@/lib/employee-movement"
 import { runDueLetters } from "@/lib/letter-schedule-server"
 import { assignMissingRoles } from "@/lib/auto-role-server"
 import { disableIdleLogins, alertFailures, remindReview } from "@/lib/access-centre-data"
+import { runExitDaily } from "@/lib/exit-flow"
 import { remindWaitingJoiners } from "@/lib/join-server"
 
 export async function runPeopleDaily(now = new Date()) {
@@ -18,7 +19,9 @@ export async function runPeopleDaily(now = new Date()) {
     const joinersWaiting = await remindWaitingJoiners(now).catch(e => { console.error("[PEOPLE_DAILY_JOINERS]", e); return -1 })
     // Safety net: any login still without a role gets its designation's role.
     const rolesGiven = await assignMissingRoles().catch(e => { console.error("[PEOPLE_DAILY_ROLES]", e); return -1 })
+    // Exits: leave on the last working day; clearance ticks itself.
+    const exits = await runExitDaily(now).catch(e => { console.error("[PEOPLE_DAILY_EXITS]", e); return null })
     // Access centre: idle logins, failed sign-in alerts, access review reminder.
     const access = await Promise.all([disableIdleLogins(now), alertFailures(now), remindReview(now)]).catch(e => { console.error("[PEOPLE_DAILY_ACCESS]", e); return null })
-    return { applied, waiting, letters, joinersWaiting, rolesGiven, access }
+    return { applied, waiting, letters, joinersWaiting, rolesGiven, access, exits }
 }

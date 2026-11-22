@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { markPrepared } from "@/lib/exit-flow"
 import { computeSettlement, getFnfRecord, saveFnfRecord, type FnfAdjustment } from "@/lib/exit-settlement"
 
 // GET — the worked-out F&F for this exit.
@@ -37,6 +38,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
             paymentMode: typeof body.paymentMode === "string" ? body.paymentMode.slice(0, 30) : prev.paymentMode,
             reference: typeof body.reference === "string" ? body.reference.slice(0, 80) : prev.reference,
         }, session!.user.id)
+        await markPrepared(params.id, session!.user.id)
         return NextResponse.json(await computeSettlement(params.id))
     } catch (error) {
         console.error("[EXIT_SETTLEMENT_PUT]", error)

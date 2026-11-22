@@ -6,6 +6,7 @@ import { checkAccess } from "@/lib/permissions"
 import { computeSettlement } from "@/lib/exit-settlement"
 import { notifyEmployee } from "@/lib/hr-notify"
 import { accessFrom, maskEmployee } from "@/lib/access"
+import { getExitSettings, approvalOf, issueExitLetters, syncClearance } from "@/lib/exit-flow"
 import { recordSiteChanges, actorOf, type SiteChange } from "@/lib/site-history"
 
 // Exit moves forward one stage at a time. Jumping straight to COMPLETED used to
@@ -128,6 +129,15 @@ export async function PUT(
       }
     }
 
+    // Paying the F&F needs it approved first (Exit settings).
+    const paying = fnfPaidAt !== undefined && fnfPaidAt && !before.fnfPaidAt
+    if (paying) {
+      const ex = await getExitSettings()
+      if (ex.fnfApproval && !(await approvalOf(params.id)).approvedAt) {
+        return new NextResponse("Approve the F&F before recording the payment (F&F tab → Approve)", { status: 400 })
+      }
+    }
+
     // The ExitRequest update and the offboarding happen together. Splitting them
     // meant a failure after the first write left the exit marked COMPLETED while
     // the employee was still active with a working login — and the UI hides the
@@ -212,6 +222,10 @@ export async function PUT(
       const s = await computeSettlement(exit.id)
       if (s) await prisma.exitRequest.update({ where: { id: exit.id }, data: { fnfAmount: s.net } })
     }
+
+    // Paid: issue the relieving / experience letters (Exit settings).
+    if (paying) await issueExitLetters(exit.id, { id: session!.user.id, name: session!.user.name ?? null }).catch(e => console.error("[EXIT_LETTERS]", e))
+    await syncClearance(exit.id).catch(() => {})
 
     // Links to /profile, not /exit: the employee being notified lacks exit.view.
     if (status !== undefined && status !== before.status && STAGE_LABEL[status]) {
