@@ -1,12 +1,13 @@
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { pendingTitles } from "@/lib/policy-signoff"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
 import { buildLoginEmail, NO_PASSWORD } from "@/lib/credentials"
 import { generateEmployeeCode } from "@/lib/employee-code"
-import { accessFrom, maskEmployee, lockedFieldNames } from "@/lib/access"
+import { approvalGate } from "@/lib/onboarding-checklist-server"
+
+import { accessFrom, maskEmployee, lockedFieldNames, auditLater } from "@/lib/access"
 
 // Provision a login (User account) for an approved employee if they don't have
 // one yet. No password is set — the employee signs in with an OTP to their
@@ -126,43 +127,27 @@ export async function PUT(
         if (!onboardingRecord) return new NextResponse("Not found", { status: 404 })
 
         if (action === "approve") {
-            // KYC has to actually be on file before someone becomes an employee.
-            // The joining forms ask for these, but they upload the files after the
-            // record is created, so a failed or skipped upload could still leave a
-            // profile with no documents — and the onboarding checklist items
-            // ("Collect Aadhar Card") are only text, they check nothing.
-            // Every joining route now offers all four, so all four are required.
-            const REQUIRED_DOCS = ["AADHAAR", "PAN", "PHOTO", "BANK_DETAILS"] as const
-            const held = await prisma.employeeDocument.findMany({
-                where: { employeeId: onboardingRecord.employeeId },
-                select: { type: true },
-            })
-            // Types are stored inconsistently cased ("PHOTO" vs "Photo").
-            const heldTypes = new Set(held.map(d => d.type.toUpperCase()))
-            const missing = REQUIRED_DOCS.filter(t => !heldTypes.has(t))
-            // Onboarding policies for the employee's designation that are still
-            // unsigned — e.g. HR corrected the designation after the joiner
-            // submitted. Other categories are signed later from My Policies.
-            const emp = await prisma.employee.findUnique({ where: { id: onboardingRecord.employeeId }, select: { designation: true } })
-            const pendingPolicies = await pendingTitles(onboardingRecord.employeeId, emp?.designation, "onboarding")
-            // `force` lets HR approve a record that predates this check, or one
-            // whose documents were collected on paper, rather than being stuck.
-            // Unsigned policies then stay pending on the employee's profile.
-            if ((missing.length > 0 || pendingPolicies.length > 0) && !body.force) {
-                const label: Record<string, string> = {
-                    AADHAAR: "Aadhaar card", PAN: "PAN card", PHOTO: "Passport photo",
-                    BANK_DETAILS: "Bank passbook / cancelled cheque",
-                }
-                const parts: string[] = []
-                if (missing.length) parts.push(`not on file: ${missing.map(m => label[m]).join(", ")}`)
-                if (pendingPolicies.length) parts.push(`policies not signed: ${pendingPolicies.join(", ")}`)
+            // Joining checklist gate (Onboarding → Joining checklist settings): every
+            // task marked "before approval" — by default the four KYC documents,
+            // joining policies, a site posting and a salary structure — plus a
+            // duplicate-KYC check and a sanity check on an old joining date.
+            // `force` approves anyway when the settings allow it (approvers, admins
+            // only, or nobody) — e.g. documents collected on paper.
+            const gate = await approvalGate(onboardingRecord.employeeId)
+            if (gate.reasons.length && !body.force) {
+                const isAdmin = (session.user as any)?.role === "ADMIN"
+                const canForce = gate.override === "approvers" || (gate.override === "admins" && isAdmin)
                 return NextResponse.json({
-                    error: missing.length ? "Missing documents" : "Policies not signed",
-                    missing,
-                    pendingPolicies,
-                    canForce: true,
-                    message: `Cannot approve — ${parts.join("; ")}.`,
+                    error: "Checks not passed",
+                    reasons: gate.reasons,
+                    canForce,
+                    message: `Cannot approve yet — ${gate.reasons.join("; ")}.${canForce ? "" : " Finish these first (approving anyway is switched off in the checklist settings)."}`,
                 }, { status: 400 })
+            }
+            if (gate.reasons.length && body.force) {
+                const isAdmin = (session.user as any)?.role === "ADMIN"
+                if (gate.override === "none" || (gate.override === "admins" && !isAdmin)) return NextResponse.json({ error: "Approving with open checks is not allowed", message: "Approving with open checks is not allowed for you — finish the checklist first." }, { status: 403 })
+                auditLater({ actorId: session.user.id, actorName: session.user.name ?? null, action: "onboarding.approve_override", targetType: "Employee", targetId: onboardingRecord.employeeId, targetName: onboardingRecord.employee?.employeeId ?? null, summary: `Approved with open checks: ${gate.reasons.join("; ")}` })
             }
 
             // Approval is the moment a pending candidate becomes a real employee:

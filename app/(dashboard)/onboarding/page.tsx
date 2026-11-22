@@ -95,6 +95,8 @@ type OnboardingRecord = {
         documents?: any[]
     }
     tasks?: { id: string; status: string; category: string; isRequired: boolean }[]
+    /** Joining checklist (only for records still in onboarding). */
+    checklist?: { done: number; total: number; blocking: string[] }
 }
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -616,10 +618,9 @@ function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, o
     const StIcon = st.icon
     const isPending = record.status === "IN_PROGRESS" || record.status === "NOT_STARTED"
 
-    const tasks = record.tasks ?? []
-    const totalTasks = tasks.length || 7
-    const doneTasks = tasks.filter(t => t.status === "COMPLETED").length
-    const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
+    // Joining checklist progress; approved records count as complete.
+    const progress = record.checklist ? (record.checklist.total ? Math.round(record.checklist.done / record.checklist.total * 100) : 100)
+        : record.status === "COMPLETED" ? 100 : 0
 
     // With borderCollapse: separate, draw row separators via borderBottom.
     // When expanded, the row group is outlined with an accent box (top/side
@@ -690,7 +691,7 @@ function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, o
                 {/* Progress */}
                 <td style={cell}>
                     <div style={{ minWidth: 130 }}>
-                        <div style={{ fontSize: 11.5, color: "var(--text3)", marginBottom: 4, whiteSpace: "nowrap" }}>{doneTasks} of {totalTasks} Completed</div>
+                        <div style={{ fontSize: 11.5, color: "var(--text3)", marginBottom: 4, whiteSpace: "nowrap" }}>{record.checklist ? `${record.checklist.done} of ${record.checklist.total} done` : record.status === "COMPLETED" ? "Approved" : "—"}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <div style={{ flex: 1, height: 6, borderRadius: 4, background: "var(--surface2)", overflow: "hidden" }}>
                                 <div style={{ width: `${progress}%`, height: "100%", borderRadius: 4, background: progress === 100 ? "#15803d" : "var(--accent, #0b5cff)" }} />
@@ -729,7 +730,7 @@ function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, o
                                 { icon: Eye,           title: "Review",         sub: "Review employee details", color: "#3b82f6", onClick: onOpen },
                                 { icon: CheckCircle2,  title: "Approve",        sub: "Approve onboarding",      color: "#15803d", onClick: onApprove },
                                 { icon: XCircle,       title: "Reject",         sub: "Reject onboarding",       color: "#dc2626", onClick: onOpen },
-                                { icon: ClipboardList, title: "View Checklist", sub: "See onboarding tasks",    color: "#6b7280", onClick: onOpen },
+                                { icon: ClipboardList, title: "View Checklist", sub: record.checklist?.blocking.length ? `Waiting: ${record.checklist.blocking.slice(0, 2).join(", ")}${record.checklist.blocking.length > 2 ? "…" : ""}` : "See joining tasks", color: "#6b7280", onClick: () => { window.location.href = `/onboarding/checklist?id=${record.employee.id}` } },
                             ].map(a => (
                                 <button key={a.title} onClick={a.onClick}
                                     style={{ display: "flex", alignItems: "center", gap: 11, padding: "12px 14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", textAlign: "left" }}>

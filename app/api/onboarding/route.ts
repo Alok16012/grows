@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { evaluateChecklists } from "@/lib/onboarding-checklist-server"
 
 const DEFAULT_TASKS = [
     { title: "Collect Aadhar Card", category: "Documents", order: 1 },
@@ -87,7 +88,14 @@ export async function GET(req: Request) {
             orderBy: { createdAt: "desc" },
         })
 
-        return NextResponse.json(records)
+        // Joining-checklist progress for the people still in onboarding (approved
+        // ones are done; evaluating 1,000 finished records would only slow this down).
+        const open = records.filter(r => r.status !== "COMPLETED").map(r => r.employeeId)
+        const checks = open.length ? await evaluateChecklists(open).catch(() => new Map()) : new Map()
+        return NextResponse.json(records.map(r => {
+            const c = checks.get(r.employeeId)
+            return c ? { ...r, checklist: { done: c.done, total: c.total, blocking: c.blocking.map((b: { title: string }) => b.title) } } : r
+        }))
     } catch (error) {
         console.error("[ONBOARDING_GET]", error)
         return new NextResponse("Internal Error", { status: 500 })
