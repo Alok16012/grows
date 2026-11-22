@@ -12,6 +12,7 @@ import { remindChallans } from "@/lib/challans"
 import { remindExpiringDocs } from "@/lib/company-profile-server"
 import { remindWaitingJoiners } from "@/lib/join-server"
 import { remindTasks } from "@/lib/tasks-server"
+import { recruitmentDaily } from "@/lib/recruitment-server"
 
 export async function runPeopleDaily(now = new Date()) {
     const applied = await applyDueMovements(now)
@@ -32,5 +33,7 @@ export async function runPeopleDaily(now = new Date()) {
     const access = await Promise.all([disableIdleLogins(now), alertFailures(now), remindReview(now)]).catch(e => { console.error("[PEOPLE_DAILY_ACCESS]", e); return null })
     // Tasks: due-soon and overdue reminders (Tasks → settings).
     const tasks = await remindTasks(now).catch(e => { console.error("[PEOPLE_DAILY_TASKS]", e); return null })
-    return { applied, waiting, letters, joinersWaiting, rolesGiven, access, exits, challans, companyDocs, tasks }
+    // Recruitment: close filled requests; recruiter digest (stuck, follow-ups, interviews).
+    const recruitment = await recruitmentDaily(now).catch(e => { console.error("[PEOPLE_DAILY_RECRUITMENT]", e); return null })
+    return { applied, waiting, letters, joinersWaiting, rolesGiven, access, exits, challans, companyDocs, tasks, recruitment }
 }

@@ -464,6 +464,15 @@ model Lead {
   convertedEmployeeId String? // Set when lead is converted to employee
   formSlug            String? // Which public form was used (if any)
   siteId              String? // Target site for deployment after joining
+  // Recruitment v2 (scripts/recruitment-v2.sql)
+  jobId               String? // JobPosting the candidate is for
+  requestId           String? // ManpowerRequest the candidate fills
+  stageChangedAt      DateTime? // when status last changed (stuck alerts)
+  offeredSalary       Float?
+  offerDesignation    String?
+  offerJoiningDate    DateTime?
+  offeredAt           DateTime?
+  offerToken          String?        @unique // personal join link /join?o=
   createdBy           String
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
@@ -473,6 +482,7 @@ model Lead {
   activities          LeadActivity[]
   documents           LeadDocument[]
   followUps           LeadFollowUp[]
+  interviews          LeadInterview[]
 
   @@index([status])
   @@index([assignedTo])
@@ -480,6 +490,71 @@ model Lead {
   // Both are used by the recruitment ownership filter (createdBy / formSlug OR).
   @@index([createdBy])
   @@index([formSlug])
+}
+
+// A site / manager asks for people; once approved it becomes a job opening.
+model ManpowerRequest {
+  id           String    @id @default(uuid())
+  reqNo        String    @unique
+  siteId       String?
+  siteName     String?
+  position     String
+  headcount    Int       @default(1)
+  reason       String    @default("NEW") // NEW | REPLACEMENT | TEMPORARY
+  neededBy     DateTime?
+  salaryMin    Int?
+  salaryMax    Int?
+  notes        String?
+  priority     String    @default("MEDIUM") // LOW | MEDIUM | HIGH
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED | FILLED | CANCELLED
+  requestedBy  String
+  decidedBy    String?
+  decidedAt    DateTime?
+  decisionNote String?
+  jobId        String?
+  closedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  @@index([status])
+  @@index([siteId])
+}
+
+// One interview round for a candidate (round 1 HR, round 2 technical, …).
+model LeadInterview {
+  id            String    @id @default(uuid())
+  leadId        String
+  round         Int       @default(1)
+  title         String    @default("Interview")
+  scheduledAt   DateTime
+  mode          String?
+  location      String?
+  interviewerId String?
+  status        String    @default("SCHEDULED") // SCHEDULED | DONE | NO_SHOW | CANCELLED
+  result        String? // PASS | FAIL | HOLD
+  scores        Json? // { communication: 4, technical: 3, ... } out of 5
+  feedback      String?
+  createdBy     String
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+  lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([scheduledAt, status])
+  @@index([interviewerId])
+}
+
+// Full copy of each candidate removed by a duplicate merge.
+model LeadMergeLog {
+  id        String   @id @default(uuid())
+  keptId    String
+  removedId String
+  snapshot  Json
+  mergedBy  String
+  createdAt DateTime @default(now())
+
+  @@index([keptId])
 }
 
 model LeadForm {

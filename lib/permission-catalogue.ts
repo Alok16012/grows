@@ -36,7 +36,7 @@ export const MODULES: ModuleDef[] = [
     { key: "assignments",   label: "Assignments",             group: "Inspections",    actions: ["view", "create", "edit", "delete"] },
 
     { key: "employees",     label: "Employees",               group: "Workforce",      actions: ["view", "create", "edit", "delete", "export", "import"] },
-    { key: "recruitment",   label: "Recruitment",             group: "Workforce",      actions: ["view", "create", "edit", "delete", "export", "import"] },
+    { key: "recruitment",   label: "Recruitment",             group: "Workforce",      actions: ["view", "create", "edit", "delete", "export", "import", "approve"] },
     { key: "jobs",          label: "Jobs",                    group: "Workforce",      actions: ["view", "create", "edit", "delete", "export"] },
     { key: "onboarding",    label: "Onboarding",              group: "Workforce",      actions: ["view", "edit", "approve"] },
     { key: "policies",      label: "Policies",                group: "Workforce",      actions: ["view", "create", "edit", "delete"] },
@@ -83,6 +83,7 @@ export const SPECIAL_ACTIONS: SpecialDef[] = [
     { key: "projects.manager",     label: "Project manager",      hint: "Shown as Manager on site teams; can be picked as a project's manager", module: "projects" },
     { key: "assets.issue",         label: "Issue assets",         hint: "Hand approved items to employees",              module: "assets" },
     { key: "documents.send",       label: "Send letters",         hint: "Appointment, warning and other letters",        module: "documents" },
+    { key: "recruitment.request",  label: "Raise manpower requests", hint: "Ask HR for people for a site (e.g. 5 inspectors)", module: "recruitment" },
     { key: "jobs.publish",         label: "Publish job posts",    hint: "Make a draft job public",                       module: "jobs" },
     { key: "policies.publish",     label: "Publish policies",     hint: "Joiners must sign published policies",          module: "policies" },
     { key: "attendance.rules",     label: "Change attendance rules", hint: "Shifts, grace time, OT",                     module: "attendance" },

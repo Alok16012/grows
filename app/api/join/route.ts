@@ -16,6 +16,7 @@ import { findLink, linkState, bumpLink } from "@/lib/join-links"
 import { JOIN_OPTIONAL_FIELDS, JOIN_DOCS, type JoinDoc } from "@/lib/join-settings"
 import { isPhotoDoc } from "@/lib/employee-photo"
 import { recordSiteChange, actorOf } from "@/lib/site-history"
+import { offerPrefill, findLeadForJoin } from "@/lib/recruitment-server"
 
 // Public route — returns site + HR lists so the /join form can render
 // the Work Site and Assigned HR dropdowns without needing a session, and the
@@ -32,7 +33,9 @@ export async function GET(req: Request) {
         // HR contact, and its site / designation / type are filled in and locked.
         const link = await findLink(sp.get("l")).catch(() => null)
         if (link) bumpLink(link.id, "opens")
-        const ref = link?.recruiterId ?? sp.get("ref")
+        // `o` = a candidate's personal offer link (Recruitment → Make offer).
+        const offer = !link && sp.get("o") ? await offerPrefill(String(sp.get("o"))).catch(() => null) : null
+        const ref = link?.recruiterId ?? offer?.hrId ?? sp.get("ref")
 
         const [sites, hrUsers, referrer, designations] = await Promise.all([
             prisma.site.findMany({
@@ -60,6 +63,7 @@ export async function GET(req: Request) {
         return NextResponse.json({
             sites, hrUsers, referrer, designations, form,
             link: link ? { code: link.code, siteId: link.siteId, designation: link.designation, employmentType: link.employmentType, closed: state && !state.ok ? state.reason : null } : null,
+            offer,
         })
     } catch (error) {
         console.error("[JOIN_GET]", error)
@@ -114,12 +118,13 @@ export async function POST(req: Request) {
             nationality, religion, caste, nameAsPerAadhar, alternatePhone,
             // Site + HR assignment (NEW)
             // Safety (declared by employee)
-            joinLink,
+            joinLink, offerToken,
         } = body
         let { siteId, hrId, designation, employmentType } = body
         // A Join link decides the recruiter, and the site / designation / type it fixes.
         const link = joinLink ? await findLink(joinLink) : null
         if (joinLink && !link) return NextResponse.json({ error: "This joining link is not valid. Please ask HR for a new link." }, { status: 410 })
+        if (!link && offerToken && !hrId) { const o = await offerPrefill(String(offerToken)).catch(() => null); if (o?.hrId) hrId = o.hrId; if (o?.siteId && !siteId) siteId = o.siteId }
         if (link) {
             const st = linkState(link)
             if (!st.ok) return NextResponse.json({ error: st.reason }, { status: 410 })
@@ -274,7 +279,12 @@ export async function POST(req: Request) {
                 const rec = await prisma.user.findUnique({ where: { id: hrId }, select: { id: true } })
                 if (rec) ownerId = rec.id
             }
-            if (ownerId) {
+            const existingLeadId = await findLeadForJoin(offerToken ? String(offerToken) : null, normalizedPhone).catch(() => null)
+            if (existingLeadId) {
+                const prevLead = await prisma.lead.findUnique({ where: { id: existingLeadId }, select: { assignedTo: true, createdBy: true, siteId: true } })
+                await prisma.lead.update({ where: { id: existingLeadId }, data: { status: "ON_SITE_JOINED" as any, stageChangedAt: new Date(), convertedEmployeeId: employee.id, siteId: siteId || prevLead?.siteId || null, assignedTo: prevLead?.assignedTo ?? ownerId } })
+                await prisma.leadActivity.create({ data: { leadId: existingLeadId, userId: prevLead?.assignedTo ?? prevLead?.createdBy ?? ownerId!, type: "status_change", content: `Filled the joining form${offerToken ? " (offer link)" : ""} — now an employee` } }).catch(() => {})
+            } else if (ownerId) {
                 const candidateName = [firstName.trim(), middleName?.trim(), lastName.trim()].filter(Boolean).join(" ")
                 await prisma.lead.create({
                     data: {
@@ -294,6 +304,7 @@ export async function POST(req: Request) {
                         assignedTo: ownerId,
                         convertedEmployeeId: employee.id,
                         formSlug: link?.code ?? null,
+                        stageChangedAt: new Date(),
                     } as any,
                 })
             }

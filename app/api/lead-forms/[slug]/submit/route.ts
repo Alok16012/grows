@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { findLeadForJoin } from "@/lib/recruitment-server"
 import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar,
@@ -11,7 +12,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
     try {
         const form = await prisma.leadForm.findUnique({
             where: { slug: params.slug },
-            select: { id: true, isActive: true, siteId: true, createdBy: true, formType: true },
+            select: { id: true, title: true, isActive: true, siteId: true, createdBy: true, formType: true },
         })
         if (!form || !form.isActive) {
             return NextResponse.json({ error: "Form not found or inactive" }, { status: 404 })
@@ -131,6 +132,14 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
             "reasonForLeaving", "hasBike", "declarationDate",
             "declarationPlace", "documentsSubmitted", "educationDetails",
         ]
+        // Same mobile already open in the pipeline → note it there instead of making a duplicate.
+        if (!isOnSiteJoin) {
+            const again = await findLeadForJoin(null, leadData.phone).catch(() => null)
+            if (again) {
+                await prisma.leadActivity.create({ data: { leadId: again, userId: leadOwnerId, type: "note", content: `Applied again through the form "${form.title}"` } }).catch(() => {})
+                return NextResponse.json({ success: true, leadId: again, status: "EXISTING" })
+            }
+        }
         let lead: any
         try {
             lead = await prisma.lead.create({ data: leadData })

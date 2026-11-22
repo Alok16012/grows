@@ -109,6 +109,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             "motherName", "motherOccupation", "maritalStatus", "nationality", "aadharNumber",
             "presentAddress", "permanentAddress", "currentDesignation", "pfEsicNumber",
             "reasonForLeaving", "declarationPlace",
+            // Recruitment v2: the job opening / manpower request this candidate is for.
+            "jobId", "requestId",
         ]
         allowedFields.forEach(f => {
             if (f in body) updateData[f] = body[f] ?? null
@@ -136,6 +138,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         }
         if (body.status && body.status !== prev.status) {
             updateData.status = body.status as LeadStatus
+            updateData.stageChangedAt = new Date()
 
             const statusLabels: Record<string, string> = {
                 NEW_LEAD: "New Lead",

@@ -23,6 +23,9 @@ import {
     Link2, Copy, ExternalLink, UserPlus, ToggleLeft, ToggleRight, Camera
 } from "lucide-react"
 import { DocumentViewer } from "@/components/DocumentViewer"
+import { JobLinkOffer, InterviewRounds } from "@/components/recruitment/CandidateExtras"
+import { OpenFromQuery } from "@/components/OpenFromQuery"
+import Link from "next/link"
 import { StatCard, statGridClass } from "@/components/StatCard"
 import { EmployeeModal, Employee as EmpType } from "@/components/EmployeeModal"
 import { format, formatDistanceToNow, parseISO } from "date-fns"
@@ -171,6 +174,12 @@ interface Lead {
     englishLevel?: string
     levelOfExperience?: string
     convertedEmployeeId?: string | null
+    // Recruitment v2
+    jobId?: string | null
+    requestId?: string | null
+    siteId?: string | null
+    offeredAt?: string | null
+    stageChangedAt?: string | null
     // Candidate Personal Information Form fields
     altPhone?: string
     dateOfBirth?: string
@@ -999,8 +1008,11 @@ export default function RecruitmentPage() {
                             </button>
                         )
                     })}
+                    <Link href="/recruitment/manage" className="z-tab" style={{ marginLeft: "auto" }}><Briefcase size={14} /> Hiring desk</Link>
                 </div></div>
             </div>
+            {/* Notification / Hiring desk links open one candidate: /recruitment?lead=… */}
+            <OpenFromQuery param="lead" ready={status === "authenticated"} onOpen={id => openDetail({ id } as Lead)} />
 
             {/* ── PIPELINE TAB ── */}
             {activeTab === "pipeline" && (
@@ -1851,11 +1863,13 @@ function personColor(key: string) {
 // so a stage with hundreds of candidates paints instantly instead of hanging.
 const KANBAN_PAGE = 25
 
-function KanbanColumn({ status, colLeads, onCard }: {
+function KanbanColumn({ status, colLeads, onCard, onDropLead }: {
     status: any
     colLeads: Lead[]
     onCard: (l: Lead) => void
+    onDropLead: (id: string) => void
 }) {
+    const [over, setOver] = useState(false)
     const [visible, setVisible] = useState(KANBAN_PAGE)
     // Reset paging when the column's contents change (filter/search/refresh).
     useEffect(() => { setVisible(KANBAN_PAGE) }, [colLeads.length])
@@ -1874,7 +1888,10 @@ function KanbanColumn({ status, colLeads, onCard }: {
             </div>
             {/* Column body — cards scroll INTERNALLY so the page height stays
                 fixed, and only KANBAN_PAGE cards render at a time. */}
-            <div className="flex flex-col bg-[var(--surface2)]/50 border-x border-b border-[var(--border)] rounded-b-[12px]">
+            <div className={`flex flex-col border-x border-b rounded-b-[12px] transition-colors ${over ? "bg-[var(--accent-light)] border-[var(--accent)]" : "bg-[var(--surface2)]/50 border-[var(--border)]"}`}
+                onDragOver={e => { if (e.dataTransfer.types.includes("text/lead")) { e.preventDefault(); setOver(true) } }}
+                onDragLeave={() => setOver(false)}
+                onDrop={e => { e.preventDefault(); setOver(false); const id = e.dataTransfer.getData("text/lead"); if (id && !colLeads.some(l => l.id === id)) onDropLead(id) }}>
                 <div className="flex flex-col gap-2.5 p-2.5 overflow-y-auto scrollbar-thin" style={{ maxHeight: "calc(100vh - 300px)", minHeight: 120 }}>
                     {shown.map(lead => (
                         <KanbanCard key={lead.id} lead={lead} onCard={onCard} statusColor={status.color} statusBg={status.bg} />
@@ -1907,7 +1924,6 @@ function KanbanView({
     onStatusChange: (id: string, s: string) => void
     onAdd: () => void
 }) {
-    void onStatusChange
     void onAdd
     const boardRef = useRef<HTMLDivElement>(null)
     const [edges, setEdges] = useState({ left: false, right: false })
@@ -1941,7 +1957,7 @@ function KanbanView({
         <div className="relative flex-1 min-w-0">
             <div ref={boardRef} onScroll={syncEdges} className="flex gap-3.5 overflow-x-auto snap-x snap-mandatory scroll-px-4 lg:scroll-px-0 pb-4 px-4 lg:px-0">
                 {STATUSES.map(status => (
-                    <KanbanColumn key={status.key} status={status} colLeads={leads[status.key] ?? []} onCard={onCard} />
+                    <KanbanColumn key={status.key} status={status} colLeads={leads[status.key] ?? []} onCard={onCard} onDropLead={id => onStatusChange(id, status.key)} />
                 ))}
             </div>
             {edges.left && (
@@ -1967,7 +1983,7 @@ function KanbanCard({ lead, onCard, statusColor, statusBg }: { lead: Lead; onCar
     // Stable per-candidate colour — same person, same colour in every stage.
     const color = personColor(lead.id || lead.candidateName || "")
     return (
-        <div onClick={() => onCard(lead)}
+        <div onClick={() => onCard(lead)} draggable onDragStart={e => { e.dataTransfer.setData("text/lead", lead.id); e.dataTransfer.effectAllowed = "move" }}
             className="bg-white border rounded-[11px] cursor-pointer hover:shadow-md transition-all overflow-hidden shrink-0"
             style={{
                 borderColor: isOnSiteJoin ? "#93bdfb" : "var(--border)",
@@ -2239,6 +2255,12 @@ function DetailDrawer({
     })
     const [savingInterview, setSavingInterview] = useState(false)
     const router = useRouter()
+    const canEditRec = session?.user?.role === "ADMIN" || ((session?.user as any)?.permissions ?? []).includes("recruitment.manage")
+    // Re-read this candidate after a v2 panel changed it (interview round, offer, link).
+    const refreshLead = async (updated?: Lead) => {
+        if (updated?.id) { onLeadUpdate({ ...lead, ...updated }); return }
+        try { const r = await fetch(`/api/recruitment/${lead.id}`); if (r.ok) onLeadUpdate(await r.json()) } catch { /* keep what we have */ }
+    }
 
     // Document form
     const [showDocForm, setShowDocForm] = useState(false)
@@ -2433,6 +2455,7 @@ function DetailDrawer({
                     {/* OVERVIEW TAB */}
                     {drawerTab === "overview" && (
                         <div className="px-5 py-4">
+                            <JobLinkOffer lead={lead} canEdit={canEditRec} onChanged={u => refreshLead(u)} />
                             {/* Convert to Employee banner */}
                             {["SELECTED", "OFFERED", "JOINED"].includes(lead.status) && (
                                 <div className={`mb-4 p-3 rounded-[10px] border flex items-center justify-between gap-3 ${lead.convertedEmployeeId ? "bg-green-50 border-green-200" : "bg-[#fffbeb] border-amber-200"}`}>
@@ -2679,6 +2702,8 @@ function DetailDrawer({
                     {/* INTERVIEW TAB */}
                     {drawerTab === "interview" && (
                         <div className="px-5 py-4 flex flex-col gap-4">
+                            <InterviewRounds lead={lead} users={users} canEdit={canEditRec} onChanged={() => refreshLead()} />
+                            <hr className="border-[var(--border)]" />
                             <p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider">Interview Details</p>
                             <Field label="Interviewer Name / ID">
                                 <input

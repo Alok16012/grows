@@ -193,6 +193,8 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             links: [
                 { name: "Job Openings", href: "/jobs", permission: "jobs.view" },
                 { name: "Candidates", href: "/recruitment", permission: "recruitment.view" },
+                // Hiring desk: recruiters, and site managers raising manpower requests.
+                { name: "Hiring desk", href: "/recruitment/manage", permissionAny: ["recruitment.view", "recruitment.request", "recruitment.approve"] },
                 { name: "Onboarding", href: "/onboarding", permissionAny: ["onboarding.view", "recruitment.view"] },
                 { name: "Join Links", href: "/onboarding/join-links", permissionAny: ["onboarding.view", "recruitment.view"] },
                 { name: "Joining Checklist", href: "/onboarding/checklist", permissionAny: ["onboarding.view", "recruitment.view"] },

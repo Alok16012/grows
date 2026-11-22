@@ -151,6 +151,8 @@ export default function JoinPage() {
     const [designationOpts, setDesignationOpts] = useState<{ designation: string; onboardingPolicies: number }[]>([])
     const [designationOther, setDesignationOther] = useState(false)
     // A Join link (?l=code) fixes the recruiter and, if set, the site / designation / type.
+    // Personal offer link token (?o=) — sent back so the candidate record is updated, not duplicated.
+    const [offerToken, setOfferToken] = useState("")
     const [link, setLink] = useState<{ code: string; siteId: string | null; designation: string | null; employmentType: string | null; closed: string | null } | null>(null)
     const startedRef = useRef(false)
     // Which optional fields / documents are required, and the languages offered (Join link settings).
@@ -166,8 +168,9 @@ export default function JoinPage() {
         const ref = params.get("ref") || ""
         const role = params.get("role") || ""
         const l = params.get("l") || ""
+        const o = params.get("o") || ""
 
-        fetch(`/api/join${l ? `?l=${encodeURIComponent(l)}` : ref ? `?ref=${encodeURIComponent(ref)}` : ""}`)
+        fetch(`/api/join${l ? `?l=${encodeURIComponent(l)}` : o ? `?o=${encodeURIComponent(o)}` : ref ? `?ref=${encodeURIComponent(ref)}` : ""}`)
             .then(r => r.json())
             .then(d => {
                 if (Array.isArray(d?.sites)) setSites(d.sites)
@@ -195,6 +198,12 @@ export default function JoinPage() {
                         set("designation", d.link.designation)
                         if (!opts.some(o => o.designation === d.link.designation)) setDesignationOther(true)
                     }
+                }
+                // Offer link (Recruitment → Make offer): fill in what the recruiter already knows.
+                if (d?.offer && o) {
+                    setOfferToken(o)
+                    for (const k of ["firstName", "middleName", "lastName", "phone", "email", "siteId", "dateOfJoining"] as const) if (d.offer[k]) set(k, d.offer[k])
+                    if (d.offer.designation) { set("designation", d.offer.designation); if (!opts.some(x => x.designation === d.offer.designation)) setDesignationOther(true) }
                 }
                 // No list (e.g. it failed to load) → plain text box, as before.
                 if (!opts.length) setDesignationOther(true)
@@ -495,7 +504,7 @@ export default function JoinPage() {
                 const res = await fetch("/api/join", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ...payload, photo: photo || undefined, joinLink: link?.code || undefined, documents: uploaded.filter(Boolean) }),
+                    body: JSON.stringify({ ...payload, photo: photo || undefined, joinLink: link?.code || undefined, offerToken: offerToken || undefined, documents: uploaded.filter(Boolean) }),
                 })
                 const data = await res.json()
                 if (!res.ok) {

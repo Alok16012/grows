@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/lib/permissions"
+import { pickRecruiter } from "@/lib/recruitment-server"
 import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar,
@@ -202,7 +203,8 @@ export async function POST(req: Request) {
             interviewMode: interviewMode || null,
             priority: priority || "MEDIUM",
             score: score || "WARM",
-            assignedTo: assignedTo || null,
+            // No recruiter picked → auto-assign (Recruitment settings), else nobody.
+            assignedTo: assignedTo || await pickRecruiter().catch(() => null) || null,
             notes: notes || null,
             nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : null,
             createdBy: creatorId,
@@ -244,6 +246,9 @@ export async function POST(req: Request) {
             declarationPlace: declarationPlace || null,
             documentsSubmitted: Array.isArray(documentsSubmitted) ? documentsSubmitted : [],
             educationDetails: educationDetails && Array.isArray(educationDetails) && educationDetails.length ? educationDetails : undefined,
+            jobId: typeof body.jobId === "string" && body.jobId ? body.jobId : null,
+            requestId: typeof body.requestId === "string" && body.requestId ? body.requestId : null,
+            stageChangedAt: new Date(),
         }
         let lead
         try {
