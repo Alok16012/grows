@@ -266,6 +266,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "System Users", href: "/admin/users", permissionAny: ["users.view", "users.manage"], group: "Users & Access" },
                 { name: "Employee Logins", href: "/admin/employee-logins", permission: "users.manage", group: "Users & Access" },
                 { name: "Roles", href: "/admin/roles", permission: "roles.view", group: "Users & Access" },
+                { name: "Access Centre", href: "/admin/access", permissionAny: ["users.view", "users.manage", "audit.view"], group: "Users & Access" },
                 { name: "Audit Log", href: "/admin/audit", permission: "audit.view", group: "Users & Access" },
                 { name: "Communication", href: "/admin/communication", permissionAny: ["whatsapp.view", "whatsapp.edit"], matchPrefixes: ["/admin/communication", "/admin/whatsapp"], group: "Messaging" },
             ],

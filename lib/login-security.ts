@@ -9,10 +9,16 @@ import crypto from "crypto"
 import bcrypt from "bcryptjs"
 import prisma from "@/lib/prisma"
 import { sendOtpSms, smsConfigured } from "@/lib/sms"
+import { getAccessCentre } from "@/lib/access-centre-server"
 import { hasOwnPassword, NO_PASSWORD } from "@/lib/credentials"
 
 export const MAX_FAILED_ATTEMPTS = 5
 export const LOCK_MINUTES = 15
+/** Lockout limits from Admin → Access centre → Security (falls back to 5 tries / 15 min). */
+async function lockLimits(): Promise<{ failures: number; minutes: number }> {
+    try { const s = await getAccessCentre(); return { failures: s.lockAfterFailures, minutes: s.lockMinutes } }
+    catch { return { failures: MAX_FAILED_ATTEMPTS, minutes: LOCK_MINUTES } }
+}
 export const OTP_TTL_MINUTES = 10
 export const OTP_MAX_ATTEMPTS = 3
 export const OTP_RESEND_SECONDS = 60
@@ -128,12 +134,13 @@ export async function recordFailedLogin(userId: string): Promise<void> {
             create: { userId, failedCount: 1 },
             update: { failedCount: { increment: 1 } },
         })
-        if (row.failedCount >= MAX_FAILED_ATTEMPTS) {
+        const lim = await lockLimits()
+        if (row.failedCount >= lim.failures) {
             await prisma.userCredential.update({
                 where: { userId },
-                data: { failedCount: 0, lockedUntil: new Date(Date.now() + LOCK_MINUTES * 60_000) },
+                data: { failedCount: 0, lockedUntil: new Date(Date.now() + lim.minutes * 60_000) },
             })
-            console.warn(`[AUTH] account locked for ${LOCK_MINUTES} min after ${MAX_FAILED_ATTEMPTS} failed attempts user=${userId}`)
+            console.warn(`[AUTH] account locked for ${lim.minutes} min after ${lim.failures} failed attempts user=${userId}`)
         }
     } catch (err) {
         if (!isMissingTable(err)) console.error("[AUTH] could not record failed login", err)

@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import { Role } from "@prisma/client"
 import { resolveAccess, accessVersion, mustChangePasswordFor } from "@/lib/access-session"
 import { recordLogin, recordLoginFailure } from "@/lib/access-audit"
+import { touchSeen, signedOutSince } from "@/lib/user-activity"
 import {
     getCredential, verifyLogin, parseLoginMethod,
     AUTH_INVALID, AUTH_INACTIVE, AUTH_LOCKED, AUTH_USE_OTP, AUTH_NO_MPIN,
@@ -211,6 +212,7 @@ export const authOptions: NextAuthOptions = {
             // session holding an older one refreshes now instead of in 3 minutes,
             // so a demoted user loses access on their next request.
             let versionChanged = false
+            if (token.id && !user) touchSeen(token.id as string, "web")
             if (token.id && !user && !String(token.id).startsWith("demo-")) {
                 const v = await accessVersion(token.id as string)
                 versionChanged = v !== ((token as any).accessVersion ?? 0)
@@ -235,8 +237,10 @@ export const authOptions: NextAuthOptions = {
                     // or whose employee was terminated after they logged in.
                     // (Demo users have no DB row — skip them in dev.)
                     const isDemo = String(token.id).startsWith("demo-")
+                    // "Sign out everywhere" (Admin → Access centre) after this session began.
+                    const signedOut = !isDemo && await signedOutSince(token.id as string, (token as { iat?: number }).iat)
                     const lockedOut = !isDemo && (
-                        !dbUser || !dbUser.isActive ||
+                        signedOut || !dbUser || !dbUser.isActive ||
                         (employee ? (employee.status === "TERMINATED" || employee.status === "INACTIVE" || employee.status === "RESIGNED") : false)
                     )
                     if (lockedOut) {

@@ -3,6 +3,7 @@ import type { Session } from "next-auth"
 import { decode } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { touchSeen, signedOutSince } from "@/lib/user-activity"
 import { resolveAccess, accessVersion } from "@/lib/access-session"
 
 const secret = process.env.NEXTAUTH_SECRET
@@ -26,6 +27,7 @@ export async function getApiSession(req?: Request): Promise<Session | null> {
                     // terminating an employee kills their app access at once.
                     // (Demo users have no DB row — skip them in dev.)
                     const uid = decoded.id as string
+                    touchSeen(uid, "app")
                     let live: { role: string; permissions: string[]; scope: string | null; siteIds: string[] } | null = null
                     if (!uid.startsWith("demo-")) {
                         const u = await prisma.user
@@ -39,6 +41,8 @@ export async function getApiSession(req?: Request): Promise<Session | null> {
                         // Role, status or sites changed since the token was minted:
                         // answer with what the user may do now, not 30 days ago.
                         if (u && (await accessVersion(uid)) !== ((decoded.accessVersion as number) ?? 0)) {
+                            // Signed out everywhere after this token was issued → no session.
+                            if (await signedOutSince(uid, decoded.iat as number | undefined)) return null
                             const a = await resolveAccess(u)
                             live = { role: u.role, permissions: a.permissions, scope: a.scope, siteIds: a.siteIds }
                         }

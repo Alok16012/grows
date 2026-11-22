@@ -3172,3 +3172,14 @@ model JoinLink {
 
   @@index([recruiterId])
 }
+
+/// Access centre: when each login was last used (web / app) and when it was signed out everywhere.
+model UserActivity {
+  userId      String    @id
+  lastSeenAt  DateTime?
+  lastSeenVia String?
+  signedOutAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([lastSeenAt])
+}
