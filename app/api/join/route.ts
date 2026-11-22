@@ -13,7 +13,8 @@ import {
 import crypto from "crypto"
 import { getJoinSettings, findJoinMatch, alertBlockedJoin, alertNewJoiner, DUPLICATE_MESSAGE } from "@/lib/join-server"
 import { findLink, linkState, bumpLink } from "@/lib/join-links"
-import { JOIN_OPTIONAL_FIELDS } from "@/lib/join-settings"
+import { JOIN_OPTIONAL_FIELDS, JOIN_DOCS, type JoinDoc } from "@/lib/join-settings"
+import { isPhotoDoc } from "@/lib/employee-photo"
 import { recordSiteChange, actorOf } from "@/lib/site-history"
 
 // Public route — returns site + HR lists so the /join form can render
@@ -175,6 +176,20 @@ export async function POST(req: Request) {
         // 2026 came in because only mobile/email were checked. The message is the
         // same whoever matched (a public form reveals nothing about the record);
         // HR is told, and an ex-employee coming back becomes a rejoin request.
+        // Documents come WITH the form (uploaded first by the page). The record used
+        // to be created first and the files sent after, so a failed upload or a
+        // closed tab left a candidate with no KYC on file — and they re-registered,
+        // which is how duplicate records appeared. Now no record is made unless
+        // every required document is here.
+        const DOC_TYPES = new Set(["AADHAAR", "PAN", "PHOTO", "BANK_DETAILS", "OTHER", "RESUME", "CERTIFICATE"])
+        const okUrl = (u: string) => /^sb:\/\//.test(u) || /^https:\/\/[\w.-]+\.supabase\.co\//.test(u) || /^data:(image\/(png|jpe?g|webp)|application\/pdf);base64,/.test(u)
+        const documents: { type: string; fileName: string; fileUrl: string }[] = (Array.isArray(body.documents) ? body.documents : [])
+            .filter((d: any) => d && typeof d.type === "string" && typeof d.fileUrl === "string" && DOC_TYPES.has(d.type.toUpperCase()) && okUrl(d.fileUrl))
+            .slice(0, 12)
+            .map((d: any) => ({ type: String(d.type).toUpperCase(), fileName: String(d.fileName || d.type).slice(0, 200), fileUrl: String(d.fileUrl) }))
+        const missingDocs = joinSettings.form.docs.filter((t: JoinDoc) => !documents.some(d => d.type === t))
+        if (missingDocs.length) return NextResponse.json({ error: `Upload required documents: ${missingDocs.map(t => JOIN_DOCS[t]).join(", ")}. If this page was open for a long time, refresh it and try again.`, missingDocs }, { status: 400 })
+
         const match = await findJoinMatch({ phone: normalizedPhone, email, aadharNumber, panNumber, bankAccountNumber, uan }, joinSettings)
         if (match) {
             await alertBlockedJoin(match, { firstName, lastName, phone: normalizedPhone, designation, siteId, dateOfJoining, hrId }, joinSettings).catch(e => console.error("[JOIN_ALERT_BLOCKED]", e))
@@ -285,6 +300,20 @@ export async function POST(req: Request) {
         } catch (leadErr) {
             // Non-fatal — employee is already created, lead is a nice-to-have for HR visibility
             console.error("[JOIN_POST] lead-mirror failed:", leadErr)
+        }
+
+        // Save the documents now; without them the record must not stay.
+        try {
+            const seen = new Set<string>()
+            const rows = documents.filter(d => d.type === "OTHER" || (!seen.has(d.type) && !!seen.add(d.type)))
+            await prisma.employeeDocument.createMany({ data: rows.map(d => ({ employeeId: employee.id, type: d.type, fileName: d.fileName, fileUrl: d.fileUrl, status: "PENDING" })) })
+            const photoDoc = rows.find(d => isPhotoDoc(d.type, d.fileName))
+            if (photoDoc && !photo) await prisma.employee.update({ where: { id: employee.id }, data: { photo: photoDoc.fileUrl } }).catch(() => {})
+        } catch (docErr) {
+            console.error("[JOIN_POST] documents failed — removing the record", docErr)
+            await prisma.lead.deleteMany({ where: { convertedEmployeeId: employee.id } as any }).catch(() => {})
+            await prisma.employee.delete({ where: { id: employee.id } }).catch(() => {})
+            return NextResponse.json({ error: "Your documents could not be saved. Nothing was submitted — please try again." }, { status: 500 })
         }
 
         recordSiteChange({

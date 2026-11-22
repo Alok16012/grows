@@ -458,15 +458,44 @@ export default function JoinPage() {
             // did and only the document upload failed.
             let token: string
             let employeeId: string
+            let sentWithForm = false
             if (created) {
                 token = created.token
                 employeeId = created.employeeId
             } else {
+                // 1a. Upload the chosen files FIRST. Nothing is saved on our side
+                // until every required file is up, so a failed upload or a closed
+                // tab can no longer leave a registration without documents.
+                const chosen = docs.map((d, i) => ({ ...d, idx: i })).filter(d => d.file)
+                setDocs(prev => prev.map(d => d.file && !d.url ? { ...d, uploading: true, error: null } : d))
+                const uploaded = await Promise.all(chosen.map(async d => {
+                    if (d.url) return { type: d.type, fileName: d.file!.name, fileUrl: d.url }
+                    try {
+                        const fd = new FormData()
+                        fd.append("file", d.file!)
+                        fd.append("kind", "document") // private storage (lib/secure-files)
+                        const up = await fetch("/api/upload", { method: "POST", headers: { "x-join-form": "true" }, body: fd })
+                        const j = await up.json().catch(() => ({}))
+                        if (!up.ok || !j.url) throw new Error(j.error || "Upload failed")
+                        setDocs(prev => prev.map((x, i) => i === d.idx ? { ...x, uploading: false, url: j.url } : x))
+                        return { type: d.type, fileName: d.file!.name, fileUrl: j.url as string }
+                    } catch (e: any) {
+                        setDocs(prev => prev.map((x, i) => i === d.idx ? { ...x, uploading: false, error: e?.message || "Upload failed" } : x))
+                        return null
+                    }
+                }))
+                const failed = chosen.filter((d, i) => !uploaded[i] && docReq(d.type))
+                if (failed.length) {
+                    setTab("documents")
+                    setDocError(`Could not upload: ${failed.map(d => d.label).join(", ")}. Nothing has been submitted yet — check your internet and tap Save & continue again.`)
+                    setLoading(false)
+                    return
+                }
                 const { sameAsCurrent, ...payload } = form
                 const res = await fetch("/api/join", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ...payload, photo: photo || undefined, joinLink: link?.code || undefined }),
+                    body: JSON.stringify({ ...payload, photo: photo || undefined, joinLink: link?.code || undefined, documents: uploaded.filter(Boolean) }),
                 })
                 const data = await res.json()
                 if (!res.ok) {
@@ -477,6 +506,9 @@ export default function JoinPage() {
                     // a perfectly valid name, and since submission happens from
                     // the Documents tab, often on a tab the user wasn't even on.
                     const lower = String(msg).toLowerCase()
+                    if (Array.isArray(data.missingDocs) || lower.includes("document")) {
+                        setTab("documents"); setDocError(msg); setLoading(false); return
+                    }
                     const field = lower.includes("email") ? "email" : lower.includes("phone") ? "phone" : "firstName"
                     setErrors({ [field]: msg })
                     setTab("personal")
@@ -485,6 +517,7 @@ export default function JoinPage() {
                 }
                 token = data.onboardingToken
                 employeeId = data.employeeId
+                sentWithForm = true
                 setCreated({ token, employeeId })
             }
 
@@ -493,7 +526,9 @@ export default function JoinPage() {
             // a retry must skip those. Filtering on `d.file` alone re-sent every
             // file on every attempt, so each retry added another copy of the whole
             // set — the reason one applicant's profile ended up with 34 documents.
-            const filledDocs = docs.map((d, i) => ({ ...d, idx: i })).filter(d => d.file && !d.url)
+            // Files already went with the form on first save; only a retry after an
+            // older-style partial save needs this step.
+            const filledDocs = sentWithForm ? [] : docs.map((d, i) => ({ ...d, idx: i })).filter(d => d.file && !d.url)
             const uploadResults = await Promise.all(filledDocs.map(d => uploadDoc(d.idx, token)))
             const failedUploads = uploadResults.filter(r => !r).length
 
