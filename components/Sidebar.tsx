@@ -191,7 +191,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             title: "Recruitment",
             icon: UserPlus,
             links: [
-                { name: "Job Openings", href: "/jobs", permission: "jobs.view" },
+                { name: "Jobs & Refer", href: "/jobs", permission: "jobs.view" },
                 { name: "Candidates", href: "/recruitment", permission: "recruitment.view" },
                 // Hiring desk: recruiters, and site managers raising manpower requests.
                 { name: "Hiring desk", href: "/recruitment/manage", permissionAny: ["recruitment.view", "recruitment.request", "recruitment.approve"] },
@@ -288,6 +288,8 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "My Attendance", href: "/attendance", permission: "self.view", hideIfHas: "attendance.view", group: "My work" },
                 { name: "My Leaves", href: "/leaves", permission: "self.view", hideIfHas: "leaves.view", group: "My work" },
                 { name: "My Learning", href: "/lms/learn", permission: "lms.view", hideForAdmin: true, group: "My work" },
+                // Every employee can refer people for open jobs.
+                { name: "Jobs & Refer", href: "/refer", permission: "self.view", hideIfHas: "jobs.view", group: "My work" },
                 { name: "My Profile", href: "/profile", permission: "self.view", group: "My account" },
                 { name: "My Onboarding", href: "/self-onboarding", permission: "self.view", hideForAdmin: true, group: "My account" },
                 { name: "Announcements", href: "/announcements", permission: "self.view", hideIfHas: "announcements.view", group: "My account" },

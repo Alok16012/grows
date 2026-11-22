@@ -10,7 +10,7 @@ import {
     Plus, Search, Loader2, Briefcase, MapPin, IndianRupee, Users, Target,
     Pencil, Copy, Trash2, CalendarClock, Send, FileText, Lock, Eye,
     MoreHorizontal, LayoutGrid, List,
-    ChevronLeft, ChevronRight, SlidersHorizontal, Download, FileStack,
+    ChevronLeft, ChevronRight, SlidersHorizontal, Download, FileStack, UserPlus,
 } from "lucide-react"
 import {
     JobPosting, STATUS_META, effectiveJobStatus, isPastDeadline, formatExperience, formatSalary, priorityStyle,
@@ -149,10 +149,14 @@ export default function JobsPage() {
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                    <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Jobs</h1>
+                    <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Jobs &amp; Refer</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Manage internal job postings across departments and sites.</p>
                 </div>
                 <div className="page-actions">
+                    <Link href="/refer"
+                        className="inline-flex items-center justify-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
+                        <UserPlus size={16} /> Refer a candidate
+                    </Link>
                     <button onClick={exportCsv}
                         className="inline-flex items-center justify-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                         <Download size={16} /> Export
