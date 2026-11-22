@@ -5,13 +5,21 @@
 // placed or the user can't see employees.
 
 import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { MapPin, ArrowRight } from "lucide-react"
 import { NEW_JOINERS_CHANGED } from "./format"
 
 export function NeedsSiteBanner({ className = "" }: { className?: string }) {
     const [n, setN] = useState(0)
+    // Only people who may see employees ask for the count — everyone else used to
+    // hit /api/new-joiners on every dashboard load (thousands of permission-denied
+    // entries in the audit log a month).
+    const { data: session, status } = useSession()
+    const u = session?.user as { role?: string; permissions?: string[] } | undefined
+    const canSee = u?.role === "ADMIN" || !!u?.permissions?.includes("employees.view")
     useEffect(() => {
+        if (status !== "authenticated" || !canSee) return
         let alive = true
         const load = () => fetch("/api/new-joiners?count=1")
             .then(r => (r.ok ? r.json() : null))
@@ -20,8 +28,8 @@ export function NeedsSiteBanner({ className = "" }: { className?: string }) {
         load()
         window.addEventListener(NEW_JOINERS_CHANGED, load)
         return () => { alive = false; window.removeEventListener(NEW_JOINERS_CHANGED, load) }
-    }, [])
-    if (n <= 0) return null
+    }, [status, canSee])
+    if (!canSee || n <= 0) return null
     return (
         <Link href="/employees/new-joiners" role="status"
             className={`flex items-center gap-2.5 rounded-[12px] border border-[#fecaca] bg-[var(--red-light)] px-4 py-2.5 text-[13px] text-[#991b1b] hover:border-[var(--red)] transition-colors ${className}`}>
