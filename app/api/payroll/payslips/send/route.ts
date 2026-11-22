@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { guard, has, auditLater, requestMeta } from "@/lib/access"
+import { monthSanity } from "@/lib/challans"
 import { getRelease, saveRelease, ym, NO_SITE } from "@/lib/payslip-release"
 
 export const dynamic = "force-dynamic"
@@ -31,7 +32,9 @@ export async function GET(req: Request) {
     }
     const before = !!s.startFrom && k < s.startFrom
     const list = Array.from(by.values()).map(c => ({ ...c, sent: s.sent[k]?.[c.siteId] ?? null })).sort((a, b) => a.site.localeCompare(b.site))
+    const sanity = await monthSanity(month, year).catch(() => ({ issues: [] as { level: string; text: string }[] }))
     return NextResponse.json({
+        warnings: sanity.issues.filter(i => i.level === "warn").map(i => i.text),
         requireSend: s.requireSend, startFrom: s.startFrom, alwaysVisible: !s.requireSend || before,
         canSend: g.access.isAdmin || SENDERS.some(p => has(g.access, p)), sites: list,
     })

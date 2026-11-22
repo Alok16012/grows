@@ -8,7 +8,7 @@ import { toast } from "sonner"
 import { Loader2, Send, Settings2 } from "lucide-react"
 
 type Row = { siteId: string; site: string; ready: number; draft: number; sent: { at: string; byName: string; count: number } | null }
-type Data = { requireSend: boolean; startFrom: string | null; alwaysVisible: boolean; canSend: boolean; sites: Row[] }
+type Data = { warnings?: string[]; requireSend: boolean; startFrom: string | null; alwaysVisible: boolean; canSend: boolean; sites: Row[] }
 const when = (s: string) => new Date(s).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
 
 export function SendPayslipsPanel({ month, year, focusSiteId }: { month: number; year: number; focusSiteId?: string }) {
@@ -36,7 +36,8 @@ export function SendPayslipsPanel({ month, year, focusSiteId }: { month: number;
     function send(ids: string[]) {
         const rows = d!.sites.filter(s => ids.includes(s.siteId))
         const drafts = rows.reduce((a, s) => a + s.draft, 0)
-        if (!confirm(`Send ${label} payslips to employees of ${rows.length} site(s)?\n\nThey appear in each employee's My Profile → Payslip and in the app, with an in-app note.${drafts ? `\n\n${drafts} payslip(s) at these sites are still drafts and will not be sent until processed.` : ""}`)) return
+        const warn = d!.warnings?.length ? "\n\nCheck first:\n• " + d!.warnings.join("\n• ") : ""
+        if (!confirm(`Send ${label} payslips to employees of ${rows.length} site(s)?${warn}\n\nThey appear in each employee's My Profile → Payslip and in the app, with an in-app note.${drafts ? `\n\n${drafts} payslip(s) at these sites are still drafts and will not be sent until processed.` : ""}`)) return
         call({ action: "send", month, year, siteIds: ids }, "Payslips sent to {n} employee(s)")
     }
     function unsend(id: string, site: string) {
@@ -60,6 +61,9 @@ export function SendPayslipsPanel({ month, year, focusSiteId }: { month: number;
                     {d.canSend && <button onClick={() => setCfg(c => !c)} style={btnG} aria-label="Sending settings"><Settings2 size={12} /></button>}
                 </div>
             </div>
+            {d.warnings && d.warnings.length > 0 && !d.alwaysVisible && (
+                <div style={{ marginTop: 8, padding: "6px 10px", borderRadius: 8, background: "#fef2f2", color: "#991b1b", fontSize: 12 }}>⚠ {d.warnings.join(" · ")}</div>
+            )}
             {cfg && d.canSend && (
                 <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6 }}><input type="checkbox" checked={d.requireSend} onChange={e => call({ action: "settings", requireSend: e.target.checked }, "Saved")} /> Employees see a payslip only after it is sent</label>
