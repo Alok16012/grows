@@ -11,6 +11,8 @@ import {
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 import crypto from "crypto"
+import { getJoinSettings, findJoinMatch, alertBlockedJoin, alertNewJoiner, DUPLICATE_MESSAGE } from "@/lib/join-server"
+import { findLink, linkState, bumpLink } from "@/lib/join-links"
 import { recordSiteChange, actorOf } from "@/lib/site-history"
 
 // Public route — returns site + HR lists so the /join form can render
@@ -23,7 +25,12 @@ export async function GET(req: Request) {
         // `ref` = the user id embedded in a personalized "Share Join Link". When
         // present we resolve that person's name so the form can pre-fill and lock
         // the HR contact — the candidate (and HR) don't pick it manually.
-        const ref = new URL(req.url).searchParams.get("ref")
+        const sp = new URL(req.url).searchParams
+        // `l` = a Join link (Onboarding → Join links): its recruiter becomes the
+        // HR contact, and its site / designation / type are filled in and locked.
+        const link = await findLink(sp.get("l")).catch(() => null)
+        if (link) bumpLink(link.id, "opens")
+        const ref = link?.recruiterId ?? sp.get("ref")
 
         const [sites, hrUsers, referrer, designations] = await Promise.all([
             prisma.site.findMany({
@@ -46,7 +53,11 @@ export async function GET(req: Request) {
                 })))
                 .catch(e => { console.error("[JOIN_GET designations]", e); return [] }),
         ])
-        return NextResponse.json({ sites, hrUsers, referrer, designations })
+        const state = link ? linkState(link) : null
+        return NextResponse.json({
+            sites, hrUsers, referrer, designations,
+            link: link ? { code: link.code, siteId: link.siteId, designation: link.designation, employmentType: link.employmentType, closed: state && !state.ok ? state.reason : null } : null,
+        })
     } catch (error) {
         console.error("[JOIN_GET]", error)
         return NextResponse.json({ sites: [], hrUsers: [], referrer: null, designations: [] }, { status: 200 })
@@ -78,7 +89,7 @@ export async function POST(req: Request) {
 
         const {
             firstName, lastName, middleName,
-            phone, email, designation,
+            phone, email,
             dateOfJoining,
             photo,
             // Personal
@@ -97,11 +108,23 @@ export async function POST(req: Request) {
             // Bank
             bankAccountNumber, bankIFSC, bankName, bankBranch,
             // Employment
-            employmentType, nationality, religion, caste, nameAsPerAadhar, alternatePhone,
+            nationality, religion, caste, nameAsPerAadhar, alternatePhone,
             // Site + HR assignment (NEW)
-            siteId, hrId,
             // Safety (declared by employee)
+            joinLink,
         } = body
+        let { siteId, hrId, designation, employmentType } = body
+        // A Join link decides the recruiter, and the site / designation / type it fixes.
+        const link = joinLink ? await findLink(joinLink) : null
+        if (joinLink && !link) return NextResponse.json({ error: "This joining link is not valid. Please ask HR for a new link." }, { status: 410 })
+        if (link) {
+            const st = linkState(link)
+            if (!st.ok) return NextResponse.json({ error: st.reason }, { status: 410 })
+            hrId = link.recruiterId
+            if (link.siteId) siteId = link.siteId
+            if (link.designation) designation = link.designation
+            if (link.employmentType) employmentType = link.employmentType
+        }
 
         if (!firstName?.trim() || !lastName?.trim() || !phone?.trim()) {
             return NextResponse.json(
@@ -137,19 +160,18 @@ export async function POST(req: Request) {
         // Store and dedupe on the same canonical form of the number.
         const normalizedPhone = normalizePhone(phone)
 
-        // Check if phone or email already exists. Case-insensitive on email so
-        // Sunil@x.com can't slip past a record stored as sunil@x.com. The
-        // messages tell the candidate what to DO — a bare "already registered"
-        // reads like a form bug and invites resubmitting; and being a public
-        // endpoint, they deliberately reveal nothing about the existing record.
-        if (email?.trim()) {
-            const byEmail = await prisma.employee.findFirst({
-                where: { email: { equals: email.trim(), mode: "insensitive" } },
-            })
-            if (byEmail) return NextResponse.json({ error: "This email is already registered. If you submitted this form earlier, do not register again — contact HR to continue your onboarding." }, { status: 409 })
+        // Already on record? Mobile and email always (they are the login); Aadhaar /
+        // PAN / bank / UAN per Join link settings — the duplicates cleaned up in Nov
+        // 2026 came in because only mobile/email were checked. The message is the
+        // same whoever matched (a public form reveals nothing about the record);
+        // HR is told, and an ex-employee coming back becomes a rejoin request.
+        const joinSettings = await getJoinSettings()
+        const match = await findJoinMatch({ phone: normalizedPhone, email, aadharNumber, panNumber, bankAccountNumber, uan }, joinSettings)
+        if (match) {
+            await alertBlockedJoin(match, { firstName, lastName, phone: normalizedPhone, designation, siteId, dateOfJoining, hrId }, joinSettings).catch(e => console.error("[JOIN_ALERT_BLOCKED]", e))
+            if (link) bumpLink(link.id, "blocked")
+            return NextResponse.json({ error: DUPLICATE_MESSAGE }, { status: 409 })
         }
-        const byPhone = await prisma.employee.findFirst({ where: { phone: normalizedPhone } })
-        if (byPhone) return NextResponse.json({ error: "This phone number is already registered. If you submitted this form earlier, do not register again — contact HR to continue your onboarding." }, { status: 409 })
 
         // Generate onboarding token for the external form link
         const onboardingToken = crypto.randomUUID().replace(/-/g, "")
@@ -247,6 +269,7 @@ export async function POST(req: Request) {
                         createdBy: ownerId,
                         assignedTo: ownerId,
                         convertedEmployeeId: employee.id,
+                        formSlug: link?.code ?? null,
                     } as any,
                 })
             }
@@ -294,6 +317,9 @@ export async function POST(req: Request) {
                 },
             },
         })
+
+        if (link) await bumpLink(link.id, "submits")
+        await alertNewJoiner({ name: [firstName.trim(), middleName?.trim(), lastName.trim()].filter(Boolean).join(" "), designation, siteId, hrId }, joinSettings).catch(e => console.error("[JOIN_ALERT_NEW]", e))
 
         return NextResponse.json({
             success: true,

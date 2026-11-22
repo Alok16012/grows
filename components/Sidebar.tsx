@@ -194,6 +194,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "Job Openings", href: "/jobs", permission: "jobs.view" },
                 { name: "Candidates", href: "/recruitment", permission: "recruitment.view" },
                 { name: "Onboarding", href: "/onboarding", permissionAny: ["onboarding.view", "recruitment.view"] },
+                { name: "Join Links", href: "/onboarding/join-links", permissionAny: ["onboarding.view", "recruitment.view"] },
                 { name: "Joining Letters", href: "/onboarding/letters", permissionAny: ["onboarding.view", "documents.send", "documents.view"] },
             ],
         },

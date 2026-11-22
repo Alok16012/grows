@@ -1088,6 +1088,7 @@ export default function OnboardingPage() {
                                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 42, borderRadius: 10, border: "1px solid #25d366", background: "#25d36612", color: "#128c3e", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
                                 Share on WhatsApp
                             </a>
+                            <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Need a link fixed to a site, a QR to print at the gate, or to see how many joined through it? <a href="/onboarding/join-links" style={{ color: "var(--accent)", fontWeight: 600 }}>Join links →</a></p>
                         </div>
                     </div>
                 </div>

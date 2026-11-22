@@ -139,13 +139,17 @@ export default function JoinPage() {
     // "Other" keeps a free-text fallback for a role nobody holds yet.
     const [designationOpts, setDesignationOpts] = useState<{ designation: string; onboardingPolicies: number }[]>([])
     const [designationOther, setDesignationOther] = useState(false)
+    // A Join link (?l=code) fixes the recruiter and, if set, the site / designation / type.
+    const [link, setLink] = useState<{ code: string; siteId: string | null; designation: string | null; employmentType: string | null; closed: string | null } | null>(null)
+    const startedRef = useRef(false)
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
         const ref = params.get("ref") || ""
         const role = params.get("role") || ""
+        const l = params.get("l") || ""
 
-        fetch(`/api/join${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`)
+        fetch(`/api/join${l ? `?l=${encodeURIComponent(l)}` : ref ? `?ref=${encodeURIComponent(ref)}` : ""}`)
             .then(r => r.json())
             .then(d => {
                 if (Array.isArray(d?.sites)) setSites(d.sites)
@@ -161,6 +165,15 @@ export default function JoinPage() {
                 }
                 const opts: { designation: string; onboardingPolicies: number }[] = Array.isArray(d?.designations) ? d.designations : []
                 setDesignationOpts(opts)
+                if (d?.link?.code) {
+                    setLink(d.link)
+                    if (d.link.siteId) set("siteId", d.link.siteId)
+                    if (d.link.employmentType) set("employmentType", d.link.employmentType)
+                    if (d.link.designation) {
+                        set("designation", d.link.designation)
+                        if (!opts.some(o => o.designation === d.link.designation)) setDesignationOther(true)
+                    }
+                }
                 // No list (e.g. it failed to load) → plain text box, as before.
                 if (!opts.length) setDesignationOther(true)
                 if (role) {
@@ -203,6 +216,20 @@ export default function JoinPage() {
         finally { setPhotoUploading(false) }
     }
 
+    const markStarted = () => {
+        if (startedRef.current || !link?.code) return
+        startedRef.current = true
+        fetch("/api/join/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ l: link.code, event: "start" }) }).catch(() => {})
+    }
+    // The first thing the candidate types counts as "started" for the link.
+    useEffect(() => {
+        if (!link?.code) return
+        const h = () => markStarted()
+        document.addEventListener("input", h, { once: true })
+        document.addEventListener("change", h, { once: true })
+        return () => { document.removeEventListener("input", h); document.removeEventListener("change", h) }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [link?.code])
     const set = (k: keyof FormData, v: string | boolean) =>
         setForm(prev => {
             const u = { ...prev, [k]: v }
@@ -412,7 +439,7 @@ export default function JoinPage() {
                 const res = await fetch("/api/join", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ...payload, photo: photo || undefined }),
+                    body: JSON.stringify({ ...payload, photo: photo || undefined, joinLink: link?.code || undefined }),
                 })
                 const data = await res.json()
                 if (!res.ok) {
@@ -545,6 +572,7 @@ export default function JoinPage() {
                     </div>
                     <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: "0 0 4px" }}>Employee Onboarding Form</h1>
                     <p style={{ fontSize: 13, color: "var(--text2)", margin: 0 }}>Fill in your details carefully. Fields marked <span style={{ color: "var(--red)" }}>*</span> are required.</p>
+                    {link?.closed && <p role="alert" style={{ fontSize: 13, fontWeight: 600, color: "var(--red)", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 10, padding: "10px 12px", margin: "12px 0 0" }}>{link.closed}</p>}
                 </div>
 
                 {/* Card */}
@@ -591,7 +619,7 @@ export default function JoinPage() {
                                     <div style={{ ...g2 }}>
                                         <div>
                                             <Lbl text="Work Site" required />
-                                            <select style={{ ...sel, borderColor: errors.siteId ? "var(--red)" : undefined }} value={form.siteId} onChange={e => { set("siteId", e.target.value); clrErr("siteId") }}>
+                                            <select disabled={!!link?.siteId} style={{ ...sel, borderColor: errors.siteId ? "var(--red)" : undefined }} value={form.siteId} onChange={e => { set("siteId", e.target.value); clrErr("siteId") }}>
                                                 <option value="">Select your work site</option>
                                                 {sites.map(s => (
                                                     <option key={s.id} value={s.id}>
@@ -823,7 +851,7 @@ export default function JoinPage() {
                                         <div>
                                             <Lbl text="Designation / Role" required />
                                             {designationOpts.length > 0 && (
-                                                <select aria-label="Designation / Role" style={{ ...sel, borderColor: errors.designation ? "var(--red)" : undefined }}
+                                                <select disabled={!!link?.designation} aria-label="Designation / Role" style={{ ...sel, borderColor: errors.designation ? "var(--red)" : undefined }}
                                                     value={designationOther ? "__other__" : form.designation}
                                                     onChange={e => {
                                                         const v = e.target.value
@@ -837,7 +865,7 @@ export default function JoinPage() {
                                                 </select>
                                             )}
                                             {designationOther && (
-                                                <input aria-label="Type your designation" style={{ ...inp, marginTop: designationOpts.length ? 8 : 0, borderColor: errors.designation ? "var(--red)" : undefined }}
+                                                <input disabled={!!link?.designation} aria-label="Type your designation" style={{ ...inp, marginTop: designationOpts.length ? 8 : 0, borderColor: errors.designation ? "var(--red)" : undefined }}
                                                     placeholder={designationOpts.length ? "Type your designation" : "e.g. Security Guard"}
                                                     value={form.designation} onChange={e => { set("designation", e.target.value); clrErr("designation") }} />
                                             )}

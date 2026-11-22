@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import { notifyApprovers } from "@/lib/hr-notify"
 import { applyDueMovements } from "@/lib/employee-movement"
 import { runDueLetters } from "@/lib/letter-schedule-server"
+import { remindWaitingJoiners } from "@/lib/join-server"
 
 export async function runPeopleDaily(now = new Date()) {
     const applied = await applyDueMovements(now)
@@ -12,5 +13,6 @@ export async function runPeopleDaily(now = new Date()) {
     if (waiting) await notifyApprovers(["employees.edit"], { title: "Employee changes waiting", message: `${waiting} employee change request(s) have been waiting more than a day for approval.`, type: "employee", link: "/employees/changes" })
     let letters: Awaited<ReturnType<typeof runDueLetters>> | { error: string }
     try { letters = await runDueLetters(now) } catch (e) { console.error("[PEOPLE_DAILY_LETTERS]", e); letters = { error: "letters failed" } }
-    return { applied, waiting, letters }
+    const joinersWaiting = await remindWaitingJoiners(now).catch(e => { console.error("[PEOPLE_DAILY_JOINERS]", e); return -1 })
+    return { applied, waiting, letters, joinersWaiting }
 }

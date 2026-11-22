@@ -3149,3 +3149,26 @@ model EmployeeMovement {
   @@index([employeeId])
   @@index([status, effectiveDate], map: "EmployeeMovement_due_idx")
 }
+
+/// Onboarding → Join links: a shareable /join?l=<code> link for a recruiter, optionally fixed to a site and designation.
+model JoinLink {
+  id             String    @id @default(uuid())
+  code           String    @unique
+  name           String
+  recruiterId    String
+  siteId         String?
+  designation    String?
+  employmentType String?
+  isActive       Boolean   @default(true)
+  expiresAt      DateTime?
+  maxUses        Int?
+  opens          Int       @default(0)
+  starts         Int       @default(0)
+  submits        Int       @default(0)
+  blocked        Int       @default(0)
+  createdBy      String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([recruiterId])
+}
