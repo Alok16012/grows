@@ -191,11 +191,37 @@ async function handle(req: Request, ctx: { draft: number }): Promise<NextRespons
             const rowsFor = stateFilter ? payrolls.filter(p => p.employee.state?.toLowerCase() === stateFilter.toLowerCase()) : payrolls
             const members = rowsFor.filter(p => (p.esiEmployee || 0) + (p.esiEmployer || 0) > 0
                 || (!(p.presentDays ?? 0) && !!p.employee.esiNumber && statutory.get(p.employee.id)?.esicApplicable !== false))
-            if (!members.length) return new NextResponse("No ESIC members for this period", { status: 404 })
-            const { file, rows, missing } = buildEsicEcrXls(members.map(p => ({
+            // Last working date: the exit / F&F record first, else Employee Master.
+            const monthStart = new Date(Date.UTC(year, month - 1, 1) - 5.5 * 3600 * 1000)
+            const monthEnd = new Date(Date.UTC(year, month, 1) - 5.5 * 3600 * 1000)
+            const exits: any[] = await prisma.exitRequest.findMany({
+                where: { status: { not: "CANCELLED" as any }, OR: [{ employeeId: { in: members.map(p => p.employee.id) } }, { lastWorkingDate: { gte: monthStart, lt: monthEnd } }] },
+                select: { employeeId: true, lastWorkingDate: true, employee: { select: { id: true, employeeId: true, firstName: true, lastName: true, esiNumber: true, state: true } } },
+            }).catch(() => [])
+            const lwdOf = new Map<string, Date>(exits.filter(e => e.lastWorkingDate).map(e => [e.employeeId, e.lastWorkingDate]))
+            const list = members.map(p => ({
                 ipNumber: p.employee.esiNumber, name: `${p.employee.firstName} ${p.employee.lastName}`, empCode: p.employee.employeeId,
-                days: p.presentDays ?? 0, wages: esiWages(p, rules), leftOn: p.employee.dateOfLeaving ?? null,
-            })), { month, year })
+                days: p.presentDays ?? 0, wages: esiWages(p, rules), leftOn: lwdOf.get(p.employee.id) ?? p.employee.dateOfLeaving ?? null,
+            }))
+            // Left this month but no payroll row: still listed (0 days, reason 2) so ESIC removes the IP.
+            if (!siteId) {
+                const inFile = new Set(members.map(p => p.employee.id))
+                const extra = exits.filter(e => e.lastWorkingDate && e.lastWorkingDate >= monthStart && e.lastWorkingDate < monthEnd && !inFile.has(e.employeeId) && e.employee?.esiNumber
+                    && (!stateFilter || e.employee.state?.toLowerCase() === stateFilter.toLowerCase()))
+                // …and leavers known only by their Employee Master leaving date.
+                const viaMaster = await prisma.employee.findMany({
+                    where: { dateOfLeaving: { gte: monthStart, lt: monthEnd }, esiNumber: { not: null }, id: { notIn: [...Array.from(inFile), ...extra.map(e => e.employeeId)] } },
+                    select: { id: true, employeeId: true, firstName: true, lastName: true, esiNumber: true, state: true, dateOfLeaving: true },
+                })
+                for (const e of viaMaster) if (!lwdOf.has(e.id) && (!stateFilter || e.state?.toLowerCase() === stateFilter.toLowerCase()))
+                    extra.push({ employeeId: e.id, lastWorkingDate: e.dateOfLeaving, employee: e })
+                const flags = extra.length ? await statutoryFlagsForMonth(extra.map(e => e.employeeId), { month, year }) : new Map()
+                for (const e of extra) if (flags.get(e.employeeId)?.esicApplicable !== false) list.push({
+                    ipNumber: e.employee.esiNumber, name: `${e.employee.firstName} ${e.employee.lastName}`, empCode: e.employee.employeeId, days: 0, wages: 0, leftOn: e.lastWorkingDate,
+                })
+            }
+            if (!list.length) return new NextResponse("No ESIC members for this period", { status: 404 })
+            const { file, rows, missing } = buildEsicEcrXls(list, { month, year })
             return new NextResponse(new Uint8Array(file), {
                 headers: {
                     "Content-Type": "application/vnd.ms-excel",

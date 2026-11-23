@@ -40,9 +40,10 @@ const ddmmyyyy = (d: Date) => {
 }
 
 /**
- * Builds the .xls. `period` decides the reason code for 0-day rows: someone
- * whose leaving date is on or before the month's end gets 2 (left service)
- * with that date; other 0-day rows get 0 and no date (portal rules).
+ * Builds the .xls. Anyone whose last working date (exit / F&F, else Employee
+ * Master) is on or before the month's end gets reason 2 (left service) with
+ * that date — client rule, also for a leaver who worked part of the month.
+ * Everyone else gets 0 and no date.
  * Members without a valid 10-digit IP number can't be uploaded: they go on a
  * second sheet so payroll can fix them, never silently dropped.
  */
@@ -56,7 +57,8 @@ export function buildEsicEcrXls(members: EsicEcrMember[], period: { month: numbe
         // Whole days, rounded up, never more than the month has (the portal rejects more; extra days stay paid in the wages).
         const days = Math.min(daysInMonth, Math.max(0, Math.ceil(Number(m.days) || 0)))
         const wages = days > 0 ? Math.max(0, Math.round(Number(m.wages) || 0)) : 0
-        const left = days === 0 && m.leftOn && m.leftOn.getTime() <= monthEnd.getTime() ? m.leftOn : null
+        // Leaver (F&F last working date on or before the month end): reason 2 + that date, worked days or not.
+        const left = m.leftOn && m.leftOn.getTime() <= monthEnd.getTime() ? m.leftOn : null
         if (ip.length !== 10) {
             missing.push([m.empCode, nameOf(m.name), ip || "(blank)", String(days), String(wages)])
             continue
