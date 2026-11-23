@@ -96,15 +96,18 @@ export async function GET(req: Request) {
                 responses: {
                     include: { field: true },
                 },
+                // Only the names this report shows. Loading the whole User row
+                // here pulled each inspector's profile photo (a ~160 KB data URL)
+                // and password hash twice per inspection — ~270 MB for one month,
+                // which is what made the report take 10–15 seconds to load.
                 assignment: {
-                    include: {
+                    select: {
                         project: {
-                            include: { site: { select: { id: true, name: true } } },
+                            select: { name: true, siteId: true, site: { select: { id: true, name: true } } },
                         },
-                        inspectionBoy: true,
+                        inspectionBoy: { select: { name: true } },
                     },
                 },
-                submitter: true,
             },
             orderBy: { submittedAt: "desc" },
         })

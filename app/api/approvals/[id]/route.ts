@@ -86,7 +86,7 @@ export async function PATCH(
         const inspection = await prisma.inspection.findUnique({
             where: { id: inspectionId },
             include: {
-                submitter: true,
+                submitter: { select: { id: true, name: true, email: true } },
                 assignment: { include: { project: { include: { site: { select: { id: true, name: true } } } } } }
             }
         })
