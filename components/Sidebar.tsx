@@ -40,7 +40,7 @@ type NavLink = {
     // anyone who already has it ("Attendance" → same route). Hide the
     // self-service copy for ADMIN and for holders of this permission.
     hideIfHas?: string
-    // Employee-only entries (My Onboarding, My Learning…) that ADMIN never needs.
+    // Employee-only entries (My Learning…) that ADMIN never needs.
     hideForAdmin?: boolean
     // Small heading printed above this link inside its category (Settings
     // splits into Organisation / Users & Access / HR & Payroll Rules).
@@ -300,7 +300,6 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 // Every employee can refer people for open jobs.
                 { name: "Jobs & Refer", href: "/refer", permission: "self.view", hideIfHas: "jobs.view", group: "My work" },
                 { name: "My Profile", href: "/profile", permission: "self.view", group: "My account" },
-                { name: "My Onboarding", href: "/self-onboarding", permission: "self.view", hideForAdmin: true, group: "My account" },
                 { name: "Announcements", href: "/announcements", permission: "self.view", hideIfHas: "announcements.view", group: "My account" },
                 { name: "Help & Support", href: "/helpdesk", permission: "self.view", hideIfHas: "helpdesk.view", group: "My account" },
             ],

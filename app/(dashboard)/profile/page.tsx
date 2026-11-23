@@ -4,13 +4,14 @@ import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { roleLabel } from "@/lib/role-label"
 import { OpenFromQuery } from "@/components/OpenFromQuery"
+import { MyDetailsWizard } from "@/components/profile/MyDetailsWizard"
 import { StatCard, statGridClass } from "@/components/StatCard"
 import { PolicySignStep } from "@/components/PolicySignStep"
 import {
     User, Phone, Mail, Save, Loader2, Upload, FileText,
     CheckCircle2, Clock, XCircle, AlertCircle, ChevronDown,
     IndianRupee, Shield, ClipboardList, X, Printer, BookOpen, Download,
-    UserCircle2, MapPin, CreditCard, Contact, Camera, LogIn, LogOut, Package, FileSignature
+    UserCircle2, MapPin, CreditCard, Contact, Camera, LogIn, LogOut, Package, FileSignature, BadgeCheck
 } from "lucide-react"
 import { ResignationCard } from "@/components/ResignationCard"
 import {
@@ -994,9 +995,11 @@ function ChangePasswordCard() {
     )
 }
 
+const TAB_KEYS = ["details", "onboarding", "documents", "policies", "attendance", "payslip", "letters", "assets"]
+
 export default function ProfilePage() {
     const { data: session, update } = useSession()
-    const [activeTab, setActiveTab] = useState<"profile"|"attendance"|"documents"|"onboarding"|"payslip"|"letters"|"assets"|"policies">("profile")
+    const [activeTab, setActiveTab] = useState<"profile"|"details"|"attendance"|"documents"|"onboarding"|"payslip"|"letters"|"assets"|"policies">("profile")
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [formData, setFormData] = useState({ name: "", email: "", phone: "", role: "", image: "" })
@@ -1019,7 +1022,7 @@ export default function ProfilePage() {
     // Notification links land on a tab: /profile?tab=letters, ?tab=documents, ?tab=assets …
     useEffect(() => {
         const t = new URLSearchParams(window.location.search).get("tab")
-        if (t && ["attendance", "documents", "letters", "onboarding", "payslip", "assets", "policies"].includes(t)) setActiveTab(t as typeof activeTab)
+        if (t && TAB_KEYS.includes(t)) setActiveTab(t as typeof activeTab)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -1078,19 +1081,24 @@ export default function ProfilePage() {
 
     // Notification links can land on a tab (asset issued → ?tab=assets).
     const openTab = (key: string) => {
-        if (["attendance", "documents", "letters", "onboarding", "payslip", "assets", "policies"].includes(key)) setActiveTab(key as typeof activeTab)
+        if (TAB_KEYS.includes(key)) setActiveTab(key as typeof activeTab)
     }
 
+    // Employee-only tabs need a linked employee record; everyone else stays on Profile.
+    const tab = isEmployee ? activeTab : "profile"
+
     const tabs = [
-        { key: "profile",    label: "Profile",       icon: User },
+        // Standard self-service order: who I am → joining → my papers → work → pay → items.
+        { key: "profile",    label: "Profile",     icon: User },
         ...(isEmployee ? [
-            { key: "attendance", label: "My Attendance", icon: Clock },
-            { key: "documents",  label: "My Documents",  icon: FileText },
-            { key: "letters",    label: "My Letters",    icon: BookOpen },
-            { key: "onboarding", label: "My Onboarding", icon: ClipboardList },
-            { key: "payslip",    label: "My Payslip",    icon: IndianRupee },
-            { key: "assets",     label: "My Assets",     icon: Package },
-            { key: "policies",   label: "My Policies",   icon: FileSignature },
+            { key: "details",    label: "My Details",  icon: BadgeCheck },
+            { key: "onboarding", label: "Onboarding",  icon: ClipboardList },
+            { key: "documents",  label: "Documents",   icon: FileText },
+            { key: "policies",   label: "Policies",    icon: FileSignature },
+            { key: "attendance", label: "Attendance",  icon: Clock },
+            { key: "payslip",    label: "Payslips",    icon: IndianRupee },
+            { key: "letters",    label: "Letters",     icon: BookOpen },
+            { key: "assets",     label: "Assets",      icon: Package },
         ] : [])
     ] as { key: typeof activeTab; label: string; icon: any }[]
 
@@ -1139,18 +1147,18 @@ export default function ProfilePage() {
             </div>
 
             {/* Tabs */}
-            {/* Up to 6 tabs — the strip scrolls sideways instead of overflowing narrow screens. */}
+            {/* Many tabs — the strip scrolls sideways instead of overflowing narrow screens. */}
             <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
                 {tabs.map(({ key, label, icon: Icon }) => (
-                    <button key={key} role="tab" aria-selected={activeTab === key} onClick={() => setActiveTab(key)}
-                        className={`z-tab ${activeTab === key ? "is-active" : ""}`}>
+                    <button key={key} role="tab" aria-selected={tab === key} onClick={() => setActiveTab(key)}
+                        className={`z-tab ${tab === key ? "is-active" : ""}`}>
                         <Icon size={14} />{label}
                     </button>
                 ))}
             </div></div>
 
             {/* ── Profile tab ── */}
-            {activeTab === "profile" && (
+            {tab === "profile" && (
                 <form onSubmit={saveProfile} className="bg-white border border-[var(--border)] rounded-2xl p-6 space-y-5">
                     <div>
                         <label className="text-[11px] font-medium text-[var(--text3)] uppercase tracking-wide block mb-1.5">Full Name</label>
@@ -1184,16 +1192,17 @@ export default function ProfilePage() {
                 </form>
             )}
 
-            {activeTab === "profile" && <ChangePasswordCard />}
-            {activeTab === "profile" && isEmployee && <ResignationCard />}
+            {tab === "profile" && <ChangePasswordCard />}
+            {tab === "profile" && isEmployee && <ResignationCard />}
 
-            {activeTab === "attendance" && <AttendanceTab />}
-            {activeTab === "documents"  && <DocsTab />}
-            {activeTab === "letters"    && <LettersTab />}
-            {activeTab === "onboarding" && <OnboardingTab />}
-            {activeTab === "payslip"    && <PayslipTab />}
-            {activeTab === "assets"     && <AssetsTab />}
-            {activeTab === "policies"   && (
+            {tab === "details"    && <MyDetailsWizard />}
+            {tab === "attendance" && <AttendanceTab />}
+            {tab === "documents"  && <DocsTab />}
+            {tab === "letters"    && <LettersTab />}
+            {tab === "onboarding" && <OnboardingTab />}
+            {tab === "payslip"    && <PayslipTab />}
+            {tab === "assets"     && <AssetsTab />}
+            {tab === "policies"   && (
                 <div className="bg-white border border-[var(--border)] rounded-2xl p-5">
                     <p className="text-[15px] font-semibold text-[var(--text)] mb-0.5">My Policies</p>
                     <p className="text-[12px] text-[var(--text3)] mb-4">Company policies for your designation. New or updated ones that need your signature show here.</p>
