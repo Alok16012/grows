@@ -1929,6 +1929,34 @@ function monthRange(month: string): { from: string; to: string } {
 // One employee's expenses as an Excel file: every category line, plus a
 // second sheet with each travel journey. `items` are per-category parts (see
 // expenseParts), so a multi-category expense contributes one row per line.
+// One row per claim line with everything the claim popup shows — used by every expense download.
+const CLAIM_HEADER = ["Date", "Month", "Expense No", "Title", "Category", "Description", "Site / Project", "Status",
+    "Approved by", "Approved on", "Paid via", "Payment mode", "Transaction ID", "Paid on", "Receipt", "Rejection reason", "Amount (₹)"]
+const CLAIM_COLS = [12, 10, 14, 30, 20, 40, 22, 12, 18, 12, 10, 12, 18, 12, 9, 24, 12].map(wch => ({ wch }))
+function claimRow(i: any): (string | number)[] {
+    const trail: any[] = Array.isArray(i.approvalTrail) ? i.approvalTrail : []
+    const approved = [...trail].reverse().find(t => t?.action === "APPROVED")
+    const dt = (v: any) => (v ? format(new Date(v), "dd-MM-yyyy") : "")
+    const kms = (Array.isArray(i.travelEntries) ? i.travelEntries : []).reduce((s: number, j: any) => s + (Number(j.kms) || 0), 0)
+    return [
+        dt(i.date), format(new Date(i.date), "MMM yyyy"), i.expenseNo ?? "", i.title ?? "",
+        categoryLabel(i.category) + (kms ? ` (${kms} km)` : ""),
+        i.description ?? "", i.siteName ?? i.project?.name ?? "", statusStyle(i.status)?.label ?? i.status,
+        approved?.byName ?? "", dt(approved?.at ?? i.approvedAt),
+        i.settledVia === "PAYROLL" ? `Salary ${i.payrollMonth ?? ""}/${i.payrollYear ?? ""}` : i.settledVia === "BANK" ? "Bank" : "",
+        i.paymentMode ?? "", i.transactionId ?? "", dt(i.paymentDate ?? i.paidAt),
+        i.receiptUrl ? "Yes" : "No", i.rejectionReason ?? "", Number(i.amount) || 0,
+    ]
+}
+function journeyRows(items: any[], who?: (i: any) => (string | number)[]) {
+    return items.flatMap(i => (Array.isArray(i.travelEntries) ? i.travelEntries : []).map((j: any) => [
+        ...(who ? who(i) : []),
+        j.date ? format(new Date(j.date), "dd-MM-yyyy") : "", i.expenseNo ?? "",
+        j.vehicleType === "2W" ? "2-Wheeler" : j.vehicleType === "4W" ? "4-Wheeler" : "",
+        j.from ?? "", j.to ?? "", Number(j.kms) || 0, Number(j.amount) || 0,
+    ]))
+}
+
 async function downloadExpenseStatement(fileName: string, heading: string, items: any[]) {
     const XLSX = await loadXLSX()
     const sorted = [...items].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -1936,33 +1964,17 @@ async function downloadExpenseStatement(fileName: string, heading: string, items
     const lines = [
         [heading],
         [],
-        ["Date", "Month", "Expense No", "Title", "Category", "Description", "Status", "Amount (₹)"],
-        ...sorted.map(i => [
-            format(new Date(i.date), "dd-MM-yyyy"),
-            format(new Date(i.date), "MMM yyyy"),
-            i.expenseNo ?? "",
-            i.title ?? "",
-            categoryLabel(i.category),
-            i.description ?? "",
-            statusStyle(i.status)?.label ?? i.status,
-            Number(i.amount) || 0,
-        ]),
+        CLAIM_HEADER,
+        ...sorted.map(claimRow),
         [],
-        ["", "", "", "", "", "", "Total", total],
+        [...CLAIM_HEADER.slice(0, -2).map(() => ""), "Total", total],
     ]
     const ws = XLSX.utils.aoa_to_sheet(lines)
-    ws["!cols"] = [{ wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 30 }, { wch: 20 }, { wch: 36 }, { wch: 12 }, { wch: 12 }]
+    ws["!cols"] = CLAIM_COLS
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "Expenses")
 
-    const journeys = sorted.flatMap(i => (Array.isArray(i.travelEntries) ? i.travelEntries : []).map((j: any) => [
-        j.date ? format(new Date(j.date), "dd-MM-yyyy") : "",
-        i.expenseNo ?? "",
-        j.vehicleType === "2W" ? "2-Wheeler" : j.vehicleType === "4W" ? "4-Wheeler" : "",
-        j.from ?? "", j.to ?? "",
-        Number(j.kms) || 0,
-        Number(j.amount) || 0,
-    ]))
+    const journeys = journeyRows(sorted)
     if (journeys.length > 0) {
         const wj = XLSX.utils.aoa_to_sheet([["Date", "Expense No", "Vehicle", "From", "To", "KMs", "Amount (₹)"], ...journeys])
         wj["!cols"] = [{ wch: 12 }, { wch: 14 }, { wch: 11 }, { wch: 26 }, { wch: 26 }, { wch: 8 }, { wch: 12 }]
@@ -2202,7 +2214,10 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
     }
 
     // The table as it stands (search applied), one row per employee.
+    const [downloadingTeam, setDownloadingTeam] = useState(false)
     const downloadTeamMonth = async () => {
+        setDownloadingTeam(true)
+        try {
         const XLSX = await loadXLSX()
         const header = ["Employee", "Employee ID", "Designation", "Dept", ...teamCols.map(c => c.label), "Total (₹)"]
         const body = visibleRows.map(r => [r.name, r.employeeId ?? "", r.designation ?? "", r.department ?? "", ...teamCols.map(c => r[c.key] || 0), r.total || 0])
@@ -2211,7 +2226,41 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
         ws["!cols"] = header.map((_, i) => ({ wch: i === 0 ? 26 : 13 }))
         const wb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(wb, ws, "Employee Summary")
-        XLSX.writeFile(wb, `Expense_Summary_${month}${q ? `_${fileSafe(empSearch)}` : ""}.xlsx`)
+
+        // Every claim behind those totals, with the employee on each row.
+        const { from, to } = monthRange(month)
+        const res = await fetch(`/api/expenses?dateFrom=${from}&dateTo=${to}`)
+        const list: any[] = res.ok ? await res.json() : []
+        const byUser = new Map<string, any>()
+        for (const r of visibleRows) { if (r.userId) byUser.set(r.userId, r); byUser.set(r.id, r) }
+        const who = (i: any) => { const r = byUser.get(i.submittedBy); return [r?.name ?? "", r?.employeeId ?? "", r?.designation ?? "", r?.department ?? ""] }
+        // Same statuses as the summary: drafts and rejected claims aren't in the totals.
+        const items = (Array.isArray(list) ? list : [])
+            .filter(e => e.status !== "DRAFT" && e.status !== "REJECTED" && byUser.has(e.submittedBy))
+            .flatMap(e => expenseParts(e).map(p => p.item))
+            .sort((a, b) => who(a)[0].localeCompare(who(b)[0]) || new Date(a.date).getTime() - new Date(b.date).getTime())
+        const whoHead = ["Employee", "Employee ID", "Designation", "Dept"]
+        const claimsTotal = items.reduce((s, i) => s + (Number(i.amount) || 0), 0)
+        const wc = XLSX.utils.aoa_to_sheet([
+            [...whoHead, ...CLAIM_HEADER],
+            ...items.map(i => [...who(i), ...claimRow(i)]),
+            [],
+            [...whoHead.map(() => ""), ...CLAIM_HEADER.slice(0, -2).map(() => ""), "Total", claimsTotal],
+        ])
+        wc["!cols"] = [{ wch: 24 }, { wch: 12 }, { wch: 18 }, { wch: 14 }, ...CLAIM_COLS]
+        XLSX.utils.book_append_sheet(wb, wc, "All Claims")
+        const journeys = journeyRows(items, i => who(i).slice(0, 2))
+        if (journeys.length) {
+            const wj = XLSX.utils.aoa_to_sheet([["Employee", "Employee ID", "Date", "Expense No", "Vehicle", "From", "To", "KMs", "Amount (₹)"], ...journeys])
+            wj["!cols"] = [{ wch: 24 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 11 }, { wch: 26 }, { wch: 26 }, { wch: 8 }, { wch: 12 }]
+            XLSX.utils.book_append_sheet(wb, wj, "Travel Journeys")
+        }
+        XLSX.writeFile(wb, `Expense_Report_${month}${q ? `_${fileSafe(empSearch)}` : ""}.xlsx`)
+        } catch {
+            toast.error("Download failed")
+        } finally {
+            setDownloadingTeam(false)
+        }
     }
 
     // Drill-down: the whole year for one employee.
@@ -2262,10 +2311,10 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                                 </button>
                             )}
                         </div>
-                        <button onClick={downloadTeamMonth} disabled={visibleRows.length === 0}
+                        <button onClick={downloadTeamMonth} disabled={visibleRows.length === 0 || downloadingTeam}
                             title={q ? "Download the matching employees for this month" : "Download all employees for this month"}
                             style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: "white", color: "var(--text2)", fontSize: 12, fontWeight: 600, cursor: visibleRows.length ? "pointer" : "not-allowed", opacity: visibleRows.length ? 1 : 0.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                            <Download size={13} /> Download{q ? ` (${visibleRows.length})` : ""}
+                            {downloadingTeam ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Download{q ? ` (${visibleRows.length})` : ""}
                         </button>
                     </>
                 )}
