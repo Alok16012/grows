@@ -12,6 +12,7 @@ import {
 import { format, formatDistanceToNow } from "date-fns"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { StatCard, statGridClass } from "@/components/StatCard"
+import { ProfileApprovals } from "@/components/onboarding/ProfileApprovals"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -758,6 +759,19 @@ export default function OnboardingPage() {
     const [records, setRecords] = useState<OnboardingRecord[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("ALL")
+    // Joiners (the list below) or Approvals — employee updates waiting (?tab=approvals).
+    const [view, setView] = useState<"joiners" | "approvals">("joiners")
+    const [apprCount, setApprCount] = useState<number | null>(null)
+    useEffect(() => {
+        if (new URLSearchParams(window.location.search).get("tab") === "approvals") setView("approvals")
+        fetch("/api/onboarding/approvals?count=1").then(r => r.ok ? r.json() : null).then(j => { if (j) setApprCount(j.count) }).catch(() => {})
+    }, [])
+    const switchView = (v: "joiners" | "approvals") => {
+        setView(v)
+        const u = new URL(window.location.href)
+        if (v === "approvals") u.searchParams.set("tab", "approvals"); else u.searchParams.delete("tab")
+        window.history.replaceState(null, "", u.toString())
+    }
     const [search, setSearch] = useState("")
     // Debounced copy of `search` — the actual fetch keys off this so we don't
     // fire a request on every keystroke (which caused out-of-order responses to
@@ -905,6 +919,17 @@ export default function OnboardingPage() {
                 </div>
             </div>
 
+            {/* Joiners | Approvals */}
+            <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
+                <button role="tab" aria-selected={view === "joiners"} onClick={() => switchView("joiners")} className={`z-tab ${view === "joiners" ? "is-active" : ""}`}><Users size={14} /> Joiners</button>
+                <button role="tab" aria-selected={view === "approvals"} onClick={() => switchView("approvals")} className={`z-tab ${view === "approvals" ? "is-active" : ""}`}>
+                    <CheckCircle2 size={14} /> Approvals
+                    {!!apprCount && <span style={{ marginLeft: 6, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "#f59e0b", color: "#fff", fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{apprCount}</span>}
+                </button>
+            </div></div>
+            {view === "approvals" && <ProfileApprovals onCount={setApprCount} />}
+
+            <div style={{ display: view === "approvals" ? "none" : "contents" }}>
             {/* KPI cards */}
             <div className={statGridClass(kpis.length)}>
                 {kpis.map((s, i) => (
@@ -1036,6 +1061,8 @@ export default function OnboardingPage() {
                     </div>
                 </div>
             )}
+
+            </div>
 
             {/* Detail Modal */}
             {selected && (

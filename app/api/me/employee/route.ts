@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { holdForApproval, createChangeRequest } from "@/lib/employee-change"
+import { holdForApproval, createChangeRequest, pendingSelfChanges, isDocChange } from "@/lib/employee-change"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { pickPhotoUrl } from "@/lib/employee-photo"
@@ -71,7 +71,11 @@ export async function GET(req: Request) {
         if (url) (emp as any).photo = url
     }
 
-    return NextResponse.json(ownRecord(emp))
+    // Changes waiting in Onboarding → Approvals: show the new value with a note.
+    const pending = (await pendingSelfChanges(emp.id)).filter(c => !isDocChange(c))
+    const out: Record<string, unknown> = { ...ownRecord(emp) }
+    for (const c of pending) out[c.field] = c.to
+    return NextResponse.json({ ...out, ...(pending.length ? { pendingApproval: pending.map(c => c.label), pendingFields: pending.map(c => c.field) } : {}) })
 }
 
 export async function PATCH(req: Request) {
@@ -120,8 +124,8 @@ export async function PATCH(req: Request) {
         }
     }
 
-    // Bank, PAN, Aadhaar, UAN, name … (People → Change requests settings) go to
-    // HR for approval instead of changing at once.
+    // Employee's own changes go to Onboarding → Approvals instead of changing at
+    // once (all fields, or the People → Change requests list — settings).
     const { data: writeNow, held } = await holdForApproval(emp, data, { source: "SELF", isAdmin: false })
     if (held.length) await createChangeRequest({ employeeId: emp.id, requestedBy: session.user.id, requesterName: session.user.name ?? "Employee", source: "SELF", changes: held, reason: typeof body?.changeReason === "string" ? body.changeReason.slice(0, 300) : null })
 

@@ -88,6 +88,12 @@ export type PeopleSettings = {
         hrChanges: boolean
         /** Admins change them directly. */
         adminBypass: boolean
+        /** Onboarding → Approvals: every field an employee changes themself is held, not only the list above. */
+        selfAllFields: boolean
+        /** Documents an employee uploads themself are held until approved. */
+        selfDocs: boolean
+        /** Also for joiners whose joining is not approved yet (status Onboarding). */
+        joinersToo: boolean
     }
 }
 
@@ -106,6 +112,7 @@ export const DEFAULT_PEOPLE_SETTINGS: PeopleSettings = {
     approval: {
         fields: ["bankAccountNumber", "bankIFSC", "bankName", "panNumber", "aadharNumber", "nameAsPerAadhar", "uan", "pfNumber", "esiNumber", "firstName", "lastName", "dateOfBirth"],
         selfService: true, hrChanges: false, adminBypass: true,
+        selfAllFields: true, selfDocs: true, joinersToo: true,
     },
 }
 
@@ -131,6 +138,9 @@ export function sanitizePeopleSettings(v: any): PeopleSettings {
             selfService: typeof ap.selfService === "boolean" ? ap.selfService : d.approval.selfService,
             hrChanges: typeof ap.hrChanges === "boolean" ? ap.hrChanges : d.approval.hrChanges,
             adminBypass: typeof ap.adminBypass === "boolean" ? ap.adminBypass : d.approval.adminBypass,
+            selfAllFields: typeof ap.selfAllFields === "boolean" ? ap.selfAllFields : d.approval.selfAllFields,
+            selfDocs: typeof ap.selfDocs === "boolean" ? ap.selfDocs : d.approval.selfDocs,
+            joinersToo: typeof ap.joinersToo === "boolean" ? ap.joinersToo : d.approval.joinersToo,
         },
     }
 }

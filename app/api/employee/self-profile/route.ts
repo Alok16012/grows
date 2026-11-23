@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { holdForApproval, createChangeRequest, pendingSelfChanges, isDocChange } from "@/lib/employee-change"
 import {
     collectErrors, validationResponse,
     validatePhone, validateEmail, validateAadhaar, validatePAN,
@@ -47,7 +48,11 @@ export async function GET() {
         })
 
         if (!employee) return NextResponse.json({ error: "No employee profile linked" }, { status: 404 })
-        return NextResponse.json(employee)
+        // Changes waiting for approval: show what the employee typed.
+        const pending = (await pendingSelfChanges(employee.id)).filter(c => !isDocChange(c) && c.field in employee)
+        const out: Record<string, unknown> = { ...employee }
+        for (const c of pending) out[c.field] = c.to
+        return NextResponse.json({ ...out, ...(pending.length ? { pendingApproval: pending.map(c => c.label), pendingFields: pending.map(c => c.field) } : {}) })
     } catch (e) {
         console.error("self-profile GET error:", e)
         return NextResponse.json({ error: "Server error. Please try again." }, { status: 500 })
@@ -59,7 +64,7 @@ export async function PATCH(req: Request) {
         const session = await getServerSession(authOptions)
         if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-        const employee = await prisma.employee.findFirst({ where: { userId: session.user.id }, select: { id: true } })
+        const employee = await prisma.employee.findFirst({ where: { userId: session.user.id } })
         if (!employee) return NextResponse.json({ error: "No employee profile found" }, { status: 404 })
 
         const body = await req.json()
@@ -106,8 +111,11 @@ export async function PATCH(req: Request) {
             }
         }
 
-        const updated = await prisma.employee.update({ where: { id: employee.id }, data })
-        return NextResponse.json({ success: true, id: updated.id })
+        // Held for Onboarding → Approvals (settings: People → Change requests).
+        const { data: writeNow, held } = await holdForApproval(employee, data, { source: "SELF", isAdmin: false })
+        if (held.length) await createChangeRequest({ employeeId: employee.id, requestedBy: session.user.id, requesterName: session.user.name ?? "Employee", source: "SELF", changes: held })
+        const updated = Object.keys(writeNow).length ? await prisma.employee.update({ where: { id: employee.id }, data: writeNow }) : employee
+        return NextResponse.json({ success: true, id: updated.id, ...(held.length ? { pendingApproval: held.map(h => h.label) } : {}) })
     } catch (e) {
         console.error("self-profile PATCH error:", e)
         return NextResponse.json({ error: "Save failed. Please try again." }, { status: 500 })

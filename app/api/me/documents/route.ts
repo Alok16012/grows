@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { isPhotoDoc } from "@/lib/employee-photo"
 import { getApiSession } from "@/lib/apiSession"
+import { holdsDocuments, createChangeRequest, pendingSelfChanges, isDocChange } from "@/lib/employee-change"
+import { DOC_LABELS } from "@/lib/doc-labels"
 
 // Find employee linked to logged-in user
 async function getMyEmployee(userId: string) {
@@ -21,7 +23,12 @@ export async function GET(req: Request) {
         where: { employeeId: emp.id },
         orderBy: { uploadedAt: "desc" }
     })
-    return NextResponse.json(docs)
+    // Uploads waiting in Onboarding → Approvals come first, so the page shows them.
+    const waiting = (await pendingSelfChanges(emp.id)).filter(isDocChange).map(c => ({
+        id: `pending-${c.field.slice(4)}`, employeeId: emp.id, type: c.field.slice(4), fileName: c.to ?? "", fileUrl: c.fileUrl ?? "",
+        status: "AWAITING_APPROVAL", rejectionReason: null, verifiedBy: null, uploadedAt: null,
+    }))
+    return NextResponse.json([...waiting, ...docs])
 }
 
 export async function POST(req: Request) {
@@ -36,6 +43,14 @@ export async function POST(req: Request) {
 
     if (!type || !fileName || !fileUrl) {
         return new NextResponse("type, fileName, fileUrl required", { status: 400 })
+    }
+
+    // Onboarding → Approvals: the file waits for HR before it replaces anything.
+    if (await holdsDocuments(emp)) {
+        const old = await prisma.employeeDocument.findFirst({ where: { employeeId: emp.id, type }, select: { fileName: true } })
+        await createChangeRequest({ employeeId: emp.id, requestedBy: session.user.id, requesterName: session.user.name ?? "Employee", source: "SELF",
+            changes: [{ field: `doc:${type}`, label: `${DOC_LABELS[type] ?? type} (document)`, from: old?.fileName ?? null, to: String(fileName).slice(0, 200), fileUrl: String(fileUrl) }] })
+        return NextResponse.json({ id: `pending-${type}`, employeeId: emp.id, type, fileName, fileUrl, status: "AWAITING_APPROVAL", rejectionReason: null, pendingApproval: true })
     }
 
     // Replace existing doc of same type (re-upload)

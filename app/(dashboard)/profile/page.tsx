@@ -78,10 +78,12 @@ function MyDetailsTab() {
     const [data, setData] = useState<Partial<Record<DetailsKey, string>>>({})
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [waiting, setWaiting] = useState<string[]>([])
 
     useEffect(() => {
         fetch("/api/me/employee").then(r => r.json()).then(d => {
             if (!d) { setLoading(false); return }
+            if (Array.isArray(d.pendingApproval)) setWaiting(d.pendingApproval)
             const normalized: Partial<Record<DetailsKey, string>> = {}
             for (const k of DETAILS_FIELDS) {
                 const v = d[k]
@@ -130,6 +132,7 @@ function MyDetailsTab() {
             if (!res.ok) throw new Error(await res.text())
             const saved = await res.json().catch(() => ({}))
             if (Array.isArray(saved?.pendingApproval) && saved.pendingApproval.length) {
+                setWaiting(w => Array.from(new Set([...w, ...saved.pendingApproval])))
                 toast.success(`Saved. ${saved.pendingApproval.join(", ")} will change once HR approves it.`, { duration: 7000 })
             } else toast.success("Details saved!")
         } catch (e) {
@@ -157,6 +160,11 @@ function MyDetailsTab() {
                     {filledCount} of {DETAILS_FIELDS.length} fields filled. Complete your profile for HR verification.
                 </p>
             </div>
+            {waiting.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 text-[12.5px] text-blue-800">
+                    <b>Waiting for HR approval:</b> {waiting.join(", ")}. These show what you entered; your record changes once HR approves.
+                </div>
+            )}
 
             <Section title="Personal Information" icon={UserCircle2}>
                 <Field label="First Name" value={data.firstName ?? ""} onChange={set("firstName")} />
@@ -240,6 +248,7 @@ const DOC_LABELS: Record<string, string> = {
 function statusBadge(s: string) {
     if (s === "VERIFIED")  return <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-700">Verified ✓</span>
     if (s === "REJECTED")  return <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-600">Rejected</span>
+    if (s === "AWAITING_APPROVAL") return <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">Waiting for HR approval</span>
     return <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">Pending Review</span>
 }
 
@@ -281,7 +290,7 @@ function DocsTab() {
             if (!res.ok) throw new Error()
             const doc = await res.json()
             setDocs(prev => [...prev.filter(d => d.type !== type), doc])
-            toast.success(`${DOC_LABELS[type]} uploaded! Pending HR review.`)
+            toast.success(doc?.pendingApproval ? `${DOC_LABELS[type]} sent. It will be added once HR approves it.` : `${DOC_LABELS[type]} uploaded! Pending HR review.`)
         } catch { toast.error("Upload failed") }
         finally { setUploading(null) }
     }

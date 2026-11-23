@@ -19,10 +19,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         await prisma.employeeChangeRequest.update({ where: { id: r.id }, data: { status: "CANCELLED", decidedAt: new Date(), decidedBy: g.access.userId } })
         return NextResponse.json({ ok: true })
     }
-    if (!(g.access.isAdmin || g.access.permissions.includes("employees.edit"))) return NextResponse.json({ error: "Needs the Edit Employees permission" }, { status: 403 })
+    // Employee's own updates (Onboarding → Approvals) may also be decided by onboarding approvers.
+    const may = g.access.isAdmin || g.access.permissions.includes("employees.edit") || (r.source === "SELF" && g.access.permissions.includes("onboarding.approve"))
+    if (!may) return NextResponse.json({ error: r.source === "SELF" ? "Needs Onboarding → Approve or Edit Employees" : "Needs the Edit Employees permission" }, { status: 403 })
     try {
         const approve = b?.action === "APPROVE"
-        const u = await decideChangeRequest(r.id, approve, { id: g.access.userId, name: g.access.name, isAdmin: g.access.isAdmin }, b?.note ? String(b.note).slice(0, 300) : null)
+        const only = Array.isArray(b?.fields) ? b.fields.filter((x: unknown): x is string => typeof x === "string") : null
+        const u = await decideChangeRequest(r.id, approve, { id: g.access.userId, name: g.access.name, isAdmin: g.access.isAdmin }, b?.note ? String(b.note).slice(0, 300) : null, only)
         const ch = (r.changes as Change[]).map(c => ({ field: c.field, from: SENSITIVE.has(c.field) ? maskValue(c.from) : c.from, to: SENSITIVE.has(c.field) ? maskValue(c.to) : c.to }))
         auditLater({ actorId: g.access.userId, actorName: g.access.name, action: approve ? "employee.change_approved" : "employee.change_rejected", targetType: "Employee", targetId: r.employeeId, targetName: r.requestNo, summary: `${r.requestNo} ${approve ? "approved" : "rejected"}: ${(r.changes as Change[]).map(c => c.label).join(", ")}`, after: { changes: ch, note: b?.note ?? null }, ...requestMeta(req) })
         return NextResponse.json(u)

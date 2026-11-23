@@ -194,7 +194,9 @@ export default function SelfOnboardingPage() {
                 body: JSON.stringify(form),
             })
             if (res.ok) {
-                toast.success("Saved successfully!")
+                const j = await res.clone().json().catch(() => ({}))
+                if (Array.isArray(j?.pendingApproval) && j.pendingApproval.length) toast.success(`Saved. ${j.pendingApproval.join(", ")} will be updated once HR approves.`, { duration: 7000 })
+                else toast.success("Saved successfully!")
                 await load()
             } else {
                 const err = await res.json()
@@ -241,7 +243,7 @@ export default function SelfOnboardingPage() {
             if (!metaRes.ok) throw new Error(await metaRes.text())
             const saved = await metaRes.json()
             setDocs(prev => [...prev.filter(d => d.type !== type), saved])
-            toast.success(`${type} uploaded`)
+            toast.success(saved?.pendingApproval ? `${type} sent — it will be added once HR approves it` : `${type} uploaded`)
         } catch {
             toast.error(`Failed to upload ${type}`)
         } finally {
@@ -626,7 +628,7 @@ export default function SelfOnboardingPage() {
                                             <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 1px", color: "var(--text)" }}>{label}</p>
                                             {existing
                                                 ? <p style={{ fontSize: 11, margin: 0, color: existing.status === "REJECTED" ? "#dc2626" : "#16a34a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                    {existing.status === "REJECTED" ? "Rejected — please re-upload" : `✓ ${existing.fileName}`}
+                                                    {existing.status === "REJECTED" ? "Rejected — please re-upload" : existing.status === "AWAITING_APPROVAL" ? `⏳ ${existing.fileName} — waiting for HR approval` : `✓ ${existing.fileName}`}
                                                   </p>
                                                 : <p style={{ fontSize: 11, margin: 0, color: "var(--text3)" }}>Not uploaded</p>
                                             }
