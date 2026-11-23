@@ -59,6 +59,15 @@ const nextConfig = {
                     { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
                 ],
             }] : []),
+            // Growus Dialer APK: always a download (phone browsers then hand it to the installer), never a stale copy.
+            {
+                source: "/downloads/growus-dialer.apk",
+                headers: [
+                    { key: "Content-Type", value: "application/vnd.android.package-archive" },
+                    { key: "Content-Disposition", value: "attachment; filename=\"growus-dialer.apk\"" },
+                    { key: "Cache-Control", value: "no-cache" },
+                ],
+            },
             // Auth endpoints must never be cached
             {
                 source: "/api/auth/:path*",

@@ -9,6 +9,21 @@ type Dev = { id: string; userId: string; name: string; deviceName: string | null
 const when = (s: string | null) => s ? new Date(s).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "never"
 const online = (s: string | null) => !!s && Date.now() - new Date(s).getTime() < 3 * 60_000
 
+/** QR for the app download: scanned with the phone camera it opens in the phone's browser. */
+function AppQr({ url }: { url: string }) {
+    const [img, setImg] = useState("")
+    const full = url.startsWith("http") ? url : `${typeof window !== "undefined" ? window.location.origin : ""}${url}`
+    useEffect(() => {
+        (async () => { const QR: any = await import("qrcode"); const toUrl = QR.toDataURL ?? QR.default?.toDataURL; setImg(await toUrl(full, { margin: 1, width: 360 })) })().catch(() => {})
+    }, [full])
+    return (
+        <div className="shrink-0 text-center">
+            {img ? <img src={img} alt="QR code to download the Growus Dialer app" className="w-[170px] h-[170px] rounded-[8px] border border-[var(--border)]" /> : <div className="w-[170px] h-[170px] rounded-[8px] bg-gray-50" />}
+            <div className="text-[11px] text-[var(--text3)] mt-1 max-w-[170px] break-all">Scan with your phone camera</div>
+        </div>
+    )
+}
+
 export function PhoneSetup({ me, canSeeTeam, appUrl }: { me: string; canSeeTeam: boolean; appUrl: string }) {
     const [devs, setDevs] = useState<Dev[] | null>(null)
     const [canEdit, setCanEdit] = useState(false)
@@ -31,15 +46,24 @@ export function PhoneSetup({ me, canSeeTeam, appUrl }: { me: string; canSeeTeam:
                     </div>
                 ) : <p className="mt-2 text-[13px] text-amber-700">No phone paired yet. Follow the steps below.</p>}
             </div>
-            <div className="rounded-[12px] border border-[var(--border)] bg-white p-4 text-[13px] text-[var(--text2)]">
+            <div className="rounded-[12px] border border-[var(--border)] bg-white p-4 text-[13px] text-[var(--text2)] flex flex-col md:flex-row gap-5">
+                {appUrl && <AppQr url={appUrl} />}
+                <div className="flex-1">
                 <h3 className="text-[14px] font-bold text-[var(--text)] mb-2">Pair a phone (once)</h3>
                 <ol className="list-decimal pl-5 space-y-1.5">
-                    <li>Install the <b>Growus Dialer</b> app on your Android phone{appUrl ? <> — <a href={appUrl} className="text-[var(--accent)] font-semibold inline-flex items-center gap-1"><Download size={12} /> download</a></> : " (ask your admin for the app file)"}. Android asks to allow installing from this source the first time.</li>
+                    <li>Install the <b>Growus Dialer</b> app on your Android phone. {appUrl ? <>Scan the QR code with the phone camera, or on the phone open <a href={appUrl} download="growus-dialer.apk" className="text-[var(--accent)] font-semibold inline-flex items-center gap-1"><Download size={12} /> this download link</a>.</> : "(Ask your admin for the app file.)"}
+                        <ul className="list-disc pl-5 mt-1 text-[12px] text-[var(--text3)] space-y-0.5">
+                            <li>Open it in <b>Chrome</b>, not inside WhatsApp or the Growus employee app (those can&apos;t download apps).</li>
+                            <li>If Chrome says the file may be harmful, tap <b>Download anyway</b>. Then open it from Chrome ⋮ → <b>Downloads</b>.</li>
+                            <li>Allow <b>Install unknown apps</b> for Chrome when asked. If Play Protect warns you, tap <b>More details → Install anyway</b>.</li>
+                        </ul>
+                    </li>
                     <li>Open it and sign in with your ERP login.</li>
                     <li>Allow <b>Phone</b> and <b>Call logs</b> when asked, and allow notifications. The app pairs itself and shows &quot;Dialer on&quot; in the notification bar.</li>
                     <li>Done. Click <b>Call</b> anywhere in the ERP (sales leads, candidates, employees) and your phone dials. Every call you make or receive on that phone, even outside the app, syncs here with its talk time.</li>
                 </ol>
                 <p className="mt-3 text-[12px] text-[var(--text3)]">Only calls are synced: number, time, direction and duration. There are no recordings, SMS or contacts. Calls to numbers that are not in the ERP show as &quot;Unknown number&quot; (this can be switched off in Settings).</p>
+                </div>
             </div>
             {canSeeTeam && (
                 <div className="rounded-[12px] border border-[var(--border)] bg-white overflow-x-auto">
