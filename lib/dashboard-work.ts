@@ -127,7 +127,7 @@ async function hr(s: Session): Promise<Panel> {
         stats: [
             { label: "Joiners waiting approval", value: waiting, href: "/onboarding", tone: waiting ? "amber" : "grey" },
             { label: "Joiners not started", value: notStarted, href: "/onboarding", tone: "grey" },
-            { label: "Profile updates to approve", value: updates, href: "/onboarding?tab=approvals", tone: updates ? "red" : "grey" },
+            { label: "Profile updates to approve", value: updates, href: "/employees/changes", tone: updates ? "red" : "grey" },
             { label: "Documents to verify", value: docsPending, href: "/employees/documents", tone: docsPending ? "amber" : "grey" },
             { label: "Open exits", value: exits, href: "/exit", tone: "blue" },
         ],

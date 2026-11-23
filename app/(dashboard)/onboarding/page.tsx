@@ -12,7 +12,8 @@ import {
 import { format, formatDistanceToNow } from "date-fns"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { StatCard, statGridClass } from "@/components/StatCard"
-import { ProfileApprovals } from "@/components/onboarding/ProfileApprovals"
+import { ModuleTabs } from "@/components/ModuleTabs"
+import Link from "next/link"
 import { can } from "@/lib/can"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -765,19 +766,13 @@ export default function OnboardingPage() {
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("ALL")
     const canApproveJoiners = can(session, "onboarding.approve")
-    // Joiners (the list below) or Approvals — employee updates waiting (?tab=approvals).
-    const [view, setView] = useState<"joiners" | "approvals">("joiners")
+    // Employee updates waiting: one approvals queue now lives in People → Changes
+    // & approvals. Old ?tab=approvals links go straight there.
     const [apprCount, setApprCount] = useState<number | null>(null)
     useEffect(() => {
-        if (new URLSearchParams(window.location.search).get("tab") === "approvals") setView("approvals")
+        if (new URLSearchParams(window.location.search).get("tab") === "approvals") { window.location.replace("/employees/changes"); return }
         fetch("/api/onboarding/approvals?count=1").then(r => r.ok ? r.json() : null).then(j => { if (j) setApprCount(j.count) }).catch(() => {})
     }, [])
-    const switchView = (v: "joiners" | "approvals") => {
-        setView(v)
-        const u = new URL(window.location.href)
-        if (v === "approvals") u.searchParams.set("tab", "approvals"); else u.searchParams.delete("tab")
-        window.history.replaceState(null, "", u.toString())
-    }
     const [search, setSearch] = useState("")
     // Debounced copy of `search` — the actual fetch keys off this so we don't
     // fire a request on every keystroke (which caused out-of-order responses to
@@ -905,10 +900,11 @@ export default function OnboardingPage() {
     return (
         <div className="px-4 lg:px-0" style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 32 }}>
 
+            <ModuleTabs group="onboarding" />
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                    <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--text)", margin: 0, letterSpacing: "-0.4px" }}>Onboarding</h1>
+                    <h2 style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", margin: 0 }}>Joiners</h2>
                     <p style={{ fontSize: 13, color: "var(--text3)", margin: "4px 0 0 0" }}>
                         Review, approve or reject newly joined employees
                     </p>
@@ -925,17 +921,13 @@ export default function OnboardingPage() {
                 </div>
             </div>
 
-            {/* Joiners | Approvals */}
-            <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
-                <button role="tab" aria-selected={view === "joiners"} onClick={() => switchView("joiners")} className={`z-tab ${view === "joiners" ? "is-active" : ""}`}><Users size={14} /> Joiners</button>
-                <button role="tab" aria-selected={view === "approvals"} onClick={() => switchView("approvals")} className={`z-tab ${view === "approvals" ? "is-active" : ""}`}>
-                    <CheckCircle2 size={14} /> Approvals
-                    {!!apprCount && <span style={{ marginLeft: 6, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "#f59e0b", color: "#fff", fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{apprCount}</span>}
-                </button>
-            </div></div>
-            {view === "approvals" && <ProfileApprovals onCount={setApprCount} />}
+            {!!apprCount && (
+                <Link href="/employees/changes" style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 10, background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                    <CheckCircle2 size={15} /> {apprCount} employee update{apprCount === 1 ? "" : "s"} waiting for approval — open Approvals →
+                </Link>
+            )}
 
-            <div style={{ display: view === "approvals" ? "none" : "contents" }}>
+            <div style={{ display: "contents" }}>
             {/* KPI cards */}
             <div className={statGridClass(kpis.length)}>
                 {kpis.map((s, i) => (

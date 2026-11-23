@@ -1,4 +1,5 @@
 "use client"
+import { ModuleTabs } from "@/components/ModuleTabs"
 // Users — who can sign in, with which role, for which sites. Search, filters
 // and paging run on the server (50 a page). Create and edit open the user form
 // (/admin/users/new, /admin/users/[id]).
@@ -146,6 +147,7 @@ export default function UsersPage() {
 
     return (
         <div className="flex flex-col gap-5 p-4 lg:p-0">
+            <ModuleTabs group="access" />
             <PageHead
                 title="Users"
                 sub="Who can sign in, with which role, for which sites."

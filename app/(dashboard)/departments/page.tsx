@@ -1,4 +1,5 @@
 "use client"
+import { ModuleTabs } from "@/components/ModuleTabs"
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -234,10 +235,11 @@ export default function DepartmentsPage() {
 
     return (
         <div className="p-4 lg:p-0 space-y-5">
+            <ModuleTabs group="masters" />
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                    <h1 className="text-[24px] font-semibold tracking-[-0.4px] text-[var(--text)]">Departments</h1>
+                    <h2 className="text-[17px] font-bold text-[var(--text)]">Departments</h2>
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">
                         {departments.length} department{departments.length !== 1 ? "s" : ""} · {totalEmployees} employees
                     </p>

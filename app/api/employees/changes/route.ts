@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     const scope = await employeeScope(g.access)
     const ids = scope ? (await prisma.employee.findMany({ where: scope, select: { id: true } })).map(e => e.id) : null
     const rows = await prisma.employeeChangeRequest.findMany({
-        where: { ...(status === "ALL" ? {} : { status }), ...(ids ? { employeeId: { in: ids } } : {}) },
+        where: { ...(status === "ALL" ? {} : { status }), ...(ids ? { employeeId: { in: ids } } : {}), ...(new URL(req.url).searchParams.get("source") === "HR" ? { source: { not: "SELF" } } : {}) },
         orderBy: { createdAt: "desc" }, take: 500,
     })
     const [emps, users] = await Promise.all([

@@ -54,7 +54,7 @@ export function ProfileApprovals({ onCount }: { onCount?: (n: number) => void })
             {d && (showSettings || (!d.settings.selfAllFields && !d.settings.selfDocs)) && d.canEditSettings && <RuleSettings value={d.settings} onSaved={s => setD(x => x ? { ...x, settings: s } : x)} />}
 
             <p className="text-[12.5px] text-[var(--text3)]">
-                {d?.settings.selfAllFields ? "Every detail" : "Bank, PAN, Aadhaar, name and other sensitive details"}{d?.settings.selfDocs ? " and every document" : ""} an employee changes in My Profile or My Onboarding waits here. It goes into their record only after you approve it.
+                {d?.settings.selfAllFields ? "Every detail" : "Bank, PAN, Aadhaar, name and other sensitive details"}{d?.settings.selfDocs ? " and every document" : ""} an employee changes in My Profile waits here. It goes into their record only after you approve it.
             </p>
 
             {!d ? <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-[var(--text3)]" /></div>

@@ -1,4 +1,5 @@
 "use client"
+import { ModuleTabs } from "@/components/ModuleTabs"
 
 // New Joiners: the live alert lists in full (who needs a site, who was just
 // deployed) and the New Joiner Deployment Register — the record of when each
@@ -100,9 +101,10 @@ export default function NewJoinersPage() {
 
     return (
         <div className="p-4 lg:p-0 space-y-5 pb-10">
+            <ModuleTabs group="onboarding" />
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-[22px] font-bold text-[var(--text)] tracking-[-0.3px] m-0">New Joiners</h1>
+                    <h2 className="text-[17px] font-bold text-[var(--text)] m-0">New joiner register</h2>
                     <p className="text-[12.5px] text-[var(--text3)] mt-0.5">
                         People who joined in the last {live?.windowDays ?? 30} days (or join soon) and where they are deployed. The record of every site assignment is kept in the register.
                     </p>

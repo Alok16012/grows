@@ -1,4 +1,5 @@
 "use client"
+import { ModuleTabs } from "@/components/ModuleTabs"
 
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
@@ -257,9 +258,10 @@ export default function EmployeeLoginsPage() {
 
     return (
         <div className="p-4 sm:p-6 lg:p-0">
+            <div className="mb-5"><ModuleTabs group="access" /></div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
                 <div className="min-w-0">
-                    <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">Employee Logins</h1>
+                    <h2 className="text-[17px] font-bold text-[var(--text)]">Employee logins</h2>
                     <p className="text-[13px] text-[var(--text2)] mt-[3px]">Employees sign in with an OTP to their mobile, then set an MPIN. Manage login ids and roles here — no passwords to hand out.</p>
                 </div>
                 <div className="page-actions">

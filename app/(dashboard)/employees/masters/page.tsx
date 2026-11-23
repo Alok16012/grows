@@ -1,4 +1,5 @@
 "use client"
+import { ModuleTabs } from "@/components/ModuleTabs"
 
 // People → Masters. Standard designations (merge the spellings in use into
 // one name each; old spellings become aliases so imports and forms map to the
@@ -43,12 +44,12 @@ export default function MastersPage() {
     const ro = !d.canEdit
     const mixedTypes = d.employmentTypes.filter(t => t.value !== t.canonical)
     return (
-        <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-4">
+        <div className="max-w-6xl mx-auto p-4 md:p-6 lg:p-0 space-y-4">
+            <ModuleTabs group="masters" />
             <div>
-                <Link href="/employees" className="inline-flex items-center gap-1 text-[12.5px] text-[var(--text3)] hover:text-[var(--text)]"><ArrowLeft className="h-3.5 w-3.5" /> Employees</Link>
-                <h1 className="text-[22px] font-bold text-[var(--text)] mt-1">Employee masters</h1>
+                <h2 className="text-[17px] font-bold text-[var(--text)]">Designations &amp; employment types</h2>
                 <p className="text-[12.5px] text-[var(--text3)]">{d.raw.length} designation spellings in use · {d.master.length} standard · {d.noDepartment} active employees without a department · {mixedTypes.reduce((s, t) => s + t.count, 0)} with an old employment-type spelling</p>
-                <p className="text-[12.5px] mt-1"><Link href="/employees/roles" className="text-[var(--accent)] font-semibold">Login role for each designation →</Link></p>
+                <p className="text-[12.5px] mt-1"><Link href="/employees/roles" className="text-[var(--accent)] font-semibold">Login role for each designation (Users &amp; Access) →</Link></p>
             </div>
             <div className="flex gap-1 border-b border-[var(--border)]">
                 {([["designations", "Designations"], ["departments", "Departments"], ["types", "Employment types"]] as const).map(([k, l]) => (

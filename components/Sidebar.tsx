@@ -205,9 +205,8 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "Candidates", href: "/recruitment", permission: "recruitment.view" },
                 // Hiring desk: recruiters, and site managers raising manpower requests.
                 { name: "Hiring desk", href: "/recruitment/manage", permissionAny: ["recruitment.view", "recruitment.request", "recruitment.approve"] },
-                { name: "Onboarding", href: "/onboarding", permissionAny: ["onboarding.view", "recruitment.view"] },
-                { name: "Join Links", href: "/onboarding/join-links", permissionAny: ["onboarding.view", "recruitment.view"] },
-                { name: "Joining Checklist", href: "/onboarding/checklist", permissionAny: ["onboarding.view", "recruitment.view"] },
+                // Joiners, Checklist board, Join links and the New joiner register are tabs inside (components/ModuleTabs).
+                { name: "Onboarding", href: "/go/onboarding", permissionAny: ["onboarding.view", "recruitment.view", "employees.view"], matchPrefixes: ["/onboarding", "/employees/new-joiners"] },
             ],
         },
         {
@@ -217,11 +216,10 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "Employee Directory", href: "/employees", permission: "employees.view" },
                 { name: "Employee Master Data", href: "/employees/master", permission: "employees.view" },
                 { name: "Org Chart", href: "/employees/org-chart", permission: "employees.view" },
-                { name: "Login Roles", href: "/employees/roles", permission: "employees.view" },
-                { name: "Change Requests", href: "/employees/changes", permission: "employees.view" },
+                { name: "Changes & Approvals", href: "/employees/changes", permission: "employees.view" },
                 { name: "Data Quality", href: "/employees/quality", permission: "employees.view" },
-                { name: "Masters", href: "/employees/masters", permission: "employees.view" },
-                { name: "New Joiners", href: "/employees/new-joiners", permission: "employees.view" },
+                // Designations & types, and Departments, are tabs inside.
+                { name: "Masters", href: "/go/masters", permission: "employees.view", matchPrefixes: ["/employees/masters", "/departments"] },
                 // An employee leaving is an HR process (clearance, F&F), not growth.
                 { name: "Exit Management", href: "/exit", permission: "exit.view" },
             ],
@@ -274,13 +272,9 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             icon: SlidersHorizontal,
             links: [
                 { name: "Company Profile", href: "/company", group: "Organisation" },
-                { name: "Departments", href: "/departments", group: "Organisation" },
                 { name: "Wage Rule Book", href: "/admin/rule-book", group: "Organisation" },
-                { name: "System Users", href: "/admin/users", permissionAny: ["users.view", "users.manage"], group: "Users & Access" },
-                { name: "Employee Logins", href: "/admin/employee-logins", permission: "users.manage", group: "Users & Access" },
-                { name: "Roles", href: "/admin/roles", permission: "roles.view", group: "Users & Access" },
-                { name: "Access Centre", href: "/admin/access", permissionAny: ["users.view", "users.manage", "audit.view"], group: "Users & Access" },
-                { name: "Audit Log", href: "/admin/audit", permission: "audit.view", group: "Users & Access" },
+                // Users, Employee logins, Roles, Role by designation, Access review and Audit log are tabs inside.
+                { name: "Users & Access", href: "/go/access", permissionAny: ["users.view", "users.manage", "roles.view", "audit.view"], matchPrefixes: ["/admin/users", "/admin/employee-logins", "/admin/roles", "/admin/access", "/admin/audit", "/employees/roles"], group: "Users & Access" },
                 { name: "Communication", href: "/admin/communication", permissionAny: ["whatsapp.view", "whatsapp.edit"], matchPrefixes: ["/admin/communication", "/admin/whatsapp"], group: "Messaging" },
             ],
         },
@@ -331,8 +325,8 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
     const allLinks = navigation.flatMap(c => c.links)
     const isActive = (link: NavLink) => {
         const prefixMatch = link.href !== "/" && pathname.startsWith(link.href + "/")
-            && !allLinks.some(other => other.href.length > link.href.length
-                && (pathname === other.href || pathname.startsWith(other.href + "/")))
+            && !allLinks.some(other => [other.href, ...(other.matchPrefixes ?? [])].some(h => h.length > link.href.length
+                && (pathname === h || pathname.startsWith(h + "/"))))
         return pathname === link.href
             || prefixMatch
             || (link.matchPrefixes?.some(p => pathname === p || pathname.startsWith(p + "/")) ?? false)

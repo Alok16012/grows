@@ -1,4 +1,5 @@
 "use client"
+import { ModuleTabs } from "@/components/ModuleTabs"
 // Roles — one card per role: what it is for, which records it sees, who holds
 // it. Open goes to the full-page editor (/admin/roles/[id]).
 
@@ -74,6 +75,7 @@ export default function RolesPage() {
 
     return (
         <div className="flex flex-col gap-5 p-4 lg:p-0">
+            <ModuleTabs group="access" />
             <PageHead
                 title="Roles"
                 sub="Each role sets what people can do and which records they can see."

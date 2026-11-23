@@ -1,4 +1,5 @@
 "use client"
+import { ModuleTabs } from "@/components/ModuleTabs"
 
 // Admin → Access centre: who actually uses their login, login problems with
 // one-click fixes, failed sign-ins and locks, and a periodic access review.
@@ -42,10 +43,11 @@ export default function AccessCentrePage() {
     const load = useCallback(() => { setD(null); fetch(`/api/admin/access?tab=${tab}`).then(r => r.json()).then(setD).catch(() => toast.error("Couldn't load")) }, [tab])
     useEffect(() => { load() }, [load])
     return (
-        <div className="max-w-[1300px] mx-auto p-4 md:p-6 space-y-4">
+        <div className="max-w-[1300px] mx-auto p-4 md:p-6 lg:p-0 space-y-4">
+            <ModuleTabs group="access" />
             <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                    <h1 className="text-[22px] font-bold text-[var(--text)]">Access centre</h1>
+                    <h2 className="text-[17px] font-bold text-[var(--text)]">Access review</h2>
                     <p className="text-[12.5px] text-[var(--text3)]">Who uses their login, what needs fixing, who is being locked out, and who holds which access.</p>
                 </div>
                 {d?.canManage && <button onClick={() => setSettingsOpen(true)} className="h-10 px-4 rounded-[10px] border border-[var(--border)] bg-white text-[13px] font-semibold text-[var(--text2)] inline-flex items-center gap-1.5"><Settings2 size={15} /> Settings</button>}

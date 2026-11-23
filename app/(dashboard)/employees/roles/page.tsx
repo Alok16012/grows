@@ -1,4 +1,5 @@
 "use client"
+import { ModuleTabs } from "@/components/ModuleTabs"
 
 // People → Login roles. Which login role each designation gets: new logins get
 // it automatically, a designation change moves the role along, and existing
@@ -28,10 +29,10 @@ export default function LoginRolesPage() {
     if (!d) return <div className="p-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-[var(--text3)]" /></div>
     const open = d.mismatches.filter(m => !m.locked).length
     return (
-        <div className="max-w-[1200px] mx-auto p-4 md:p-6 space-y-4">
+        <div className="max-w-[1200px] mx-auto p-4 md:p-6 lg:p-0 space-y-4">
+            <ModuleTabs group="access" />
             <div>
-                <Link href="/employees/masters" className="inline-flex items-center gap-1 text-[12.5px] text-[var(--text3)] hover:text-[var(--text)]"><ArrowLeft className="h-3.5 w-3.5" /> Masters</Link>
-                <h1 className="text-[22px] font-bold text-[var(--text)] mt-1">Login role by designation</h1>
+                <h2 className="text-[17px] font-bold text-[var(--text)]">Login role by designation</h2>
                 <p className="text-[12.5px] text-[var(--text3)]">Each designation gets a login role. New logins get it automatically and it follows promotions; roles given by hand, protected roles and Admin logins are left alone.</p>
             </div>
             <div className="flex gap-1 border-b border-[var(--border)]">

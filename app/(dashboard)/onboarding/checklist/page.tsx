@@ -1,4 +1,5 @@
 "use client"
+import { ModuleTabs } from "@/components/ModuleTabs"
 
 // Onboarding → Joining checklist. Board: everyone in onboarding (and recent
 // joiners with tasks open) by stage, with how long they have been stuck.
@@ -35,10 +36,10 @@ export default function ChecklistPage() {
     }, [d])
     if (!d) return <div className="p-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-[var(--text3)]" /></div>
     return (
-        <div className="max-w-[1400px] mx-auto p-4 md:p-6 space-y-4">
+        <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-0 space-y-4">
+            <ModuleTabs group="onboarding" />
             <div>
-                <Link href="/onboarding" className="inline-flex items-center gap-1 text-[12.5px] text-[var(--text3)] hover:text-[var(--text)]"><ArrowLeft className="h-3.5 w-3.5" /> Onboarding</Link>
-                <h1 className="text-[22px] font-bold text-[var(--text)] mt-1">Joining checklist</h1>
+                <h2 className="text-[17px] font-bold text-[var(--text)]">Joining checklist</h2>
                 <p className="text-[12.5px] text-[var(--text3)]">Where every new joiner stands, what is holding them up, and who has to act.</p>
             </div>
             <div className="flex gap-1 border-b border-[var(--border)]">

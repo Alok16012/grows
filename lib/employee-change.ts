@@ -103,7 +103,7 @@ export async function createChangeRequest(input: { employeeId: string; requested
     await notifyApprovers(self ? ["onboarding.approve", "employees.edit"] : ["employees.edit"], {
         title: self ? "Employee update to approve" : "Employee change to approve",
         message: `${input.requesterName} changed ${input.changes.map(c => c.label).join(", ")} for ${emp?.firstName ?? ""} ${emp?.lastName ?? ""} (${emp?.employeeId ?? ""})`,
-        type: "employee", link: self ? "/onboarding?tab=approvals" : "/employees/changes",
+        type: "employee", link: "/employees/changes",
     }, input.requestedBy)
     return req
 }

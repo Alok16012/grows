@@ -1,8 +1,9 @@
 "use client"
 
-// People → Changes & movements.
-//   Approvals — sensitive changes (bank, PAN, Aadhaar, UAN, name …) waiting for a
-//               second person; approve or reject with a reason.
+// People → Changes & approvals — the one approvals queue for employee data.
+//   Approvals — what employees changed or uploaded themselves (My Profile), and
+//               sensitive changes made by HR (bank, PAN, Aadhaar, UAN, name …)
+//               waiting for a second person; approve or reject with a reason.
 //   Movements — transfers, promotions, designation / department / manager
 //               changes with an effective date (applied on that date).
 //   Settings  — which fields need approval, and for whom.
@@ -12,6 +13,7 @@ import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import { ArrowLeft, Loader2, Plus, X } from "lucide-react"
 import { APPROVABLE_FIELDS } from "@/lib/employee-change-fields"
+import { ProfileApprovals } from "@/components/onboarding/ProfileApprovals"
 
 type Change = { field: string; label: string; from: string | null; to: string | null }
 type Req = { id: string; requestNo: string; employeeId: string; employee: string; employeeCode: string; requestedBy: string; requestedByName: string; source: string; changes: Change[]; reason: string | null; status: string; decidedByName: string | null; decidedAt: string | null; decisionNote: string | null; createdAt: string }
@@ -30,15 +32,24 @@ export default function ChangesPage() {
         <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-4">
             <div>
                 <Link href="/employees" className="inline-flex items-center gap-1 text-[12.5px] text-[var(--text3)] hover:text-[var(--text)]"><ArrowLeft className="h-3.5 w-3.5" /> Employees</Link>
-                <h1 className="text-[22px] font-bold text-[var(--text)] mt-1">Changes &amp; movements</h1>
-                <p className="text-[12.5px] text-[var(--text3)]">Approve sensitive changes, and schedule transfers, promotions and other moves with an effective date.</p>
+                <h1 className="text-[22px] font-bold text-[var(--text)] mt-1">Changes &amp; approvals</h1>
+                <p className="text-[12.5px] text-[var(--text3)]">One queue for every employee data change — what employees updated or uploaded themselves and sensitive changes made by HR — plus transfers, promotions and other moves with an effective date.</p>
             </div>
             <div className="flex gap-1 border-b border-[var(--border)] overflow-x-auto">
                 {([["pending", "Waiting for approval"], ["all", "All requests"], ["movements", "Movements"], ["settings", "Approval settings"]] as const).map(([k, l]) => (
                     <button key={k} onClick={() => setTab(k)} className={`px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap ${tab === k ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text3)]"}`}>{l}</button>
                 ))}
             </div>
-            {(tab === "pending" || tab === "all") && <Requests status={tab === "pending" ? "PENDING" : "ALL"} />}
+            {(tab === "pending" || tab === "all") && (
+                <div className="space-y-6">
+                    <ProfileApprovalsSection />
+                    <section className="space-y-2">
+                        <h2 className="text-[15px] font-semibold text-[var(--text)]">Changes made by HR</h2>
+                        <p className="text-[12px] text-[var(--text3)] -mt-1">Sensitive fields changed by someone in HR, waiting for a second person.</p>
+                        <Requests status={tab === "pending" ? "PENDING" : "ALL"} />
+                    </section>
+                </div>
+            )}
             {tab === "movements" && <Movements />}
             {tab === "settings" && <ApprovalSettings />}
         </div>
@@ -48,7 +59,8 @@ export default function ChangesPage() {
 function Requests({ status }: { status: string }) {
     const [d, setD] = useState<{ requests: Req[]; me: string; canDecide: boolean } | null>(null)
     const [busy, setBusy] = useState<string | null>(null)
-    const load = useCallback(() => { setD(null); fetch(`/api/employees/changes?status=${status}`).then(r => r.json()).then(setD).catch(() => toast.error("Couldn't load")) }, [status])
+    // Employees' own updates are in the section above (ProfileApprovals); here only changes made by HR.
+    const load = useCallback(() => { setD(null); fetch(`/api/employees/changes?status=${status}&source=HR`).then(r => r.ok ? r.json() : { requests: [], me: "", canDecide: false }).then(setD).catch(() => toast.error("Couldn't load")) }, [status])
     useEffect(() => { load() }, [load])
     async function act(r: Req, action: string) {
         let note: string | null = null
@@ -220,5 +232,21 @@ function ApprovalSettings() {
             </div>
             <div className="flex justify-end"><button onClick={save} disabled={busy} className={btn}>Save</button></div>
         </div>
+    )
+}
+
+// Employees' own updates and uploads (My Profile → My Details / Documents),
+// with the per-field approve and document preview. Hidden for people who can't
+// see them (the API refuses).
+function ProfileApprovalsSection() {
+    const [ok, setOk] = useState<boolean | null>(null)
+    useEffect(() => { fetch("/api/onboarding/approvals?count=1").then(r => setOk(r.ok)).catch(() => setOk(false)) }, [])
+    if (!ok) return null
+    return (
+        <section className="space-y-2">
+            <h2 className="text-[15px] font-semibold text-[var(--text)]">Updates by employees</h2>
+            <p className="text-[12px] text-[var(--text3)] -mt-1">Details and documents employees changed or uploaded themselves, waiting before they go into the record.</p>
+            <ProfileApprovals />
+        </section>
     )
 }

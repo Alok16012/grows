@@ -1,4 +1,5 @@
 "use client"
+import { ModuleTabs } from "@/components/ModuleTabs"
 // Audit log — every change to roles, users and access, plus sign-ins, refusals,
 // payroll locks and sensitive exports. Entries can't be edited or deleted.
 
@@ -96,6 +97,7 @@ export default function AuditPage() {
     const rows = data?.rows ?? []
     return (
         <div className="flex flex-col gap-5 p-4 lg:p-0">
+            <ModuleTabs group="access" />
             <PageHead
                 title="Audit log"
                 sub="Every change to roles, users and access. Entries can't be edited or deleted."

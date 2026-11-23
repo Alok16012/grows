@@ -1,4 +1,5 @@
 "use client"
+import { ModuleTabs } from "@/components/ModuleTabs"
 
 // Onboarding → Join links. A recruiter's /join link fixed to a site and
 // designation, with QR, on/off, expiry and use limit — and per link how many
@@ -29,10 +30,10 @@ const pct = (a: number, b: number) => b ? `${Math.round(a / b * 100)}%` : "—"
 export default function JoinLinksPage() {
     const [tab, setTab] = useState<"links" | "settings">("links")
     return (
-        <div className="max-w-[1300px] mx-auto p-4 md:p-6 space-y-4">
+        <div className="max-w-[1300px] mx-auto p-4 md:p-6 lg:p-0 space-y-4">
+            <ModuleTabs group="onboarding" />
             <div>
-                <Link href="/onboarding" className="inline-flex items-center gap-1 text-[12.5px] text-[var(--text3)] hover:text-[var(--text)]"><ArrowLeft className="h-3.5 w-3.5" /> Onboarding</Link>
-                <h1 className="text-[22px] font-bold text-[var(--text)] mt-1">Join links</h1>
+                <h2 className="text-[17px] font-bold text-[var(--text)]">Join links</h2>
                 <p className="text-[12.5px] text-[var(--text3)]">Links and QR codes candidates use to fill the joining form — and which ones bring joiners.</p>
             </div>
             <div className="flex gap-1 border-b border-[var(--border)]">
