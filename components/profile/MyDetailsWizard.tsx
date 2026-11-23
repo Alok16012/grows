@@ -1,7 +1,8 @@
 "use client"
 
 // My Profile → My Details: the employee fills in their own details step by step
-// (personal, address, policies, statutory IDs, bank, emergency contacts, uploads).
+// (personal, address, ID numbers, bank, emergency contacts). Documents and
+// policies have their own tabs in My Profile, so they are not repeated here.
 // Was the separate "My Onboarding" page (/self-onboarding now redirects here).
 
 import { useState, useEffect, useCallback } from "react"
@@ -11,9 +12,8 @@ import {
     User, MapPin, Shield, CreditCard, Users, CheckCircle2,
     ChevronRight, ChevronLeft, Save, Loader2, AlertCircle,
     RefreshCw, BadgeCheck, Clock, Building2, CalendarDays,
-    FileText, UploadCloud, FileSignature
+    FileText, FileSignature
 } from "lucide-react"
-import { PolicySignStep, type PolicyProgress } from "@/components/PolicySignStep"
 import {
     validatePhone, validateAadhaar, validatePAN, validateIFSC,
     validateBankAccount, validateUAN, validateESIC, validateEmail,
@@ -59,29 +59,14 @@ function completion(p: EmpProfile | null) {
 }
 
 // ── Steps config ─────────────────────────────────────────────────────────────
-// Policies sit third, right after the details that decide who you are.
-const POLICY_STEP = 3
 const STEPS = [
-    { id: 1, label: "Personal",  icon: User,          desc: "Basic identity & contact" },
-    { id: 2, label: "Address",   icon: MapPin,        desc: "Current & permanent address" },
-    { id: 3, label: "Policies",  icon: FileSignature, desc: "Read and sign company policies" },
-    { id: 4, label: "Documents", icon: Shield,        desc: "Aadhar, PAN & statutory IDs" },
-    { id: 5, label: "Bank",      icon: CreditCard,    desc: "Salary bank account details" },
-    { id: 6, label: "Emergency", icon: Users,         desc: "Emergency contacts" },
-    { id: 7, label: "Uploads",   icon: FileText,      desc: "Upload identity documents" },
+    { id: 1, label: "Personal",   icon: User,       desc: "Basic identity & contact" },
+    { id: 2, label: "Address",    icon: MapPin,     desc: "Current & permanent address" },
+    { id: 3, label: "ID numbers", icon: Shield,     desc: "Aadhar, PAN & statutory IDs" },
+    { id: 4, label: "Bank",       icon: CreditCard, desc: "Salary bank account details" },
+    { id: 5, label: "Emergency",  icon: Users,      desc: "Emergency contacts" },
 ]
 
-const DOC_UPLOAD_TYPES = [
-    { type: "AADHAAR",      label: "Aadhaar Card" },
-    { type: "PAN",          label: "PAN Card" },
-    { type: "PHOTO",        label: "Passport Photo" },
-    // Bank proof is required before HR can approve, and this form had no way to
-    // upload one — anyone joining through it could never satisfy that check.
-    { type: "BANK_DETAILS", label: "Bank Passbook / Cancelled Cheque" },
-    { type: "RESUME",       label: "Resume / CV" },
-    { type: "CERTIFICATE",  label: "Educational Certificate" },
-    { type: "OTHER",        label: "Other Document" },
-]
 
 // ── Small UI helpers ─────────────────────────────────────────────────────────
 function Label({ children }: { children: React.ReactNode }) {
@@ -116,7 +101,7 @@ function FieldFull({ label, children }: { label: string; children: React.ReactNo
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
-export function MyDetailsWizard() {
+export function MyDetailsWizard({ onOpenTab }: { onOpenTab?: (tab: "documents" | "policies") => void }) {
     const { data: session } = useSession()
     const [profile, setProfile] = useState<EmpProfile | null>(null)
     const [form, setForm]       = useState<Partial<EmpProfile>>({})
@@ -124,8 +109,6 @@ export function MyDetailsWizard() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving]   = useState(false)
     const [sameAddr, setSameAddr] = useState(false)
-    const [docs, setDocs] = useState<{ id: string; type: string; fileName: string; fileUrl: string; status: string | null }[]>([])
-    const [uploadingDoc, setUploadingDoc] = useState<Record<string, boolean>>({})
 
     const f = (k: keyof EmpProfile) => String(form[k] ?? "")
     const set = (k: keyof EmpProfile) => (v: string) => setForm(prev => ({ ...prev, [k]: v }))
@@ -133,10 +116,7 @@ export function MyDetailsWizard() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const [profileRes, docsRes] = await Promise.all([
-                fetch("/api/employee/self-profile"),
-                fetch("/api/me/documents"),
-            ])
+            const profileRes = await fetch("/api/employee/self-profile")
             if (profileRes.ok) {
                 const d: EmpProfile = await profileRes.json()
                 setProfile(d)
@@ -148,7 +128,6 @@ export function MyDetailsWizard() {
                 const err = await profileRes.json().catch(() => ({}))
                 toast.error(err?.error ?? "Could not load your profile")
             }
-            if (docsRes.ok) setDocs(await docsRes.json())
         } catch { toast.error("Connection error — check your network and retry") }
         finally { setLoading(false) }
     }, [])
@@ -210,50 +189,9 @@ export function MyDetailsWizard() {
         finally { setSaving(false) }
     }
 
-    const [policyProgress, setPolicyProgress] = useState<PolicyProgress | null>(null)
-    const onPolicyProgress = useCallback((p: PolicyProgress) => setPolicyProgress(p), [])
-
     const saveAndNext = async () => {
-        // Nothing to save on the policy step — each policy is saved when signed.
-        if (step === POLICY_STEP) {
-            if (policyProgress && !policyProgress.allSigned) {
-                toast.error(policyProgress.loading ? "Loading policies…" : `Sign all policies to continue (${policyProgress.signed} of ${policyProgress.total} signed)`)
-                return
-            }
-            setStep(s => s + 1)
-            return
-        }
         await save()
         if (step < STEPS.length) setStep(s => s + 1)
-    }
-
-    const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-        setUploadingDoc(p => ({ ...p, [type]: true }))
-        try {
-            const fd = new FormData()
-            fd.append("file", file)
-            fd.append("kind", "document") // private storage (lib/secure-files)
-            const uploadRes = await fetch("/api/upload", { method: "POST", body: fd })
-            if (!uploadRes.ok) throw new Error(await uploadRes.text())
-            const { url } = await uploadRes.json()
-
-            const metaRes = await fetch("/api/me/documents", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ type, fileName: file.name, fileUrl: url }),
-            })
-            if (!metaRes.ok) throw new Error(await metaRes.text())
-            const saved = await metaRes.json()
-            setDocs(prev => [...prev.filter(d => d.type !== type), saved])
-            toast.success(saved?.pendingApproval ? `${type} sent — it will be added once HR approves it` : `${type} uploaded`)
-        } catch {
-            toast.error(`Failed to upload ${type}`)
-        } finally {
-            setUploadingDoc(p => ({ ...p, [type]: false }))
-            e.target.value = ""
-        }
     }
 
     const pct = completion(profile)
@@ -502,13 +440,8 @@ export function MyDetailsWizard() {
                     </div>
                 )}
 
-                {/* ── Step 3: Policies ─────────────────────────────────── */}
-                {step === POLICY_STEP && (
-                    <PolicySignStep source={{ kind: "self", scope: "onboarding" }} theme="light" onProgress={onPolicyProgress} />
-                )}
-
-                {/* ── Step 4: Documents / Statutory ─────────────────────── */}
-                {step === 4 && (
+                {/* ── Step 3: ID numbers / statutory ────────────────────── */}
+                {step === 3 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                         <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1d4ed8" }}>
                             Ensure your Aadhar and PAN numbers are accurate — they are used for PF, ESIC and income tax processing.
@@ -533,8 +466,8 @@ export function MyDetailsWizard() {
                     </div>
                 )}
 
-                {/* ── Step 5: Bank Details ──────────────────────────────── */}
-                {step === 5 && (
+                {/* ── Step 4: Bank Details ──────────────────────────────── */}
+                {step === 4 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                         <div style={{ padding: "10px 14px", borderRadius: 10, background: "#f0fdf4", border: "1px solid #86efac", fontSize: 12, color: "#15803d" }}>
                             Your salary will be credited to this account. Please double-check the account number and IFSC code.
@@ -559,8 +492,8 @@ export function MyDetailsWizard() {
                     </div>
                 )}
 
-                {/* ── Step 6: Emergency Contacts ────────────────────────── */}
-                {step === 6 && (
+                {/* ── Step 5: Emergency Contacts ────────────────────────── */}
+                {step === 5 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                         <div>
                             <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)", marginBottom: 12 }}>Primary Emergency Contact</p>
@@ -608,56 +541,16 @@ export function MyDetailsWizard() {
                     </div>
                 )}
 
-                {/* ── Step 7: Upload Docs ───────────────────────────────── */}
-                {step === 7 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                        <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1d4ed8" }}>
-                            Upload clear, legible copies of each document. Accepted formats: PDF, JPG, PNG.
-                        </div>
-                        {DOC_UPLOAD_TYPES.map(({ type, label }) => {
-                            const existing = docs.find(d => d.type === type)
-                            const uploading = uploadingDoc[type]
-                            return (
-                                <div key={type} style={{
-                                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                                    padding: "12px 14px", borderRadius: 12, gap: 12,
-                                    border: `1px solid ${existing ? "rgba(22,163,74,0.3)" : "var(--border)"}`,
-                                    background: existing ? "#f0fdf4" : "var(--surface2)",
-                                }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
-                                        <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: existing ? "rgba(22,163,74,0.1)" : "var(--surface)" }}>
-                                            <FileText size={16} style={{ color: existing ? "#16a34a" : "var(--text3)" }} />
-                                        </div>
-                                        <div style={{ minWidth: 0 }}>
-                                            <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 1px", color: "var(--text)" }}>{label}</p>
-                                            {existing
-                                                ? <p style={{ fontSize: 11, margin: 0, color: existing.status === "REJECTED" ? "#dc2626" : "#16a34a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                    {existing.status === "REJECTED" ? "Rejected — please re-upload" : existing.status === "AWAITING_APPROVAL" ? `⏳ ${existing.fileName} — waiting for HR approval` : `✓ ${existing.fileName}`}
-                                                  </p>
-                                                : <p style={{ fontSize: 11, margin: 0, color: "var(--text3)" }}>Not uploaded</p>
-                                            }
-                                        </div>
-                                    </div>
-                                    <label style={{ flexShrink: 0, cursor: uploading ? "not-allowed" : "pointer" }}>
-                                        <div style={{
-                                            display: "flex", alignItems: "center", gap: 6,
-                                            padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                                            border: "1px solid var(--accent)", color: "var(--accent)",
-                                            background: "var(--accent-light)", opacity: uploading ? 0.6 : 1,
-                                        }}>
-                                            {uploading
-                                                ? <><Loader2 size={12} className="animate-spin" /> Uploading…</>
-                                                : <><UploadCloud size={12} /> {existing ? "Re-upload" : "Upload"}</>
-                                            }
-                                        </div>
-                                        <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }} disabled={uploading} onChange={e => handleDocUpload(e, type)} />
-                                    </label>
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
             </div>
+
+            {/* Documents and policies live in their own tabs — point there from the last step. */}
+            {step === STEPS.length && onOpenTab && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", fontSize: 12.5, color: "var(--text2)" }}>
+                    <span>Next: upload your documents and sign the company policies.</span>
+                    <button type="button" onClick={() => onOpenTab("documents")} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 8, border: "1px solid var(--accent)", background: "#fff", color: "var(--accent)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}><FileText size={13} /> Documents</button>
+                    <button type="button" onClick={() => onOpenTab("policies")} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 8, border: "1px solid var(--accent)", background: "#fff", color: "var(--accent)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}><FileSignature size={13} /> Policies</button>
+                </div>
+            )}
 
             {/* ── Navigation footer ───────────────────────────────────────── */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>

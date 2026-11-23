@@ -1195,7 +1195,7 @@ export default function ProfilePage() {
             {tab === "profile" && <ChangePasswordCard />}
             {tab === "profile" && isEmployee && <ResignationCard />}
 
-            {tab === "details"    && <MyDetailsWizard />}
+            {tab === "details"    && <MyDetailsWizard onOpenTab={setActiveTab} />}
             {tab === "attendance" && <AttendanceTab />}
             {tab === "documents"  && <DocsTab />}
             {tab === "letters"    && <LettersTab />}
