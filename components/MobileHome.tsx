@@ -11,6 +11,7 @@ import {
     IndianRupee, Eye, EyeOff, PartyPopper, Megaphone, CalendarHeart, AlertTriangle, type LucideIcon,
 } from "lucide-react"
 import { useCachedFetch } from "@/lib/useCachedFetch"
+import { WorkPanels } from "@/components/dashboard/WorkPanels"
 
 /**
  * The phone home screen. Everyone sees THEIR OWN day first — today's
@@ -236,6 +237,9 @@ export function MobileHome() {
                     </div>
                 </section>
             )}
+
+            {/* The profile's own work (recruiter, payroll, inspector …) */}
+            <WorkPanels compact />
 
             {/* Needs attention */}
             {(me || (stats && !stats.error)) && (

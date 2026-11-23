@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { NeedsSiteBanner } from "@/components/new-joiners/NeedsSiteBanner"
 import { MyTasksBanner } from "@/components/tasks/MyTasksBanner"
+import { WorkPanels } from "@/components/dashboard/WorkPanels"
 
 // ─── Small shared pieces (mirrors the admin dashboard) ───────────────────────
 
@@ -347,6 +348,9 @@ function DesktopDashboard() {
 
             <NeedsSiteBanner />
             <MyTasksBanner />
+            {/* The profile's own work first: recruiter, payroll, inspector, HR, approver … */}
+            <WorkPanels />
+            {hasAnyWidget && <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text3)] pt-2">Company overview</p>}
 
             {/* ── KPI ROW ── */}
             {kpiRow.length > 0 && (
