@@ -302,7 +302,7 @@ export function MobileHome() {
                                 title={celebrationTitle(me.celebrations)}
                                 sub={me.celebrations.slice(0, 4).map(c => c.kind === "birthday" ? `🎂 ${c.name}` : `🎉 ${c.name} (${c.years} yr)`).join(" · ") + (me.celebrations.length > 4 ? ` +${me.celebrations.length - 4} more` : "")} />
                         )}
-                        {me.announcements.map(a => (
+                        {me.announcements.slice(0, 2).map(a => (
                             <Row key={a.id} href="/announcements" icon={Megaphone} color={a.category === "URGENT" ? "#dc2626" : "#0b5cff"} tint={a.category === "URGENT" ? "#fef2f2" : "#e8effe"}
                                 title={a.title} sub={`${a.category.charAt(0) + a.category.slice(1).toLowerCase()} · ${format(new Date(a.publishedAt), "d MMM")}`} />
                         ))}

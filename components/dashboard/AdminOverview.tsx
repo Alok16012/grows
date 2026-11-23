@@ -33,7 +33,7 @@ const TONES: Record<Tone, { card: string; chip: string; icon: string }> = {
 }
 
 function Panel({ tone, className, children }: { tone: Tone; className?: string; children: React.ReactNode }) {
-    return <div className={cn("rounded-[16px] border p-5", TONES[tone].card, className)}>{children}</div>
+    return <div className={cn("rounded-[22px] p-5 bg-white shadow-[var(--shadow-card)]", className)} data-tone={tone}>{children}</div>
 }
 
 function PanelHead({ tone, icon: Icon, title, hint, sub, action }: {
@@ -65,41 +65,32 @@ function HeadLink({ href, children }: { href: string; children: React.ReactNode 
     )
 }
 
-// ─── Gradient KPI tile ───────────────────────────────────────────────────────
+// ─── KPI tile (soft theme) ───────────────────────────────────────────────────
+// White rounded card with a tinted icon chip in the tile's own colour (taken
+// from the first colour of `gradient`, kept so callers stay the same).
 
-function KpiTile({ href, gradient, dark, icon: Icon, label, value, children }: {
+function KpiTile({ href, gradient, icon: Icon, label, value, children }: {
     href: string; gradient: string; dark?: boolean; icon: React.ElementType
     label: string; value: string; children: React.ReactNode
 }) {
+    const hue = gradient.match(/#[0-9a-f]{6}/i)?.[0] ?? "#3d6ff5"
     return (
-        <div
-            style={{ background: gradient }}
-            className={cn(
-                "relative overflow-hidden rounded-[16px] p-5 min-h-[156px] flex flex-col group transition-transform hover:-translate-y-0.5",
-                "shadow-[0_10px_24px_-12px_rgba(15,23,41,0.45)]",
-                dark ? "text-[#1d1a0f]" : "text-white"
-            )}
-        >
+        <div className="relative overflow-hidden rounded-[22px] bg-white p-5 min-h-[148px] flex flex-col group transition-transform hover:-translate-y-0.5 shadow-[var(--shadow-card)] text-[var(--text)]">
             {/* Whole-tile link underneath; content above ignores the pointer so
                 clicks fall through, except links in `children` (pointer-events-auto).
                 Avoids nesting <a> inside <a>. */}
-            <Link href={href} aria-label={label} className="absolute inset-0 rounded-[16px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70" />
-
-            {/* soft light blooms, purely decorative */}
-            <span aria-hidden className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-white/10" />
-            <span aria-hidden className="pointer-events-none absolute right-16 -bottom-20 h-36 w-36 rounded-full bg-white/[0.07]" />
-
+            <Link href={href} aria-label={label} className="absolute inset-0 rounded-[22px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" />
             <div className="relative pointer-events-none flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                    <div className={cn("h-11 w-11 rounded-[12px] flex items-center justify-center", dark ? "bg-white/45" : "bg-white/20")}>
-                        <Icon size={20} />
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-[12px] flex items-center justify-center shrink-0" style={{ background: `${hue}1a`, color: hue }}>
+                        <Icon size={19} />
                     </div>
-                    <span className="text-[15px] font-medium">{label}</span>
+                    <span className="text-[14px] font-medium text-[var(--text2)] truncate">{label}</span>
                 </div>
-                <ChevronRight size={20} className="opacity-80 group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight size={18} className="text-[var(--text3)] group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <div className="relative pointer-events-none text-[38px] font-bold leading-none tabular-nums tracking-[-0.02em] mb-3">{value}</div>
-            <div className="relative pointer-events-none mt-auto text-[13px]">{children}</div>
+            <div className="relative pointer-events-none text-[32px] font-bold leading-none tabular-nums tracking-[-0.02em] mb-3">{value}</div>
+            <div className="relative pointer-events-none mt-auto text-[12.5px] text-[var(--text2)]">{children}</div>
         </div>
     )
 }
@@ -542,7 +533,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                         </select>
                         <ChevronDown size={17} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text2)]" />
                     </div>
-                    <Link href="/reports" className="h-12 inline-flex items-center gap-2.5 px-5 rounded-[12px] text-white text-[14.5px] font-semibold bg-[linear-gradient(135deg,#2f6bff_0%,#1447e6_100%)] shadow-[0_8px_20px_-6px_rgba(31,95,255,0.6)] hover:brightness-110 transition">
+                    <Link href="/reports" className="h-12 inline-flex items-center gap-2.5 px-5 rounded-[12px] text-white text-[14.5px] font-semibold bg-[var(--accent)] shadow-[0_8px_20px_-8px_rgba(61,111,245,0.6)] hover:bg-[var(--accent-hover)] transition">
                         <BarChart3 size={19} /> View reports
                     </Link>
                 </div>
@@ -553,22 +544,22 @@ export function AdminOverview({ stats }: { stats: any }) {
                 <KpiTile href="/employees" gradient="linear-gradient(135deg,#2f6bff 0%,#1240d8 100%)" icon={Users} label="Active employees"
                     value={(stats.activeEmployees ?? 0).toLocaleString("en-IN")}>
                     {(stats.newEmployees30d ?? 0) > 0 ? (
-                        <span className="inline-flex items-center gap-1 font-semibold text-[#8cf5b8]">
+                        <span className="inline-flex items-center gap-1 font-semibold text-[#15803d]">
                             <ArrowUpRight size={17} className="stroke-[2.5px]" />+{stats.newEmployees30d} last 30 days
                         </span>
-                    ) : <span className="text-white/75">No new joiners in 30 days</span>}
+                    ) : <span className="text-[var(--text2)]">No new joiners in 30 days</span>}
                 </KpiTile>
 
                 <KpiTile href="/attendance" gradient="linear-gradient(135deg,#0f766e 0%,#0b4d4a 100%)" icon={CalendarCheck} label="Today's attendance"
                     value={attPctLabel}>
-                    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-white/85">
-                        <span>Present <b className="font-semibold text-[#8cc8ff] tabular-nums">{att.present.toLocaleString("en-IN")}</b></span>
+                    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[var(--text2)]">
+                        <span>Present <b className="font-semibold text-[var(--accent)] tabular-nums">{att.present.toLocaleString("en-IN")}</b></span>
                         <span aria-hidden>·</span>
-                        <span>Absent <b className="font-semibold text-[#ff8f8f] tabular-nums">{att.absent.toLocaleString("en-IN")}</b></span>
+                        <span>Absent <b className="font-semibold text-[#dc2626] tabular-nums">{att.absent.toLocaleString("en-IN")}</b></span>
                         <span aria-hidden>·</span>
-                        <span>On leave <b className="font-semibold text-[#ffd54d] tabular-nums">{att.onLeave.toLocaleString("en-IN")}</b></span>
+                        <span>On leave <b className="font-semibold text-[#b45309] tabular-nums">{att.onLeave.toLocaleString("en-IN")}</b></span>
                         <span aria-hidden>·</span>
-                        <span>Not marked <b className="font-semibold text-white tabular-nums">{attNotMarked.toLocaleString("en-IN")}</b></span>
+                        <span>Not marked <b className="font-semibold text-[var(--text)] tabular-nums">{attNotMarked.toLocaleString("en-IN")}</b></span>
                     </span>
                 </KpiTile>
 
@@ -589,10 +580,10 @@ export function AdminOverview({ stats }: { stats: any }) {
                 <KpiTile href="/approvals?date=today" gradient="linear-gradient(135deg,#8b3cf6 0%,#5b21b6 100%)" icon={FileCheck} label="Inspections today"
                     value={String(inspToday)}>
                     {inspDelta === null ? (
-                        <span className="text-white/85 tabular-nums">{inspToday.toLocaleString("en-IN")} today · {inspYesterday.toLocaleString("en-IN")} yesterday</span>
+                        <span className="text-[var(--text2)] tabular-nums">{inspToday.toLocaleString("en-IN")} today · {inspYesterday.toLocaleString("en-IN")} yesterday</span>
                     ) : (
                         <span className={cn(
-                            "inline-flex items-center gap-1 h-8 px-3 rounded-full bg-white font-semibold",
+                            "inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-[var(--surface2)] font-semibold",
                             inspDelta >= 0 ? "text-[#15803d]" : "text-[#dc2626]"
                         )}>
                             {inspDelta >= 0 ? <ArrowUpRight size={16} className="stroke-[2.5px]" /> : <ArrowDownRight size={16} className="stroke-[2.5px]" />}

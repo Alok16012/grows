@@ -30,7 +30,8 @@ export async function GET(req: Request) {
     const monthStart = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), 1) - 330 * 60_000)
     const aud = await safe(audienceWhere(session), null)
 
-    const [today, presentDays, leaveDays, absentDays, payslip, leave, myOpen, myOverdue, awaitingMine, holiday, announcements, celebrations] = await Promise.all([
+    const monthEnd = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth() + 1, 1) - 330 * 60_000)
+    const [today, presentDays, leaveDays, absentDays, payslip, leave, myOpen, myOverdue, awaitingMine, holiday, announcements, celebrations, monthHolidays] = await Promise.all([
         emp ? safe(prisma.attendance.findFirst({ where: { employeeId: emp.id, date: { gte: dayStart, lt: dayEnd } }, select: { checkIn: true, checkOut: true, status: true, workingHrs: true } }), null) : null,
         emp ? safe(prisma.attendance.count({ where: { employeeId: emp.id, date: { gte: monthStart, lt: dayEnd }, ...PRESENT_WHERE } }), 0) : 0,
         emp ? safe(prisma.attendance.count({ where: { employeeId: emp.id, date: { gte: monthStart, lt: dayEnd }, status: { in: ["ON_LEAVE", "LEAVE"] } } }), 0) : 0,
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
         safe(prisma.workTask.count({ where: { assigneeId: userId, status: { in: ["TODO", "IN_PROGRESS"] }, dueAt: { lt: now } } }), 0),
         safe(prisma.workTask.count({ where: { createdBy: userId, status: "AWAITING_APPROVAL" } }), 0),
         safe(prisma.holiday.findFirst({ where: { ...(aud ?? {}), date: { gte: dayStart } }, orderBy: { date: "asc" }, select: { name: true, date: true, type: true } }), null),
-        safe(prisma.announcement.findMany({ where: aud ? { isActive: true, ...aud } : { isActive: true }, orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }], take: 2, select: { id: true, title: true, category: true, publishedAt: true } }), []),
+        safe(prisma.announcement.findMany({ where: aud ? { isActive: true, ...aud } : { isActive: true }, orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }], take: 5, select: { id: true, title: true, category: true, publishedAt: true } }), []),
         // Birthdays and work anniversaries today (IST), active employees only. First names only.
         safe(prisma.$queryRawUnsafe<{ firstName: string; lastName: string | null; kind: string; years: number | null }[]>(`
             SELECT "firstName", "lastName", 'birthday' AS kind, NULL::int AS years FROM "Employee"
@@ -63,6 +64,8 @@ export async function GET(req: Request) {
                AND EXTRACT(MONTH FROM ("dateOfJoining" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')) = $1 AND EXTRACT(DAY FROM ("dateOfJoining" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')) = $2
                AND EXTRACT(YEAR FROM ("dateOfJoining" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')) < $3
             LIMIT 30`, ist.getUTCMonth() + 1, ist.getUTCDate(), ist.getUTCFullYear()), []),
+        // This month's holidays, for the calendar on the desktop home.
+        safe(prisma.holiday.findMany({ where: { ...(aud ?? {}), date: { gte: monthStart, lt: monthEnd } }, orderBy: { date: "asc" }, take: 15, select: { name: true, date: true, type: true } }), []),
     ])
 
     return NextResponse.json({
@@ -70,7 +73,7 @@ export async function GET(req: Request) {
         today, month: { present: presentDays, leave: leaveDays, absent: absentDays },
         leave, payslip,
         tasks: { myOpen, myOverdue, awaitingMine },
-        holiday, announcements,
+        holiday, announcements, monthHolidays,
         celebrations: celebrations.map(c => ({ name: [c.firstName, c.lastName].filter(Boolean).join(" "), kind: c.kind, years: c.years })),
     })
 }

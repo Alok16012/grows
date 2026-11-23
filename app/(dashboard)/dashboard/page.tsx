@@ -20,7 +20,7 @@ import { format } from "date-fns"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { NeedsSiteBanner } from "@/components/new-joiners/NeedsSiteBanner"
-import { MyTasksBanner } from "@/components/tasks/MyTasksBanner"
+import { MyDay } from "@/components/dashboard/MyDay"
 import { WorkPanels } from "@/components/dashboard/WorkPanels"
 
 // ─── Small shared pieces (mirrors the admin dashboard) ───────────────────────
@@ -348,9 +348,10 @@ function DesktopDashboard() {
             </div>
 
             <NeedsSiteBanner />
-            <MyTasksBanner />
             {/* Issued assets waiting for Received / Not received (blinks). */}
             <AssetReceiptCard />
+            {/* Check-in, quick actions, my tasks, events, attendance and leave rings. */}
+            <MyDay />
             {/* The profile's own work first: recruiter, payroll, inspector, HR, approver … */}
             <WorkPanels />
             {hasAnyWidget && <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text3)] pt-2">Company overview</p>}
