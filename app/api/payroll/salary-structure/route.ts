@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { setManualOtRates } from "@/lib/payroll-manual-ot-rates"
 import { recalcDraftPayroll } from "@/lib/payroll-recalc"
 import { checkEffectiveMonth, openPayrollMonth } from "@/lib/payroll-change-control"
 import { refreshArrears, logRevisions, salaryFigures } from "@/lib/salary-arrears"
@@ -297,6 +298,8 @@ export async function POST(req: Request) {
         where: { employeeId: { in: rows.map(r => r.employeeId) }, effectiveYear: effYear!, effectiveMonth: effMonth! },
     })).map(r => [r.employeeId, salaryFigures(r)]))
     const afterById = new Map<string, Record<string, unknown>>()
+    // OT rates as shown before the upload (to tell a typed manual rate from an unchanged one).
+    const otShown = new Map((await prisma.employeeSalary.findMany({ where: { employeeId: { in: rows.map(r => r.employeeId) } }, select: { employeeId: true, otRatePerHour: true } })).map(r => [r.employeeId, r.otRatePerHour]))
     for (const row of rows) {
         try {
             const basic      = Number(row.basic) || 0
@@ -440,6 +443,19 @@ export async function POST(req: Request) {
         before: beforeRevs.get(id) ?? null, after: afterById.get(id)!, changedBy: session.user.id,
     })))
     const arrearsPending = await refreshArrears(savedIds, { month: effMonth!, year: effYear! }, session.user.id)
+    // An OT rate in the upload that differs from the one shown is a manual
+    // rate (always first over the site formula); an unchanged value is not.
+    {
+        const saved = new Set(savedIds)
+        const changes: Record<string, number> = {}
+        for (const row of rows) {
+            if (!saved.has(row.employeeId) || row.otRatePerHour === undefined || row.otRatePerHour === null || (row.otRatePerHour as unknown) === "") continue
+            const v = Number(row.otRatePerHour)
+            const shown = otShown.get(row.employeeId)
+            if (Number.isFinite(v) && v > 0 && (shown == null || Math.abs(v - shown) >= 0.005)) changes[row.employeeId] = v
+        }
+        if (Object.keys(changes).length) await setManualOtRates(changes, session.user.id)
+    }
     // Their draft payroll from that month on picks up the new structure now.
     const recalculated = await recalcDraftPayroll({ from: { month: effMonth!, year: effYear! }, employeeIds: savedIds })
 

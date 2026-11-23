@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { setManualOtRates } from "@/lib/payroll-manual-ot-rates"
 import { recalcDraftPayroll } from "@/lib/payroll-recalc"
 import { checkEffectiveMonth, openPayrollMonth } from "@/lib/payroll-change-control"
 import { refreshArrears, logRevisions, salaryFigures } from "@/lib/salary-arrears"
@@ -83,6 +84,7 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
 
     // The row as it stood before this edit — needed below to preserve history.
     const before = await prisma.employeeSalary.findUnique({ where: { employeeId: params.employeeId } })
+    await noteManualOtRate(params.employeeId, otRatePerHour, before?.otRatePerHour, session.user.id)
 
     // One transaction: the live row, the baseline and this month's revision
     // land together or not at all. Written separately, a failed baseline left
@@ -219,4 +221,13 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
         await recalcDraftPayroll({ from: { month: h.month, year: h.year }, employeeIds: [params.employeeId] })
     }
     return NextResponse.json(sal)
+}
+
+// A typed OT rate that differs from the one shown is a manual rate (always first);
+// an unchanged value is not, so editing other figures never pins the formula rate.
+async function noteManualOtRate(employeeId: string, typed: unknown, shown: number | null | undefined, userId: string) {
+    const v = Number(typed)
+    if (!Number.isFinite(v) || v <= 0) return
+    if (shown != null && Math.abs(v - shown) < 0.005) return
+    await setManualOtRates({ [employeeId]: v }, userId)
 }

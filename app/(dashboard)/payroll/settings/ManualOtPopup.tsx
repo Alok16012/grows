@@ -78,12 +78,19 @@ export default function ManualOtPopup({ site, ot, ruleKind, onChange, onClose }:
     const filled = (emps ?? []).filter(e => toNum(values[e.id] ?? "") !== null).length
 
     // ── Save ────────────────────────────────────────────────────────────────
-    const applyRates = () => {
-        const next = { ...(ot.manualRates ?? {}) }
-        for (const e of emps ?? []) { const n = toNum(rates[e.id] ?? ""); if (n === null || n === 0) delete next[e.id]; else next[e.id] = n }
-        onChange({ manualRates: next })
-        toast.success("Rates applied — click Save on the settings page to keep them")
-        onClose()
+    const applyRates = async () => {
+        setBusy(true)
+        try {
+            const body = { rates: Object.fromEntries((emps ?? []).map(e => [e.id, toNum(rates[e.id] ?? "") || null])) }
+            const r = await fetch("/api/payroll/manual-ot", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+            const d = await r.json().catch(() => ({}))
+            if (!r.ok) throw new Error(d?.error || "Could not save")
+            const next = { ...(ot.manualRates ?? {}) }
+            for (const e of emps ?? []) { const n = toNum(rates[e.id] ?? ""); if (!n) delete next[e.id]; else next[e.id] = n }
+            onChange({ manualRates: next })
+            toast.success(`Manual OT rates saved${d.recalculated?.rows ? ` · ${d.recalculated.rows} draft payroll row(s) updated` : ""}`)
+            onClose()
+        } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
     }
     const saveAmounts = async () => {
         if (!period) return
@@ -164,7 +171,7 @@ export default function ManualOtPopup({ site, ot, ruleKind, onChange, onClose }:
                     <div>
                         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--text)" }}>Manual OT — {site.name}</h3>
                         <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "var(--text3)" }}>
-                            {active ? <>This site uses <b>{active === "rate" ? "rate per employee" : "monthly amount per employee"}</b>. </> : null}<b>A rate typed here is used for that employee whatever the site&apos;s rule.</b> Monthly amounts are used only when the site&apos;s rule is &quot;Manual OT — monthly amount&quot;. 
+                            {active ? <>This site uses <b>{active === "rate" ? "rate per employee" : "monthly amount per employee"}</b>. </> : null}<b>A manual rate (typed here or in Salary Master) is always used first; no manual rate → the site&apos;s formula.</b> Monthly amounts are used only when the site&apos;s rule is &quot;Manual OT — monthly amount&quot;. 
                             Employees left blank get OT days × their own rate (Salary Master).
                         </p>
                     </div>
@@ -232,12 +239,12 @@ export default function ManualOtPopup({ site, ot, ruleKind, onChange, onClose }:
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 16px", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 11.5, color: "var(--text3)" }}>
                         {emps ? `${filled} of ${emps.length} filled` : ""}
-                        {tab === "rate" ? " · Apply, then Save on the settings page." : " · Saved straight away; draft payroll updates."}
+                        {" · Saved straight away; draft payroll updates."}
                     </span>
                     <div style={{ display: "flex", gap: 8 }}>
                         <button type="button" onClick={onClose} style={ghost}>Close</button>
                         {tab === "rate"
-                            ? <button type="button" onClick={applyRates} disabled={!emps} style={primary}>Apply rates</button>
+                            ? <button type="button" onClick={applyRates} disabled={!emps || busy} style={{ ...primary, opacity: busy ? 0.6 : 1 }}>{busy ? "Saving…" : "Save rates"}</button>
                             : <button type="button" onClick={saveAmounts} disabled={!emps || !period || busy} style={{ ...primary, opacity: busy ? 0.6 : 1 }}>{busy ? "Saving…" : `Save amounts${period ? ` — ${ymLabel(period)}` : ""}`}</button>}
                     </div>
                 </div>

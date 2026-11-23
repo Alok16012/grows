@@ -8,6 +8,7 @@
 // settings row (key "payrollRules") is the starting version for all months
 // before the first dated one.
 import prisma from "./prisma"
+import { loadManualOtRates } from "./payroll-manual-ot-rates"
 import {
     DEFAULT_PAYROLL_RULES,
     PAYROLL_RULES_SETTING_KEY,
@@ -86,15 +87,21 @@ function versionFor(versions: RulesVersion[], p: YM): RulesVersion | null {
 // stored or the stored JSON is unreadable. Payroll must never fail because of
 // a bad settings row.
 export async function getPayrollRules(period?: YM): Promise<{ rules: PayrollRules; customized: boolean; from: YM | null }> {
-    const { base, baseCustomized, versions } = await loadRulesHistory()
+    const [{ base, baseCustomized, versions }, manual] = await Promise.all([loadRulesHistory(), loadManualOtRates()])
     const p = period ?? await openPayrollMonth()
     const v = versionFor(versions, p)
-    return v ? { rules: v.rules, customized: true, from: { year: v.fromYear, month: v.fromMonth } } : { rules: base, customized: baseCustomized, from: null }
+    return v ? { rules: withManual(v.rules, manual), customized: true, from: { year: v.fromYear, month: v.fromMonth } } : { rules: withManual(base, manual), customized: baseCustomized, from: null }
+}
+
+/** Manual OT rates per employee (lib/payroll-manual-ot-rates) win over anything a settings version holds. */
+function withManual(rules: PayrollRules, manual: Record<string, number>): PayrollRules {
+    return { ...rules, ot: { ...rules.ot, manualRates: { ...(rules.ot.manualRates ?? {}), ...manual } } }
 }
 
 /** Save rules as the version that applies from `from` (replacing a version already starting that month). */
 export async function savePayrollRules(input: unknown, userId: string, from: YM, note?: string | null): Promise<PayrollRules> {
-    const rules = sanitizePayrollRules(input)
+    const clean = sanitizePayrollRules(input)
+    const rules = { ...clean, ot: { ...clean.ot, manualRates: {} } }
     const { versions } = await loadRulesHistory()
     const next = versions.filter(v => !(v.fromYear === from.year && v.fromMonth === from.month))
     next.push({ fromYear: from.year, fromMonth: from.month, rules, savedBy: userId, savedAt: new Date().toISOString(), note: note ?? null })
@@ -121,6 +128,6 @@ export async function deletePayrollRulesVersion(from: YM, userId: string): Promi
 
 /** Rules for many months at once (one read): p => the version in force that month. */
 export async function getRulesResolver(): Promise<(p: YM) => PayrollRules> {
-    const { base, versions } = await loadRulesHistory()
-    return (p: YM) => versionFor(versions, p)?.rules ?? base
+    const [{ base, versions }, manual] = await Promise.all([loadRulesHistory(), loadManualOtRates()])
+    return (p: YM) => withManual(versionFor(versions, p)?.rules ?? base, manual)
 }

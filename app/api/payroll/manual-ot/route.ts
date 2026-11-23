@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
+import { setManualOtRates } from "@/lib/payroll-manual-ot-rates"
 import prisma from "@/lib/prisma"
 import { guard, auditLater, requestMeta } from "@/lib/access"
 import { loadManualOt, manualOtKey, saveManualOtAmounts } from "@/lib/payroll-manual-ot"
-import { checkEffectiveMonth, effectiveWindow } from "@/lib/payroll-change-control"
+import { checkEffectiveMonth, effectiveWindow, openPayrollMonth } from "@/lib/payroll-change-control"
 import { recalcDraftPayroll } from "@/lib/payroll-recalc"
 
 export const dynamic = "force-dynamic"
@@ -51,6 +52,14 @@ export async function PUT(req: Request) {
     const g = await guard(req, "payroll.edit")
     if (g instanceof NextResponse) return g
     const body = await req.json().catch(() => null)
+    // { rates: { employeeId: ₹/hr | null } } — manual OT rates, in force at once.
+    if (body?.rates && typeof body.rates === "object") {
+        const changed = await setManualOtRates(body.rates, g.access.userId)
+        const ids = Object.keys(body.rates).filter(id => id && id.length <= 64)
+        const recalculated = ids.length ? await recalcDraftPayroll({ from: await openPayrollMonth(), employeeIds: ids }) : { rows: 0, months: [] }
+        auditLater({ actorId: g.access.userId, actorName: g.access.name, action: "payroll.manual_ot_rates", targetType: "Payroll", targetId: "manual-ot-rates", targetName: "Manual OT rates", summary: `Manual OT rates: ${changed} changed`, ...requestMeta(req) })
+        return NextResponse.json({ ok: true, changed, recalculated })
+    }
     const p = { month: Number(body?.month), year: Number(body?.year) }
     const amounts = body?.amounts && typeof body.amounts === "object" ? body.amounts as Record<string, unknown> : null
     if (!amounts) return NextResponse.json({ error: "Nothing to save" }, { status: 400 })
