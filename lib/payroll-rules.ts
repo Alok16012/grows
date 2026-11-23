@@ -149,6 +149,8 @@ export type PayrollRules = {
         // Default false: full PF regardless of worked days.
         prorateEmployee: boolean
         prorationThresholdDays: number
+        // PF ECR file: NCP days column — "zero" (always 0) or "actual" (month days − days worked).
+        ecrNcpDays: "zero" | "actual"
         employer: {
             epsPct: number
             epfPct: number
@@ -248,6 +250,7 @@ export const DEFAULT_PAYROLL_RULES: PayrollRules = {
         employeePct: 12,
         prorateEmployee: false,
         prorationThresholdDays: 26,
+        ecrNcpDays: "zero",
         employer: {
             epsPct: 8.33,
             epfPct: 3.67,
@@ -579,6 +582,7 @@ export function sanitizePayrollRules(input: unknown): PayrollRules {
             employeePct: num(pf.employeePct, d.pf.employeePct, { max: 100 }),
             prorateEmployee: bool(pf.prorateEmployee, d.pf.prorateEmployee),
             prorationThresholdDays: num(pf.prorationThresholdDays, d.pf.prorationThresholdDays, { min: 1, max: 31 }),
+            ecrNcpDays: pf.ecrNcpDays === "actual" ? "actual" : "zero",
             employer: {
                 epsPct: num(pfEmployer.epsPct, d.pf.employer.epsPct, { max: 100 }),
                 epfPct: num(pfEmployer.epfPct, d.pf.employer.epfPct, { max: 100 }),

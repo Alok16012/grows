@@ -380,6 +380,13 @@ export default function PayrollSettingsPage() {
                         <NumField label="Proration threshold" suffix="days" value={rules.pf.prorationThresholdDays}
                             onChange={n => up("pf", { prorationThresholdDays: n })} />
                     )}
+                    <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <span style={fieldLabel}>NCP days in PF ECR file</span>
+                        <select value={rules.pf.ecrNcpDays} onChange={e => up("pf", { ecrNcpDays: e.target.value as "zero" | "actual" })} style={inputStyle}>
+                            <option value="zero">Always 0</option>
+                            <option value="actual">Actual — month days − days worked</option>
+                        </select>
+                    </label>
                     <div>
                         <p style={{ ...fieldLabel, marginBottom: 6 }}>Employer contribution split (%)</p>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>

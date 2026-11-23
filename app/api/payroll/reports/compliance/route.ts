@@ -101,7 +101,7 @@ const ecrMember = (p: PayrollRow, rules: PayrollRules): EcrMember => ({
     epfEmployee: p.pfEmployee,
     epsContribution: epsContrib(p, rules),
     epfEmployer: epfEmployerContrib(p, rules),
-    ncpDays: ncpDays(p),
+    ncpDays: rules.pf.ecrNcpDays === "actual" ? ncpDays(p) : 0,
 })
 
 // `includeDraft=1` also takes DRAFT rows, so reports can be checked before the
@@ -458,7 +458,7 @@ async function handle(req: Request, ctx: { draft: number }): Promise<NextRespons
                         "EPF Contribution (EE)": p.pfEmployee,
                         "EPS Contribution (ER)": epsContrib(p, rules),
                         "EPF Contribution (ER)": epfEmployerContrib(p, rules),
-                        "NCP Days": ncpDays(p),
+                        "NCP Days": rules.pf.ecrNcpDays === "actual" ? ncpDays(p) : 0,
                         "Refund of Advances": 0,
                     }))
                     break
@@ -474,7 +474,7 @@ async function handle(req: Request, ctx: { draft: number }): Promise<NextRespons
                         "EPF Contribution (EE)": p.pfEmployee,
                         "EPS Contribution": epsContrib(p, rules),
                         "EPF Contribution (ER)": epfEmployerContrib(p, rules),
-                        "NCP Days": ncpDays(p),
+                        "NCP Days": rules.pf.ecrNcpDays === "actual" ? ncpDays(p) : 0,
                         "Refund of Advances": 0,
                     }))
                     break
