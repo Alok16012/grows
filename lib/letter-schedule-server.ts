@@ -242,7 +242,7 @@ export class LetterError extends Error {}
 
 /**
  * Make one letter from the rule's template. Types that need approval wait as
- * PENDING_APPROVAL (approved and issued in Letters & Documents); the rest are
+ * PENDING_APPROVAL (approved and issued in Send & issued); the rest are
  * ISSUED and appear in the employee's My Profile → Letters.
  */
 export async function issueLetter(employeeId: string, rule: LetterRule, actor: { id: string; name: string } | null, ev: EventData & { eventKey: string }) {
@@ -252,7 +252,7 @@ export async function issueLetter(employeeId: string, rule: LetterRule, actor: {
         prisma.hrDocumentType.findUnique({ where: { id: rule.typeId } }),
     ])
     if (!employee || !type) throw new LetterError("Employee or letter template not found")
-    if (!type.isActive) throw new LetterError(`The "${type.name}" template is switched off in Letters & Documents`)
+    if (!type.isActive) throw new LetterError(`The "${type.name}" template is switched off in Send & issued`)
     if (!type.templateContent?.trim()) throw new LetterError(`The "${type.name}" template is empty`)
     const effectiveDate = ev.effectiveDay ? istDate(ev.effectiveDay) : employee.dateOfJoining
     const repeating = REPEATING_TRIGGERS.includes(rule.trigger)

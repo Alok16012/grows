@@ -208,7 +208,6 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "Onboarding", href: "/onboarding", permissionAny: ["onboarding.view", "recruitment.view"] },
                 { name: "Join Links", href: "/onboarding/join-links", permissionAny: ["onboarding.view", "recruitment.view"] },
                 { name: "Joining Checklist", href: "/onboarding/checklist", permissionAny: ["onboarding.view", "recruitment.view"] },
-                { name: "HR Letters", href: "/onboarding/letters", permissionAny: ["onboarding.view", "documents.send", "documents.view"] },
             ],
         },
         {
@@ -232,9 +231,9 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             icon: FileText,
             links: [
                 { name: "Employee Documents", href: "/employees/documents", permission: "documents.view" },
-                { name: "Letters & Documents", href: "/documents/send", permissionAny: ["documents.send", "documents.view"] },
+                // Send & issued, Auto letters and Templates are tabs inside (components/documents/LettersTabs).
+                { name: "HR Letters", href: "/documents/send", permissionAny: ["documents.send", "documents.view"], matchPrefixes: ["/documents"] },
                 { name: "Policies", href: "/policies", permissionAny: ["policy.view", "policy.report", "policies.create", "policies.edit", "policies.delete", "policies.publish"] },
-                { name: "Document Types", href: "/documents/types", permission: "documents.view" },
             ],
         },
         {

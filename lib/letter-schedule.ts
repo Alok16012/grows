@@ -134,7 +134,7 @@ export const STANDARD_LETTERS: StandardLetter[] = [
     { name: "Appreciation Letter", trigger: "ON_DEMAND", offsetDays: 0, requiresApproval: true, note: "On demand, when HR needs it" },
 ]
 
-/** Starter wording for templates that do not exist yet (HR can edit them in Letters & Documents → Types). */
+/** Starter wording for templates that do not exist yet (HR can edit them in HR Letters → Templates). */
 export const STARTER_TEMPLATES: Record<string, string> = {
     "Joining Letter": `<p>Date: {{date}}</p><p>To,<br/><b>{{employee_name}}</b> ({{employee_id}})</p><p><b>Subject: Joining Letter</b></p><p>Dear {{employee_name}},</p><p>We are pleased to confirm that you have joined <b>{{company_name}}</b> as <b>{{designation}}</b> on <b>{{joining_date}}</b>.</p><p>Your monthly CTC is ₹{{salary}}. Please keep this letter for your records.</p><p>We wish you a long and successful career with us.</p><p>For {{company_name}}<br/>Authorised Signatory</p>`,
     "Increment Letter": `<p>Date: {{date}}</p><p>To,<br/><b>{{employee_name}}</b> ({{employee_id}})<br/>{{designation}}</p><p><b>Subject: Salary Revision</b></p><p>Dear {{employee_name}},</p><p>We are pleased to inform you that your salary has been revised with effect from <b>{{effective_month}}</b>.</p><p>Previous monthly CTC: ₹{{old_salary}}<br/>Revised monthly CTC: <b>₹{{new_salary}}</b><br/>Increase: ₹{{increment_amount}}</p><p>All other terms of your employment remain the same. We appreciate your contribution and look forward to your continued good work.</p><p>For {{company_name}}<br/>Authorised Signatory</p>`,

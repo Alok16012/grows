@@ -1,4 +1,5 @@
 "use client"
+import { LettersTabs } from "@/components/documents/LettersTabs"
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -118,7 +119,7 @@ function TypeModal({
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] sticky top-0 bg-white z-10">
                     <h2 className="text-[16px] font-semibold text-[var(--text)] flex items-center gap-2">
                         <FolderOpen size={18} className="text-[var(--accent)]" />
-                        {existing ? "Edit Document Type" : "Add Document Type"}
+                        {existing ? "Edit template" : "Add template"}
                     </h2>
                     <button
                         onClick={onClose}
@@ -297,17 +298,15 @@ export default function DocumentTypesPage() {
 
     return (
         <div className="w-full min-w-0 space-y-5 pb-12 px-4 pt-4 lg:p-0">
+            <LettersTabs />
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-[13px] text-[var(--text3)] mb-1">
-                        <span className="text-[var(--text)]">Document Types</span>
-                    </div>
-                    <h1 className="text-[22px] font-semibold text-[var(--text)] flex items-center gap-2">
-                        <FolderOpen size={22} className="text-[var(--accent)]" /> Document Types
-                    </h1>
+                    <h2 className="text-[18px] font-bold text-[var(--text)] flex items-center gap-2">
+                        <FolderOpen size={19} className="text-[var(--accent)]" /> Letter templates
+                    </h2>
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">
-                        Manage document templates and settings
+                        The wording of each letter, whether it needs approval, and on/off. Used by Send &amp; issued, Auto letters and Exit.
                     </p>
                 </div>
                 <div className="page-actions">
@@ -315,7 +314,7 @@ export default function DocumentTypesPage() {
                         onClick={() => { setEditingType(null); setShowModal(true) }}
                         className="flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity"
                     >
-                        <Plus size={16} /> Add Document Type
+                        <Plus size={16} /> Add template
                     </button>
                 </div>
             </div>
@@ -332,7 +331,7 @@ export default function DocumentTypesPage() {
                 <div className="bg-white border border-[var(--border)] rounded-[14px] flex flex-col items-center justify-center py-20 text-center">
                     <FolderOpen size={40} className="text-[var(--text3)] mb-3" />
                     <p className="text-[15px] font-semibold text-[var(--text)]">No document types yet</p>
-                    <p className="text-[13px] text-[var(--text3)] mt-1">Click &ldquo;Add Document Type&rdquo; to create your first template.</p>
+                    <p className="text-[13px] text-[var(--text3)] mt-1">Click &ldquo;Add template&rdquo; to create your first template.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

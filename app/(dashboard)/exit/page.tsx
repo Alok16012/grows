@@ -1518,7 +1518,7 @@ function FnFTab({
       {paid && flow && (
         <div style={{ padding: 12, marginBottom: 12, borderRadius: 12, border: "1px solid var(--border)", fontSize: 13 }}>
           {flow.letters.length
-            ? <>Letters issued: {flow.letters.map(l => `${l.type.name} (${l.docNumber}${l.status === "PENDING_APPROVAL" ? ", waiting for approval" : ""})`).join(", ")} — in Letters &amp; Documents.</>
+            ? <>Letters issued: {flow.letters.map(l => `${l.type.name} (${l.docNumber}${l.status === "PENDING_APPROVAL" ? ", waiting for approval" : ""})`).join(", ")} — in HR Letters.</>
             : <>No exit letters issued — set the letter types in <a href="/exit/settings" style={{ color: "var(--accent)" }}>Exit settings</a>.</>}
         </div>
       )}

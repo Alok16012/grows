@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Send, Loader2, FileText, Download, Users, UserCheck, Globe, Search, Eye, X, Undo2, RotateCcw, History, PenLine, Trash2, Lock, Play, ArrowRight, FileStack, ChevronDown } from "lucide-react"
 import { can, canAny } from "@/lib/can"
+import { LettersTabs } from "@/components/documents/LettersTabs"
 
 type DocType = { id: string; name: string; requiresApproval: boolean; templateContent?: string }
 
@@ -344,11 +345,12 @@ export default function SendDocumentsPage() {
 
     return (
         <div className="p-5 lg:p-0 flex flex-col gap-6">
+            <LettersTabs />
             {/* Header */}
             <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                    <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Send Documents</h1>
-                    <p className="text-[13.5px] text-[var(--text3)] mt-1.5">Issue letters or documents to employees by role or selection — generated on the company letterhead as PDF.</p>
+                    <h2 className="text-[18px] font-bold text-[var(--text)]">Send a letter now</h2>
+                    <p className="text-[13.5px] text-[var(--text3)] mt-1.5">Issue letters or documents to employees by role or selection — generated on the company letterhead as PDF. Letters made automatically (Auto letters) also appear in the issued list below.</p>
                 </div>
                 <button
                     onClick={openPreview}
@@ -386,7 +388,7 @@ export default function SendDocumentsPage() {
                             {docTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                         {docTypes.length === 0 && (
-                            <p className="text-[12px] text-[var(--text3)] mt-1.5">No document types yet. Create one in <button onClick={() => router.push("/documents/types")} className="text-[var(--accent)] underline">Doc Types</button>.</p>
+                            <p className="text-[12px] text-[var(--text3)] mt-1.5">No document types yet. Create one in <button onClick={() => router.push("/documents/types")} className="text-[var(--accent)] underline">Templates</button>.</p>
                         )}
                     </div>
 

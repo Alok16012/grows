@@ -68,12 +68,7 @@ export default function ExitSettingsPage() {
                 <p className="text-[13px] font-semibold">Full &amp; final</p>
                 <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" disabled={!canEdit} checked={s.fnfApproval} onChange={e => set({ fnfApproval: e.target.checked })} /> F&amp;F must be approved before the payment is recorded</label>
                 <label className="flex items-center gap-2 text-[13px] pl-6"><input type="checkbox" disabled={!canEdit || !s.fnfApproval} checked={s.makerChecker} onChange={e => set({ makerChecker: e.target.checked })} /> The approver must be someone other than whoever prepared it (Admins excepted)</label>
-                <p className="text-[12.5px] pt-1">Once paid, issue these letters automatically:</p>
-                <div className="grid sm:grid-cols-2 gap-2">
-                    <label className="text-[11px] font-semibold uppercase text-[var(--text3)]">Relieving letter<select disabled={!canEdit} value={s.relievingTypeId ?? ""} onChange={e => set({ relievingTypeId: e.target.value || null })} className={`${box} w-full`}><option value="">— none —</option>{types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-                    <label className="text-[11px] font-semibold uppercase text-[var(--text3)]">Experience letter<select disabled={!canEdit} value={s.experienceTypeId ?? ""} onChange={e => set({ experienceTypeId: e.target.value || null })} className={`${box} w-full`}><option value="">— none —</option>{types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-                </div>
-                <p className="text-[11.5px] text-[var(--text3)]">Templates are in Letters &amp; Documents → Types. Extra fields available: {"{{leaving_date}}"}, {"{{resignation_date}}"}.</p>
+                <p className="text-[12.5px] pt-1">Letters made once the F&amp;F is paid ({[s.relievingTypeId, s.experienceTypeId].map(id => types.find(t => t.id === id)?.name).filter(Boolean).join(", ") || "none"}) are now set with all other letters in <Link href="/documents/letters" className="text-[var(--accent)] font-semibold">HR Letters → Auto letters</Link>.</p>
             </div>
             {canEdit && <div className="flex justify-end"><button onClick={save} disabled={busy} className={btn}>{busy && <Loader2 size={14} className="animate-spin" />}Save settings</button></div>}
             {canEdit && (
