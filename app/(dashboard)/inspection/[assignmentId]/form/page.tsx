@@ -980,8 +980,9 @@ export default function InspectionFormPage() {
                     </div>
                 )}
 
-                {/* Reviewer sent-back notice */}
-                {inspection?.sentBackCount > 0 && inspection?.reviewerNotes && (
+                {/* Reviewer sent-back notice — only while the part is back with the
+                    inspector (draft); once corrected and resubmitted it is history. */}
+                {inspection?.sentBackCount > 0 && inspection?.reviewerNotes && inspection?.status === "draft" && (
                     <div className="bg-orange-50 border border-orange-200 rounded-[12px] p-[14px_18px] mb-[20px]">
                         <div className="flex items-center gap-2 mb-2">
                             <span className="text-[11px] font-bold uppercase tracking-wider text-orange-600 bg-orange-100 px-2 py-0.5 rounded">Sent Back for Corrections</span>
