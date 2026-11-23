@@ -418,21 +418,21 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
 
     if (collapsedRail) {
         return (
-            <div className="flex h-full w-full flex-col items-center overflow-hidden text-white bg-[linear-gradient(180deg,#0c2459_0%,#0a1f4f_45%,#081a42_100%)]">
+            <div className="flex h-full w-full flex-col items-center overflow-hidden text-[var(--text)] bg-white border-r border-[var(--border)]">
                 <div className="flex h-[72px] items-center shrink-0">
-                    <Link href="/" title={COMPANY.name} className="h-10 w-10 rounded-[12px] flex items-center justify-center text-[#0a1f4f] bg-white shadow-[0_6px_16px_rgba(2,8,32,0.35)]">
+                    <Link href="/" title={COMPANY.name} className="h-10 w-10 rounded-[12px] flex items-center justify-center text-[var(--accent)] bg-[var(--accent-light)]">
                         <img src="/logo-mark.png" alt="" aria-hidden="true" className="w-[26px] h-[26px] object-contain" />
                     </Link>
                 </div>
                 <button type="button" onClick={() => onToggleRail?.()} title="Expand sidebar" aria-label="Expand sidebar"
-                    className="h-9 w-9 shrink-0 rounded-[10px] flex items-center justify-center text-white/70 hover:text-white hover:bg-white/[0.08] transition-colors">
+                    className="h-9 w-9 shrink-0 rounded-[10px] flex items-center justify-center text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
                     <PanelLeftOpen size={18} aria-hidden="true" />
                 </button>
                 <button type="button" onClick={() => { setFocusSearch(true); onToggleRail?.() }} title="Find a module" aria-label="Find a module"
-                    className="mt-1 mb-2 h-9 w-9 shrink-0 rounded-[10px] flex items-center justify-center bg-white/[0.08] ring-1 ring-white/10 text-white/70 hover:text-white hover:bg-white/[0.12] transition-colors">
+                    className="mt-1 mb-2 h-9 w-9 shrink-0 rounded-[10px] flex items-center justify-center bg-[var(--surface2)] ring-1 ring-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
                     <Search size={16} aria-hidden="true" />
                 </button>
-                <nav aria-label="Main" className="flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col items-center gap-1.5 py-2 border-t border-white/[0.08] [scrollbar-width:none]">
+                <nav aria-label="Main" className="flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col items-center gap-1.5 py-2 border-t border-[var(--border)] [scrollbar-width:none]">
                     {visible.map(category => {
                         const Icon = category.icon
                         const holdsActive = category.links.some(isActive)
@@ -441,13 +441,13 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                         const tileCls = cn(
                             "relative h-10 w-10 shrink-0 rounded-[10px] flex items-center justify-center transition-colors",
                             holdsActive
-                                ? "bg-white text-[#0a1f4f] shadow-[0_6px_16px_rgba(2,8,32,0.35)]"
+                                ? "bg-[var(--accent-light)] text-[var(--accent)]"
                                 : shown
-                                    ? "bg-white/[0.18] text-white ring-1 ring-white/30"
-                                    : "bg-white/[0.06] text-white/75 hover:bg-white/[0.12] hover:text-white"
+                                    ? "bg-[var(--accent-light)] text-[var(--accent)]"
+                                    : "bg-[var(--surface2)] text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
                         )
                         const dot = waiting > 0 && (
-                            <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#ef4444] ring-2 ring-[#0a1f4f]" />
+                            <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#ef4444] ring-2 ring-white" />
                         )
                         const label = waiting ? `${category.title} · ${waiting} waiting` : category.title
                         // One page: the tile is that page.
@@ -487,16 +487,16 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                         role="menu"
                         aria-label={flyoutCategory.title}
                         style={{ top: flyout.top, left: flyout.left }}
-                        className="fixed z-[60] w-[240px] max-h-[calc(100vh-16px)] overflow-y-auto [scrollbar-width:thin] rounded-[14px] p-2 text-white bg-[#0c2459] ring-1 ring-white/10 shadow-[0_18px_40px_rgba(2,8,32,0.45)] animate-in fade-in slide-in-from-left-1 duration-150"
+                        className="fixed z-[60] w-[240px] max-h-[calc(100vh-16px)] overflow-y-auto [scrollbar-width:thin] rounded-[14px] p-2 text-[var(--text)] bg-white ring-1 ring-[var(--border)] shadow-[0_18px_40px_rgba(40,48,100,0.14)] animate-in fade-in slide-in-from-left-1 duration-150"
                     >
-                        <p className="px-2.5 pt-1.5 pb-2 text-[10.5px] font-bold tracking-[1px] uppercase text-[#93b8ff]">{flyoutCategory.title}</p>
+                        <p className="px-2.5 pt-1.5 pb-2 text-[10.5px] font-bold tracking-[1px] uppercase text-[var(--accent)]">{flyoutCategory.title}</p>
                         <div className="flex flex-col gap-0.5">
                             {flyoutCategory.links.map((link, i) => {
                                 const active = isActive(link)
                                 const heading = link.group && link.group !== flyoutCategory.links[i - 1]?.group ? link.group : null
                                 return (
                                     <div key={`${link.href}-${link.name}`}>
-                                        {heading && <p className="px-2.5 pt-2 pb-1 text-[10px] font-bold tracking-[1px] uppercase text-white/45">{heading}</p>}
+                                        {heading && <p className="px-2.5 pt-2 pb-1 text-[10px] font-bold tracking-[1px] uppercase text-[var(--text3)]">{heading}</p>}
                                         <Link
                                             href={link.href}
                                             role="menuitem"
@@ -504,7 +504,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                                             aria-current={active ? "page" : undefined}
                                             className={cn(
                                                 "flex items-center justify-between gap-2 rounded-[9px] px-2.5 py-2 min-h-[36px] text-[13px] transition-colors",
-                                                active ? "bg-white text-[#0a1f4f] font-semibold" : "text-white/80 hover:bg-white/[0.08] hover:text-white"
+                                                active ? "bg-[var(--accent-light)] text-[var(--accent)] font-semibold" : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
                                             )}
                                         >
                                             <span className="leading-tight">{link.name}</span>
@@ -526,10 +526,10 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                     // otherwise keep the pop-out underneath the page content.
                     document.body
                 )}
-                <div className="py-3 shrink-0 w-full flex justify-center border-t border-white/[0.08]">
+                <div className="py-3 shrink-0 w-full flex justify-center border-t border-[var(--border)]">
                     {session?.user && (
                         <Link href="/profile" title={`${session.user.name || "Signed in"} · ${roleLabel}`} aria-label="My Profile"
-                            className="h-9 w-9 rounded-full bg-[#e3c98f] text-[#2a1f05] text-[12px] font-bold flex items-center justify-center hover:ring-2 hover:ring-white/40 transition-shadow">
+                            className="h-9 w-9 rounded-full bg-[#e3c98f] text-[#2a1f05] text-[12px] font-bold flex items-center justify-center hover:ring-2 hover:ring-[var(--border2)] transition-shadow">
                             {initials(session.user.name)}
                         </Link>
                     )}
@@ -542,23 +542,23 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
         // "Royal sapphire": a deep sapphire rail, white type, the open page as a
         // white pill and each category's icon in a soft tile. Colours are local
         // to the sidebar; page tokens are untouched.
-        <div className="flex h-full w-full flex-col overflow-hidden rounded-r-[24px] md:rounded-none text-white bg-[linear-gradient(180deg,#0c2459_0%,#0a1f4f_45%,#081a42_100%)]">
+        <div className="flex h-full w-full flex-col overflow-hidden rounded-r-[24px] md:rounded-none text-[var(--text)] bg-white border-r border-[var(--border)]">
 
             {/* ── Logo / Header ── */}
             <div className="flex h-[72px] items-center justify-between px-5 shrink-0">
                 <Link href="/" className="flex items-center gap-2.5">
-                    <div className="h-10 w-10 rounded-[12px] flex items-center justify-center text-[#0a1f4f] bg-white shadow-[0_6px_16px_rgba(2,8,32,0.35)]">
+                    <div className="h-10 w-10 rounded-[12px] flex items-center justify-center text-[var(--accent)] bg-[var(--accent-light)]">
                         <img src="/logo-mark.png" alt="" aria-hidden="true" className="w-[26px] h-[26px] object-contain" />
                     </div>
-                    <span className="text-[19px] font-bold tracking-[-0.02em] text-white leading-none">{COMPANY.shortName} <span className="text-[#93b8ff]">{COMPANY.nameSuffix}</span></span>
+                    <span className="text-[19px] font-bold tracking-[-0.02em] text-[var(--text)] leading-none">{COMPANY.shortName} <span className="text-[var(--accent)]">{COMPANY.nameSuffix}</span></span>
                 </Link>
                 {onToggleRail && !onMobileClose && (
-                    <button type="button" onClick={onToggleRail} title="Collapse sidebar" aria-label="Collapse sidebar" className="h-9 w-9 rounded-[10px] flex items-center justify-center text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors">
+                    <button type="button" onClick={onToggleRail} title="Collapse sidebar" aria-label="Collapse sidebar" className="h-9 w-9 rounded-[10px] flex items-center justify-center text-[var(--text3)] hover:text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
                         <PanelLeftClose size={18} aria-hidden="true" />
                     </button>
                 )}
                 {onMobileClose && (
-                    <button onClick={onMobileClose} aria-label="Close sidebar" className="p-1 md:hidden hover:bg-white/10 rounded-md transition-colors text-white/70 h-9 w-9 flex items-center justify-center">
+                    <button onClick={onMobileClose} aria-label="Close sidebar" className="p-1 md:hidden hover:bg-[var(--surface2)] rounded-md transition-colors text-[var(--text2)] h-9 w-9 flex items-center justify-center">
                         <X size={20} />
                     </button>
                 )}
@@ -567,7 +567,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             {/* ── Find a module ── */}
             <div className="px-2 shrink-0">
                 <div className="relative">
-                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/55 pointer-events-none" aria-hidden="true" />
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text3)] pointer-events-none" aria-hidden="true" />
                     <input
                         ref={searchRef}
                         type="search"
@@ -576,19 +576,19 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                         onKeyDown={e => { if (e.key === "Escape") setQuery("") }}
                         placeholder="Find a module..."
                         aria-label="Find a module"
-                        className="w-full h-10 rounded-[10px] bg-white/[0.08] pl-9 pr-3 text-[13px] text-white placeholder:text-white/50 outline-none ring-1 ring-white/10 focus:bg-white/[0.12] focus:ring-white/30 [&::-webkit-search-cancel-button]:invert"
+                        className="w-full h-10 rounded-[10px] bg-[var(--surface2)] pl-9 pr-3 text-[13px] text-[var(--text)] placeholder:text-[var(--text3)] outline-none ring-1 ring-[var(--border)] focus:bg-white focus:ring-[var(--accent)]"
                     />
                 </div>
                 {visible.length > 1 && (
                     <div className="flex items-center justify-between px-1 pt-3 pb-1">
-                        <p className="text-[10.5px] font-semibold tracking-[1px] uppercase text-white/55">
+                        <p className="text-[10.5px] font-semibold tracking-[1px] uppercase text-[var(--text3)]">
                             {visible.length} {visible.length === 1 ? "category" : "categories"} · {moduleCount} {moduleCount === 1 ? "module" : "modules"}
                         </p>
                         {!q && (
                             <button
                                 type="button"
                                 onClick={toggleAll}
-                                className="shrink-0 whitespace-nowrap text-[11px] font-medium text-white/70 hover:text-white"
+                                className="shrink-0 whitespace-nowrap text-[11px] font-medium text-[var(--text2)] hover:text-[var(--text)]"
                             >
                                 {allCollapsed ? "Expand all" : "Collapse all"}
                             </button>
@@ -600,7 +600,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             {/* ── Navigation ── */}
             <nav aria-label="Main" className="flex-1 overflow-y-auto pt-1 pb-3 px-2 [scrollbar-width:thin] [scrollbar-color:transparent_transparent] hover:[scrollbar-color:rgba(255,255,255,0.22)_transparent] focus-within:[scrollbar-color:rgba(255,255,255,0.22)_transparent]">
                 {q && shown.length === 0 && (
-                    <p className="px-3 py-6 text-[13px] text-white/60">No module matches “{query.trim()}”.</p>
+                    <p className="px-3 py-6 text-[13px] text-[var(--text3)]">No module matches “{query.trim()}”.</p>
                 )}
                 {shown.map((category, ci) => {
                     const Icon = category.icon
@@ -609,7 +609,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                     const listId = `nav-${category.title.replace(/\W+/g, "-").toLowerCase()}`
 
                     return (
-                        <div key={category.title} className={cn("pb-1", ci > 0 && "pt-1 border-t border-white/[0.07]")}>
+                        <div key={category.title} className={cn("pb-1", ci > 0 && "pt-1 border-t border-[var(--border)]")}>
                             <button
                                 type="button"
                                 onClick={() => toggle(category.title)}
@@ -618,19 +618,19 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                                 disabled={!!q}
                                 className={cn(
                                     "w-full flex items-center gap-2 rounded-[10px] px-2.5 py-2 min-h-[40px] text-left text-[13px] font-semibold transition-colors",
-                                    holdsActive ? "text-white" : "text-white/80 hover:text-white",
-                                    !q && "hover:bg-white/[0.06]"
+                                    holdsActive ? "text-[var(--text)]" : "text-[var(--text2)] hover:text-[var(--text)]",
+                                    !q && "hover:bg-[var(--surface2)]"
                                 )}
                             >
                                 {/* Icon tile: brighter for the category holding the open page. */}
                                 <span className={cn(
                                     "h-[26px] w-[26px] shrink-0 rounded-[8px] flex items-center justify-center transition-colors",
-                                    holdsActive ? "bg-white/[0.22] ring-1 ring-white/30 text-white" : "bg-white/[0.08] text-white/70"
+                                    holdsActive ? "bg-[var(--accent-light)] text-[var(--accent)]" : "bg-[var(--surface2)] text-[var(--text2)]"
                                 )}>
                                     <Icon size={15} aria-hidden="true" />
                                 </span>
                                 <span className="flex-1 leading-tight">{category.title}</span>
-                                <ChevronDown size={14} className={cn("text-white/50 transition-transform", !open && "-rotate-90")} aria-hidden="true" />
+                                <ChevronDown size={14} className={cn("text-[var(--text3)] transition-transform", !open && "-rotate-90")} aria-hidden="true" />
                             </button>
 
                             {open && (
@@ -641,7 +641,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                                         return (
                                             <div key={`${link.href}-${link.name}`}>
                                                 {heading && (
-                                                    <p className="pl-[44px] pr-2.5 pt-2 pb-1 text-[10px] font-bold tracking-[1px] uppercase text-[#93b8ff]">{heading}</p>
+                                                    <p className="pl-[44px] pr-2.5 pt-2 pb-1 text-[10px] font-bold tracking-[1px] uppercase text-[var(--accent)]">{heading}</p>
                                                 )}
                                                 <Link
                                                     href={link.href}
@@ -650,11 +650,11 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                                                     className={cn(
                                                         "relative flex items-center justify-between gap-2 rounded-[10px] pl-[44px] pr-2.5 py-2 min-h-[36px] text-[13px] transition-colors",
                                                         active
-                                                            ? "bg-white text-[#0a1f4f] font-semibold shadow-[0_6px_16px_rgba(2,8,32,0.35)]"
-                                                            : "text-white/75 hover:bg-white/[0.08] hover:text-white"
+                                                            ? "bg-[var(--accent-light)] text-[var(--accent)] font-semibold"
+                                                            : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
                                                     )}
                                                 >
-                                                    {active && <span aria-hidden="true" className="absolute left-[31px] top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-[#1f4fd8]" />}
+                                                    {active && <span aria-hidden="true" className="absolute left-[31px] top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />}
                                                     <span className="leading-tight">{link.name}</span>
                                                     {link.badge && badgeCounts[link.badge] > 0 && (
                                                         <span title={BADGES[link.badge].title} className={cn(
@@ -676,25 +676,25 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             </nav>
 
             {/* ── Footer: who is signed in, then version and terms ── */}
-            <div className="px-2 pt-2 pb-3 mt-auto shrink-0 border-t border-white/[0.08]">
+            <div className="px-2 pt-2 pb-3 mt-auto shrink-0 border-t border-[var(--border)]">
                 {session?.user && (
                     <Link
                         href="/profile"
                         onClick={onMobileClose}
-                        className="flex items-center gap-2.5 rounded-[10px] px-2 py-2 hover:bg-white/[0.06] transition-colors"
+                        className="flex items-center gap-2.5 rounded-[10px] px-2 py-2 hover:bg-[var(--surface2)] transition-colors"
                     >
                         <span aria-hidden="true" className="h-8 w-8 shrink-0 rounded-full bg-[#e3c98f] text-[#2a1f05] text-[12px] font-bold flex items-center justify-center">
                             {initials(session.user.name)}
                         </span>
                         <span className="min-w-0 flex-1 leading-tight">
-                            <span className="block truncate text-[13px] font-semibold text-white">{session.user.name || "Signed in"}</span>
-                            <span className="block truncate text-[11px] text-white/55">{roleLabel}</span>
+                            <span className="block truncate text-[13px] font-semibold text-[var(--text)]">{session.user.name || "Signed in"}</span>
+                            <span className="block truncate text-[11px] text-[var(--text3)]">{roleLabel}</span>
                         </span>
                     </Link>
                 )}
                 <div className="flex items-center justify-between gap-2 px-2 pt-1.5">
-                    <p className="text-[10.5px] text-white/45">{`v${COMPANY.version}`}</p>
-                    <Link href="/terms" className="text-[10.5px] text-white/45 hover:text-white">Terms & Privacy</Link>
+                    <p className="text-[10.5px] text-[var(--text3)]">{`v${COMPANY.version}`}</p>
+                    <Link href="/terms" className="text-[10.5px] text-[var(--text3)] hover:text-[var(--text)]">Terms & Privacy</Link>
                 </div>
             </div>
         </div>
