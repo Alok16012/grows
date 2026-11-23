@@ -31,6 +31,17 @@ const TEMPLATE_VARIABLES = [
     "{{effective_date}}",
     "{{salary}}",
     "{{company_name}}",
+    "{{date}}",
+    "{{confirmation_date}}",
+    "{{probation_months}}",
+    "{{old_salary}}",
+    "{{new_salary}}",
+    "{{increment_amount}}",
+    "{{effective_month}}",
+    "{{from_site}}",
+    "{{to_site}}",
+    "{{transfer_date}}",
+    "{{last_working_date}}",
 ]
 
 type FormState = {
