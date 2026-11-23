@@ -179,6 +179,7 @@ const newRule = (typeId: string, trigger: LetterRule["trigger"], offsetDays: num
 
 function Rules({ d, reload, onSaved }: { d: Data; reload: () => void; onSaved: () => void }) {
     const [s, setS] = useState<LetterSettings>(d.settings)
+    const [approvals, setApprovals] = useState<Record<string, boolean>>({})
     const [busy, setBusy] = useState(false)
     const byName = (n: string) => d.types.find(t => t.name.toLowerCase() === n)?.id
     const setRule = (id: string, p: Partial<LetterRule>) => setS(x => ({ ...x, rules: x.rules.map(r => r.id === id ? { ...r, ...p } : r) }))
@@ -191,15 +192,15 @@ function Rules({ d, reload, onSaved }: { d: Data; reload: () => void; onSaved: (
     async function save() {
         setBusy(true)
         try {
-            const r = await fetch("/api/onboarding/letters", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(s) })
+            const r = await fetch("/api/onboarding/letters", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...s, approvals }) })
             if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || "Could not save")
             toast.success("Letter settings saved"); onSaved()
         } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
     }
     const lbl = "block text-[11px] font-semibold uppercase text-[var(--text3)]"
     return (
-        <div className="space-y-3 max-w-4xl">
-            <StandardLetters d={d} s={s} setS={setS} reload={reload} />
+        <div className="space-y-3">
+            <StandardLetters d={d} s={s} setS={setS} reload={reload} approvals={approvals} setApprovals={setApprovals} />
             {s.rules.map(r => {
                 const t = d.types.find(x => x.id === r.typeId)
                 const onDemand = r.trigger === "ON_DEMAND"
@@ -268,13 +269,19 @@ function Rules({ d, reload, onSaved }: { d: Data; reload: () => void; onSaved: (
     )
 }
 
-// The client's letter sheet in one place: for each standard letter, whether the
-// template exists and whether a rule is set. "Apply" adds the missing rules and
-// updates the ones already there (same template) to the standard timing.
-function StandardLetters({ d, s, setS, reload }: { d: Data; s: LetterSettings; setS: (f: (x: LetterSettings) => LetterSettings) => void; reload: () => void }) {
+// The client's letter sheet as one settings grid: for each standard letter —
+// on/off, when, timing, automatic or manual, approval, telling the employee and
+// from which date. Editing a letter that already has a rule changes that rule
+// (no second rule is added). More options (types, sites, signer) are in the
+// cards below.
+function StandardLetters({ d, s, setS, reload, approvals, setApprovals }: {
+    d: Data; s: LetterSettings; setS: (f: (x: LetterSettings) => LetterSettings) => void; reload: () => void
+    approvals: Record<string, boolean>; setApprovals: (f: (x: Record<string, boolean>) => Record<string, boolean>) => void
+}) {
     const [busy, setBusy] = useState(false)
     const typeOf = (n: string) => d.types.find(t => t.name.trim().toLowerCase() === n.toLowerCase())
     const missing = STANDARD_LETTERS.filter(l => !typeOf(l.name))
+    const ro = !d.canEdit
     async function createTemplates() {
         if (!confirm(`Create ${missing.length} letter template(s) with starter wording?\n\n${missing.map(m => m.name).join(", ")}\n\nExisting templates are not changed. You can edit the wording in Letters & Documents → Types.`)) return
         setBusy(true)
@@ -285,8 +292,10 @@ function StandardLetters({ d, s, setS, reload }: { d: Data; s: LetterSettings; s
             toast.success(j.made?.length ? `Created: ${j.made.join(", ")}` : "All templates already exist"); reload()
         } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
     }
+    const standardRule = (l: (typeof STANDARD_LETTERS)[number], typeId: string): LetterRule => ({
+        ...newRule(typeId, l.trigger, l.offsetDays), periodMonths: l.periodMonths ?? 6, enabled: l.trigger !== "ON_DEMAND", fromDate: new Date().toISOString().slice(0, 10),
+    })
     function apply() {
-        const today = new Date().toISOString().slice(0, 10)
         const rules = [...s.rules]
         let added = 0, updated = 0
         for (const l of STANDARD_LETTERS) {
@@ -294,42 +303,120 @@ function StandardLetters({ d, s, setS, reload }: { d: Data; s: LetterSettings; s
             const i = rules.findIndex(r => r.typeId === t.id)
             const timing = { trigger: l.trigger, offsetDays: l.offsetDays, ...(l.periodMonths ? { periodMonths: l.periodMonths } : {}) }
             if (i >= 0) { rules[i] = { ...rules[i], ...timing }; updated++ }
-            else { rules.push({ ...newRule(t.id, l.trigger, l.offsetDays), ...timing, enabled: l.trigger !== "ON_DEMAND", fromDate: today }); added++ }
+            else { rules.push(standardRule(l, t.id)); added++ }
         }
         setS(x => ({ ...x, rules }))
-        toast.success(`${added} rule(s) added, ${updated} updated — check them below, then Save`)
+        toast.success(`${added} rule(s) added, ${updated} updated — check them, then Save`)
     }
+    /** Change the letter's rule; the first change adds the standard rule for it. */
+    function edit(l: (typeof STANDARD_LETTERS)[number], typeId: string, p: Partial<LetterRule>) {
+        setS(x => {
+            const i = x.rules.findIndex(r => r.typeId === typeId)
+            if (i < 0) return { ...x, rules: [...x.rules, { ...standardRule(l, typeId), ...p }] }
+            const rules = [...x.rules]; rules[i] = { ...rules[i], ...p }; return { ...x, rules }
+        })
+    }
+    const sel = "h-8 rounded-[8px] border border-[var(--border)] px-1.5 text-[12px] bg-white disabled:bg-[var(--surface2)]"
     return (
         <div className="bg-white border border-[var(--border)] rounded-[12px] overflow-hidden">
             <div className="px-4 py-3 border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <p className="text-[14px] font-semibold text-[var(--text)]">Standard HR letters</p>
-                    <p className="text-[12px] text-[var(--text3)]">When the ERP makes each letter. A rule already set for a template is updated, not duplicated.</p>
+                    <p className="text-[14px] font-semibold text-[var(--text)]">Letter settings</p>
+                    <p className="text-[12px] text-[var(--text3)]">For each letter: on or off, when, timing, automatic or manual, approval. A letter that already has a rule is updated, not duplicated. Press Save below when done.</p>
                 </div>
                 {d.canEdit && <div className="flex flex-wrap gap-2">
                     {missing.length > 0 && <button onClick={createTemplates} disabled={busy} className={btn2}>{busy ? <Loader2 size={14} className="animate-spin" /> : <FilePlus2 size={14} />} Create missing templates ({missing.length})</button>}
-                    <button onClick={apply} className={btn}><Sparkles size={14} /> Apply standard timings</button>
+                    <button onClick={apply} className={btn2}><Sparkles size={14} /> Apply standard timings</button>
                 </div>}
             </div>
             <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px]">
-                    <thead><tr><th className={th}>Letter</th><th className={th}>When the ERP makes it</th><th className={th}>Template</th><th className={th}>Rule</th></tr></thead>
+                <table className="w-full min-w-[1080px]">
+                    <thead><tr>
+                        <th className={th}>On</th><th className={th}>Letter</th><th className={th}>When</th><th className={th}>Timing</th>
+                        <th className={th}>Send</th><th className={th}>Approval</th><th className={th}>Tell employee</th><th className={th}>Only from</th>
+                    </tr></thead>
                     <tbody>
                         {STANDARD_LETTERS.map(l => {
                             const t = typeOf(l.name)
-                            const rule = t ? s.rules.find(r => r.typeId === t.id) : undefined
-                            return (
+                            if (!t) return (
                                 <tr key={l.name}>
-                                    <td className={`${td} font-semibold`}>{l.name}</td>
-                                    <td className={`${td} text-[var(--text2)]`}>{l.note}</td>
-                                    <td className={td}>{t ? <span className="inline-flex items-center gap-1 text-green-700"><CheckCircle2 size={13} /> Ready{!t.hasTemplate ? " (empty)" : ""}</span> : <span className="text-amber-700">Missing</span>}</td>
-                                    <td className={`${td} text-[11.5px]`}>{rule ? <span className={rule.enabled || rule.trigger === "ON_DEMAND" ? "text-green-700" : "text-[var(--text3)]"}>{ruleText(rule, l.name).replace(`${l.name} — `, "")}{rule.enabled || rule.trigger === "ON_DEMAND" ? "" : " (off)"}</span> : <span className="text-[var(--text3)]">Not set</span>}</td>
+                                    <td className={td}>—</td>
+                                    <td className={td}><span className="font-semibold whitespace-nowrap">{l.name}</span><span className="block text-[11px] text-[var(--text3)] min-w-[170px] max-w-[220px]">{l.note}</span></td>
+                                    <td className={`${td} text-amber-700`} colSpan={6}>No template yet — use “Create missing templates” above, or make one in Letters &amp; Documents → Types.</td>
+                                </tr>
+                            )
+                            const rule = s.rules.find(r => r.typeId === t.id)
+                            const r: LetterRule = rule ?? { ...standardRule(l, t.id), enabled: false }
+                            const set = (p: Partial<LetterRule>) => edit(l, t.id, p)
+                            const onDemand = r.trigger === "ON_DEMAND"
+                            const needsApproval = approvals[t.id] ?? t.requiresApproval
+                            return (
+                                <tr key={l.name} className={r.enabled || onDemand ? "" : "opacity-70"}>
+                                    <td className={td}><input type="checkbox" aria-label={`${l.name} on`} disabled={ro} checked={r.enabled} onChange={e => set({ enabled: e.target.checked })} /></td>
+                                    <td className={td}>
+                                        <span className="font-semibold whitespace-nowrap">{l.name}</span>
+                                        <span className="block text-[11px] text-[var(--text3)] min-w-[170px] max-w-[220px]">{l.note}</span>
+                                        {!t.hasTemplate && <span className="block text-[11px] text-amber-700">Template is empty</span>}
+                                        {!rule && <span className="block text-[11px] text-[var(--text3)]">Not set yet</span>}
+                                    </td>
+                                    <td className={td}>
+                                        <select aria-label={`${l.name} when`} disabled={ro} value={r.trigger} onChange={e => set({ trigger: e.target.value as LetterRule["trigger"] })} className={`${sel} w-[200px]`}>
+                                            {Object.entries(LETTER_TRIGGERS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                                        </select>
+                                        {r.trigger === "CONFIRMATION" && (
+                                            <div className="flex items-center gap-1 mt-1">
+                                                <select aria-label="Confirmation period" disabled={ro} value={[6, 12].includes(r.periodMonths) ? String(r.periodMonths) : "custom"} onChange={e => e.target.value !== "custom" && set({ periodMonths: Number(e.target.value) })} className={sel}>
+                                                    <option value="6">6 months</option><option value="12">1 year</option><option value="custom">Other…</option>
+                                                </select>
+                                                {![6, 12].includes(r.periodMonths) && <input type="number" min={1} max={36} disabled={ro} value={r.periodMonths} onChange={e => set({ periodMonths: Math.max(1, Math.min(36, Number(e.target.value) || 6)) })} className={`${sel} w-14`} />}
+                                                <span className="text-[11px] text-[var(--text3)]">from joining</span>
+                                            </div>
+                                        )}
+                                        {r.trigger === "SALARY_REVISION" && (
+                                            <div className="mt-1 space-y-1 text-[11.5px]">
+                                                <label className="flex items-center gap-1"><input type="checkbox" disabled={ro} checked={r.onlyIncrease} onChange={e => set({ onlyIncrease: e.target.checked })} /> Only increases</label>
+                                                <label className="flex items-center gap-1">Ignore below ₹<input type="number" min={0} disabled={ro} value={r.minChange} onChange={e => set({ minChange: Math.max(0, Number(e.target.value) || 0) })} className={`${sel} w-20`} /></label>
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className={td}>
+                                        {onDemand ? <span className="text-[12px] text-[var(--text3)]">When HR needs it</span> : (
+                                            <div className="flex items-center gap-1">
+                                                <input type="number" min={0} max={365} aria-label={`${l.name} days`} disabled={ro} value={Math.abs(r.offsetDays)} onChange={e => set({ offsetDays: (r.offsetDays < 0 ? -1 : 1) * Math.min(365, Math.abs(Number(e.target.value) || 0)) })} className={`${sel} w-14`} />
+                                                <span className="text-[12px]">days</span>
+                                                <select aria-label={`${l.name} before or after`} disabled={ro} value={r.offsetDays < 0 ? "before" : "after"} onChange={e => set({ offsetDays: (e.target.value === "before" ? -1 : 1) * Math.abs(r.offsetDays) })} className={sel}>
+                                                    <option value="after">after</option><option value="before">before</option>
+                                                </select>
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className={td}>
+                                        {onDemand ? <span className="text-[12px] text-[var(--text3)]">Manual</span> : (
+                                            <select aria-label={`${l.name} send mode`} disabled={ro} value={r.autoIssue ? "auto" : "manual"} onChange={e => set({ autoIssue: e.target.value === "auto" })} className={sel}>
+                                                <option value="auto">Automatic on the due date</option>
+                                                <option value="manual">Manual — HR clicks Send</option>
+                                            </select>
+                                        )}
+                                    </td>
+                                    <td className={td}>
+                                        <select aria-label={`${l.name} approval`} disabled={ro} value={needsApproval ? "yes" : "no"} onChange={e => setApprovals(x => ({ ...x, [t.id]: e.target.value === "yes" }))} className={sel}>
+                                            <option value="yes">Needs approval</option>
+                                            <option value="no">Goes straight to employee</option>
+                                        </select>
+                                    </td>
+                                    <td className={td}><input type="checkbox" aria-label={`${l.name} tell employee`} disabled={ro} checked={r.notify} onChange={e => set({ notify: e.target.checked })} /></td>
+                                    <td className={td}>
+                                        {onDemand ? "—" : <input type="date" aria-label={`${l.name} only from`} disabled={ro} value={r.fromDate ?? ""} onChange={e => set({ fromDate: e.target.value || null })} className={`${sel} w-[130px]`} />}
+                                    </td>
                                 </tr>
                             )
                         })}
                     </tbody>
                 </table>
             </div>
+            <p className="px-4 py-2 text-[11.5px] text-[var(--text3)] border-t border-[var(--border)]">
+                <b>Automatic</b>: made by the daily job on the due date. <b>Manual</b>: listed as due in “Sent or not” until HR presses Send. <b>Needs approval</b>: waits in Letters &amp; Documents until approved. <b>Only from</b>: older joiners / events are left out (empty = everyone, including old staff). Sites, employment types and signer: in each letter’s card below.
+            </p>
         </div>
     )
 }

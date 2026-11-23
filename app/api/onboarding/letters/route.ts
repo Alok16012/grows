@@ -28,8 +28,18 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
     const g = await guard(req, EDIT)
     if (g instanceof NextResponse) return g
-    const s = await saveLetterSettings(await req.json().catch(() => ({})), g.access.userId)
-    auditLater({ actorId: g.access.userId, actorName: g.access.name, action: "letters.settings", targetType: "Setting", targetId: "letterSchedule", targetName: "HR letter schedule", summary: `${s.rules.length} rule(s), ${s.rules.filter(r => r.enabled).length} on`, after: s, ...requestMeta(req) })
+    const body = await req.json().catch(() => ({}))
+    const s = await saveLetterSettings(body, g.access.userId)
+    // "Needs approval / goes straight to employee" per letter — the template's own setting.
+    const approvals = body?.approvals && typeof body.approvals === "object" ? Object.entries(body.approvals).filter(([id, v]) => typeof id === "string" && typeof v === "boolean").slice(0, 100) as [string, boolean][] : []
+    const changed: string[] = []
+    for (const [id, v] of approvals) {
+        const t = await prisma.hrDocumentType.findUnique({ where: { id }, select: { name: true, requiresApproval: true } })
+        if (!t || t.requiresApproval === v) continue
+        await prisma.hrDocumentType.update({ where: { id }, data: { requiresApproval: v } })
+        changed.push(`${t.name}: ${v ? "needs approval" : "no approval"}`)
+    }
+    auditLater({ actorId: g.access.userId, actorName: g.access.name, action: "letters.settings", targetType: "Setting", targetId: "letterSchedule", targetName: "HR letter schedule", summary: `${s.rules.length} rule(s), ${s.rules.filter(r => r.enabled).length} on${changed.length ? ` · ${changed.join(", ")}` : ""}`, after: s, ...requestMeta(req) })
     return NextResponse.json({ settings: s })
 }
 
