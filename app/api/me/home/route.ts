@@ -6,6 +6,7 @@ import { getLeavePolicy, getLeaveBalances } from "@/lib/leave-policy-server"
 import { audienceWhere } from "@/lib/audience"
 import { istDateOnly, dayWindow } from "@/lib/attendance-policy"
 import { PRESENT_WHERE } from "@/lib/attendance-today"
+import { pickPhotoUrl } from "@/lib/employee-photo"
 
 export const dynamic = "force-dynamic"
 
@@ -21,8 +22,12 @@ export async function GET(req: Request) {
     const userId = session.user.id
     const emp = await prisma.employee.findFirst({
         where: { userId },
-        select: { id: true, firstName: true, employeeId: true, designation: true, deployments: { where: { isActive: true }, select: { site: { select: { name: true } } }, take: 1 } },
+        select: { id: true, firstName: true, lastName: true, photo: true, employeeId: true, designation: true, deployments: { where: { isActive: true }, select: { site: { select: { name: true } } }, take: 1 } },
     })
+
+    // Profile photo for the desktop home card; falls back to an uploaded Photo document.
+    let photo: string | null = emp?.photo ?? null
+    if (emp && !photo) photo = await safe(prisma.employeeDocument.findMany({ where: { employeeId: emp.id }, select: { type: true, fileName: true, fileUrl: true, uploadedAt: true } }).then(pickPhotoUrl), null)
 
     const now = new Date()
     const { gte: dayStart, lt: dayEnd } = dayWindow(istDateOnly(now))
@@ -69,7 +74,7 @@ export async function GET(req: Request) {
     ])
 
     return NextResponse.json({
-        employee: emp ? { firstName: emp.firstName, code: emp.employeeId, designation: emp.designation, site: emp.deployments[0]?.site?.name ?? null } : null,
+        employee: emp ? { firstName: emp.firstName, name: [emp.firstName, emp.lastName].filter(Boolean).join(" "), photo, code: emp.employeeId, designation: emp.designation, site: emp.deployments[0]?.site?.name ?? null } : null,
         today, month: { present: presentDays, leave: leaveDays, absent: absentDays },
         leave, payslip,
         tasks: { myOpen, myOverdue, awaitingMine },

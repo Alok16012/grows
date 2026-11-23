@@ -3,19 +3,21 @@
 // Desktop home, top section (soft theme, client reference Nov 2026):
 //   col 1 — check-in card with a live clock, quick-action tiles, my tasks
 //   col 2 — events & announcements: this month's calendar + what's coming
-//   col 3 — my attendance ring (this month) and my leave balance ring
+//   col 3 — profile card (photo, name, designation, Check-in / Check-out),
+//           my attendance ring (this month) and my leave balance ring
 // Data: /api/me/home (one call) and /api/tasks?view=mine. People without an
 // employee record (e.g. Admin) get the tiles, events and tasks only.
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
-    BookOpen, CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, GraduationCap, IndianRupee,
-    LifeBuoy, ListChecks, Loader2, LogIn, LogOut, Plus, Receipt, Umbrella,
+    ArrowLeft, ArrowRight, BookOpen, CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, GraduationCap, IndianRupee,
+    LifeBuoy, ListChecks, Loader2, Plus, Receipt, Umbrella,
 } from "lucide-react"
 
 type Home = {
-    employee: { firstName: string; code: string; designation: string | null; site: string | null } | null
+    employee: { firstName: string; name?: string; photo?: string | null; code: string; designation: string | null; site: string | null } | null
     today: { checkIn: string | null; checkOut: string | null; status: string | null; workingHrs: number | null } | null
     month: { present: number; leave: number; absent: number }
     leave: { total: number; items: { code: string; name: string; available: number; color?: string | null }[] } | null
@@ -41,13 +43,18 @@ export function MyDay() {
     return (
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.85fr)] items-start">
             <div className="flex flex-col gap-4 min-w-0">
-                {isEmp && <CheckInCard today={d.today} onDone={load} />}
+                {isEmp && <TimerCard today={d.today} />}
                 <QuickTiles />
                 <MyTasks />
             </div>
-            <EventsCard d={d} />
+            {/* Two-column screens: the profile card sits at the top of the right column. */}
+            <div className="flex flex-col gap-4 min-w-0">
+                {isEmp && <div className="xl:hidden"><ProfileCheckCard emp={d.employee!} today={d.today} onDone={load} /></div>}
+                <EventsCard d={d} />
+            </div>
             {isEmp && (
                 <div className="flex flex-col gap-4 min-w-0 lg:col-span-2 xl:col-span-1 lg:grid lg:grid-cols-2 xl:flex">
+                    <div className="hidden xl:block"><ProfileCheckCard emp={d.employee!} today={d.today} onDone={load} /></div>
                     <AttendanceRing m={d.month} />
                     <LeaveRing leave={d.leave} />
                 </div>
@@ -56,10 +63,57 @@ export function MyDay() {
     )
 }
 
-// ── Check-in ─────────────────────────────────────────────────────────────────
-function CheckInCard({ today, onDone }: { today: Home["today"]; onDone: () => void }) {
+// ── Check-in / check-out (shared by the profile card) ───────────────────────
+async function punch(action: "in" | "out") {
+    const loc = await new Promise<{ lat: number; lng: number } | null>(res => {
+        if (!navigator.geolocation) return res(null)
+        navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res(null), { timeout: 5000 })
+    })
+    const r = await fetch("/api/me/attendance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...(loc ?? {}) }) })
+    if (!r.ok) throw new Error((await r.text()) || "Couldn't save")
+}
+
+// ── Profile card: photo, name, designation, Check-in / Check-out ─────────────
+function ProfileCheckCard({ emp, today, onDone }: { emp: NonNullable<Home["employee"]>; today: Home["today"]; onDone: () => void }) {
+    const { data: session } = useSession()
+    const [busy, setBusy] = useState<"in" | "out" | null>(null)
+    const photo = emp.photo || (session?.user as any)?.image || null
+    const name = emp.name || emp.firstName
+    const inAt = today?.checkIn, outAt = today?.checkOut
+    async function go(action: "in" | "out") {
+        setBusy(action)
+        try { await punch(action); toast.success(action === "in" ? "Checked in" : "Checked out"); onDone() }
+        catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
+    }
+    const initials = name.split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase()
+    return (
+        <div className={`${card} flex flex-col items-center text-center`}>
+            <div className="h-24 w-24 rounded-[22px] overflow-hidden bg-[var(--accent-light)] shadow-[0_10px_24px_rgba(40,48,100,0.14)] flex items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {photo ? <img src={photo} alt={name} className="h-full w-full object-cover" /> : <span className="text-[28px] font-bold text-[var(--accent)]">{initials}</span>}
+            </div>
+            <p className="mt-3 text-[17px] font-bold text-[var(--text)] leading-tight">{name}</p>
+            <p className="text-[13px] text-[var(--text2)]">{emp.designation || emp.code}</p>
+            <div className="mt-4 w-full grid grid-cols-2 gap-1 p-1.5 rounded-[18px] bg-white border border-[var(--border)]">
+                <button onClick={() => go("in")} disabled={!!inAt || !!busy}
+                    className={`h-[72px] rounded-[14px] flex flex-col items-center justify-center gap-1.5 text-[11px] font-semibold tracking-wide transition-colors ${!inAt ? "bg-[#3ecf8e] text-white shadow-[0_8px_18px_rgba(62,207,142,0.35)]" : "text-[var(--text3)]"}`}>
+                    {busy === "in" ? <Loader2 size={20} className="animate-spin" /> : <ArrowRight size={20} />}
+                    {inAt ? `IN ${hm(inAt)}` : "CHECK-IN"}
+                </button>
+                <button onClick={() => go("out")} disabled={!inAt || !!outAt || !!busy}
+                    className={`h-[72px] rounded-[14px] flex flex-col items-center justify-center gap-1.5 text-[11px] font-semibold tracking-wide transition-colors ${inAt && !outAt ? "bg-[#f05252] text-white shadow-[0_8px_18px_rgba(240,82,82,0.30)]" : "text-[var(--text3)]"}`}>
+                    {busy === "out" ? <Loader2 size={20} className="animate-spin" />
+                        : <span className={`h-7 w-7 rounded-[8px] flex items-center justify-center ${inAt && !outAt ? "bg-white/25" : "bg-[#fde2e2] text-[#e02424]"}`}><ArrowLeft size={16} /></span>}
+                    {outAt ? `OUT ${hm(outAt)}` : "CHECK-OUT"}
+                </button>
+            </div>
+        </div>
+    )
+}
+
+// ── Today's timer (blue card) ────────────────────────────────────────────────
+function TimerCard({ today }: { today: Home["today"] }) {
     const [now, setNow] = useState(() => new Date())
-    const [busy, setBusy] = useState(false)
     useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
     const inAt = today?.checkIn ? new Date(today.checkIn) : null
     const outAt = today?.checkOut ? new Date(today.checkOut) : null
@@ -67,33 +121,13 @@ function CheckInCard({ today, onDone }: { today: Home["today"]; onDone: () => vo
     const worked = `${Math.floor(workedMs / 3_600_000)}h ${Math.floor((workedMs % 3_600_000) / 60_000)}m`
     const pct = Math.min(100, Math.round(workedMs / (8 * 3_600_000) * 100))
     const [hh, mm, ss] = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).split(":")
-
-    async function punch(action: "in" | "out") {
-        setBusy(true)
-        try {
-            const loc = await new Promise<{ lat: number; lng: number } | null>(res => {
-                if (!navigator.geolocation) return res(null)
-                navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res(null), { timeout: 5000 })
-            })
-            const r = await fetch("/api/me/attendance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...(loc ?? {}) }) })
-            if (!r.ok) throw new Error((await r.text()) || "Couldn't save")
-            toast.success(action === "in" ? "Checked in" : "Checked out")
-            onDone()
-        } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
-    }
-
     return (
         <div className="relative overflow-hidden rounded-[22px] p-5 text-white" style={{ background: "#3d6ff5", boxShadow: "0 12px 28px rgba(61,111,245,0.28)" }}>
             <Clock aria-hidden className="absolute -right-6 -top-6 h-36 w-36 text-white/10" strokeWidth={1.5} />
             <p className="text-[34px] font-bold leading-none tabular-nums tracking-tight">{hh}:{mm}<span className="text-white/50">:{ss}</span></p>
             <p className="mt-2 text-[13px] text-white/90">
-                {!inAt ? "You haven't checked in today" : outAt ? `Day complete · ${worked} worked` : `Checked in at ${hm(today?.checkIn)} · ${worked} so far`}
+                {!inAt ? "You haven't checked in today — use Check-in on your profile card" : outAt ? `Day complete · ${worked} worked` : `Checked in at ${hm(today?.checkIn)} · ${worked} so far`}
             </p>
-            <div className="mt-4 flex items-center gap-3 flex-wrap">
-                {!inAt && <button onClick={() => punch("in")} disabled={busy} className="h-10 px-4 rounded-[12px] bg-white text-[#2f5be0] text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-60">{busy ? <Loader2 size={15} className="animate-spin" /> : <LogIn size={15} />} Check in</button>}
-                {inAt && !outAt && <button onClick={() => punch("out")} disabled={busy} className="h-10 px-4 rounded-[12px] bg-[#1f46c8] text-white text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-60">{busy ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />} Check out</button>}
-                {inAt && <span className="text-[12px] text-white/80">In {hm(today?.checkIn)}{outAt ? ` · Out ${hm(today?.checkOut)}` : ""}</span>}
-            </div>
             {inAt && (
                 <div className="mt-4 h-2 rounded-full bg-[#1f46c8]/60 overflow-hidden" title={`${worked} of an 8h day`}>
                     <div className="h-full rounded-full bg-white/90" style={{ width: `${pct}%` }} />
