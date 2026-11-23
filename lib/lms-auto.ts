@@ -180,7 +180,7 @@ export async function runLmsDaily(now = new Date()) {
             return names.join(", ") + (list.length > 8 ? ` and ${list.length - 8} more` : "")
         }
         if (s.reminders.escalateTo !== "manager") {
-            await notifyApprovers(["lms.manage"], { title: `${late.length} trainings overdue ${s.reminders.escalateAfterDays}+ days`, message: line(late), type: "lms", link: "/lms" })
+            await notifyApprovers(["lms.enroll"], { title: `${late.length} trainings overdue ${s.reminders.escalateAfterDays}+ days`, message: line(late), type: "lms", link: "/lms" })
         }
         if (s.reminders.escalateTo !== "hr") {
             const byMgr = new Map<string, typeof late>()

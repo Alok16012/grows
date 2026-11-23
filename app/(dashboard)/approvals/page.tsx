@@ -246,7 +246,7 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                         <h1 className="text-[26px] font-bold tracking-[-0.5px] text-[var(--text)]">Approvals</h1>
                         <p className="text-[13.5px] text-[var(--text3)] mt-1">Review and approve submitted inspections to finalize reports. Target: within {targetHours} h.</p>
                     </div>
-                    {canAny(session, ["approvals.manage", "projects.manage"]) && (
+                    {canAny(session, ["approvals.manage", "projects.edit"]) && (
                         <Link href="/approvals/settings" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-[9px] border border-[var(--border)] bg-white text-[12.5px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)]">
                             Settings
                         </Link>

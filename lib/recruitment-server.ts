@@ -18,7 +18,7 @@ export async function saveRecSettings(v: unknown, userId: string) {
 
 // ── Who may do what ──────────────────────────────────────────────────────────
 export const canView = (s: Session | null) => checkAccess(s, [], "recruitment.view")
-export const canManage = (s: Session | null) => checkAccess(s, [], "recruitment.manage")
+export const canManage = (s: Session | null) => checkAccess(s, [], "recruitment.edit")
 export const canApprove = (s: Session | null) => checkAccess(s, [], "recruitment.approve")
 export const canRequest = (s: Session | null) => checkAccess(s, [], "recruitment.request") || canApprove(s) || canManage(s)
 

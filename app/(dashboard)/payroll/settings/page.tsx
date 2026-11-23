@@ -210,7 +210,7 @@ export default function PayrollSettingsPage() {
     const upSample = (patch: Partial<typeof sample>) => setSample(prev => ({ ...prev, ...patch }))
 
     const role = session?.user?.role
-    if (role && !can(session, "payroll.manage")) {
+    if (role && !can(session, "payroll.edit")) {
         return (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, color: "var(--text3)", fontSize: 13 }}>
                 Access denied

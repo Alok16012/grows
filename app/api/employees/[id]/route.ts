@@ -37,7 +37,7 @@ export async function GET(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
         const canViewEmployee = checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.view")
-        const canViewViaRecruitment = checkAccess(session, [], "recruitment.manage") || checkAccess(session, [], "recruitment.view")
+        const canViewViaRecruitment = checkAccess(session, [], ["recruitment.view", "recruitment.edit"])
         if (!canViewEmployee && !canViewViaRecruitment) {
             return new NextResponse("Forbidden", { status: 403 })
         }
@@ -98,7 +98,7 @@ export async function PUT(
         // Editable by HR/employee managers, OR by recruiters managing a joined
         // candidate (they reach this via Recruitment → Joined → employee).
         const canEditEmployee = checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.edit")
-        const canEditViaRecruitment = checkAccess(session, [], "recruitment.manage")
+        const canEditViaRecruitment = checkAccess(session, [], "recruitment.edit")
         if (!canEditEmployee && !canEditViaRecruitment) {
             return new NextResponse("Forbidden", { status: 403 })
         }

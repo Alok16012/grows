@@ -50,7 +50,7 @@ export async function GET(
         const isOwner = assignment.inspectionBoyId === session.user.id
         const canSeeAnyAssignment =
             session.user.role === Role.ADMIN ||
-            perms.includes("assignments.manage")
+            perms.includes("assignments.edit")
         if (!isOwner && !canSeeAnyAssignment) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         }
@@ -82,7 +82,7 @@ export async function PATCH(
 ) {
     const session = await getServerSession(authOptions)
 
-    if (!checkAccess(session, ["MANAGER"], "assignments.manage")) {
+    if (!checkAccess(session, ["MANAGER"], "assignments.edit")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -173,7 +173,7 @@ export async function DELETE(
 ) {
     const session = await getServerSession(authOptions)
 
-    if (!checkAccess(session, ["MANAGER"], "assignments.manage")) {
+    if (!checkAccess(session, ["MANAGER"], "assignments.delete")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

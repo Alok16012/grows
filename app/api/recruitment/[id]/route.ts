@@ -76,7 +76,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
+    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.edit")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -225,7 +225,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     const session = await getServerSession(authOptions)
     // Same gate as the update handler above — ADMIN passes implicitly via
     // checkAccess, so custom roles that manage recruitment can delete too.
-    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
+    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.delete")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

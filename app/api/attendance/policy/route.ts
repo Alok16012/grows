@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
     const session = await getApiSession(req)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
-    if (!checkAccess(session, [], "attendance.manage")) return new NextResponse("Forbidden", { status: 403 })
+    if (!checkAccess(session, [], "attendance.rules")) return new NextResponse("Forbidden", { status: 403 })
     try {
         return NextResponse.json({ policy: await saveAttendancePolicy(await req.json(), session.user.id) })
     } catch (error) {

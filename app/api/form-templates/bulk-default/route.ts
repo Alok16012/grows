@@ -34,7 +34,7 @@ const AUTO_FIELDS = [
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "projects.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "projects.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

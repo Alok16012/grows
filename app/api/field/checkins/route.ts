@@ -90,7 +90,7 @@ export async function POST(req: Request) {
         // else is pinned to their own employee record — the body value used to
         // be trusted as-is, so anyone could log a check-in for any employee.
         let employeeId: string | undefined = body.employeeId
-        if (!checkAccess(session, [], "field.manage")) {
+        if (!checkAccess(session, [], "projects.edit")) {
             const me = await prisma.employee.findFirst({
                 where: { userId: session.user.id },
                 select: { id: true },

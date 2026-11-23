@@ -16,7 +16,7 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
     const session = await getApiSession(req)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
-    if (!checkAccess(session, [], "leaves.manage")) return new NextResponse("Forbidden", { status: 403 })
+    if (!checkAccess(session, [], "leaves.policy")) return new NextResponse("Forbidden", { status: 403 })
     try {
         const policy = await saveLeavePolicy(await req.json(), session.user.id)
         return NextResponse.json({ policy, customized: true })

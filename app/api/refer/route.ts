@@ -7,7 +7,7 @@ import { getReferralSettings, saveReferralSettings, openJobs, refer, myReferrals
 export const dynamic = "force-dynamic"
 
 const hr = (s: any) => checkAccess(s, [], "recruitment.view") || checkAccess(s, [], "jobs.view")
-const boss = (s: any) => s?.user?.role === "ADMIN" || checkAccess(s, [], "recruitment.approve") || checkAccess(s, [], "jobs.manage")
+const boss = (s: any) => s?.user?.role === "ADMIN" || checkAccess(s, [], "recruitment.approve") || checkAccess(s, [], ["jobs.create", "jobs.edit"])
 
 // GET — open jobs to refer for, my referrals, settings; HR also gets every referral + leaderboard.
 export async function GET(req: Request) {

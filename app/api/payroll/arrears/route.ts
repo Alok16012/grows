@@ -17,7 +17,7 @@ export const maxDuration = 60
 const MISSING = "Arrears aren't set up on the database yet (scripts/salary-effective.sql)."
 
 export async function GET(req: Request) {
-    const g = await guard(req, ["payroll.view", "payroll.manage"])
+    const g = await guard(req, ["payroll.view", "payroll.edit"])
     if (g instanceof NextResponse) return g
     const sp = new URL(req.url).searchParams
     const status = sp.get("status") || "PENDING"
@@ -59,7 +59,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-    const g = await guard(req, "payroll.manage")
+    const g = await guard(req, "payroll.edit")
     if (g instanceof NextResponse) return g
     const b = await req.json().catch(() => ({}))
     const note = typeof b?.note === "string" ? b.note.trim().slice(0, 300) || null : undefined

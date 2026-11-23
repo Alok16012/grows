@@ -121,7 +121,7 @@ const structureDefaults = (r: PayrollRules): SalaryRow => ({
 function SalaryMasterInner() {
     const router  = useRouter()
     const { data: session } = useSession()
-    const canManagePerm = can(session, "payroll.manage")
+    const canManagePerm = can(session, "payroll.edit")
     const [data,       setData]       = useState<EmpSalary[]>([])
     const [loading,    setLoading]    = useState(true)
     const [search,     setSearch]     = useState("")

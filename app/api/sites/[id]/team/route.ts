@@ -85,7 +85,7 @@ export async function POST(
 ) {
     try {
         const session = await getServerSession(authOptions)
-        if (!checkAccess(session, [], "sites.manage")) {
+        if (!checkAccess(session, [], "projects.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -149,7 +149,7 @@ export async function DELETE(
 ) {
     try {
         const session = await getServerSession(authOptions)
-        if (!checkAccess(session, [], "sites.manage")) {
+        if (!checkAccess(session, [], "projects.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

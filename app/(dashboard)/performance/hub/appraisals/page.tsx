@@ -1495,7 +1495,7 @@ function DrawerHRApproval({
                 </button>
             )}
 
-            {review.hrApprovedAt && (review.incrementPercent ?? 0) > 0 && can(session, "payroll.manage") && (
+            {review.hrApprovedAt && (review.incrementPercent ?? 0) > 0 && can(session, "payroll.edit") && (
                 <ApplyIncrement reviewId={review.id} percent={review.incrementPercent ?? 0} />
             )}
         </div>

@@ -7,7 +7,7 @@ import { checkAccess } from "@/lib/permissions"
 // PUT — rename / reweight a KRA. DELETE — remove it with its KPIs.
 export async function PUT(req: Request, { params }: { params: { id: string; kraId: string } }) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) return new NextResponse("Forbidden", { status: 403 })
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.edit")) return new NextResponse("Forbidden", { status: 403 })
     const { title, description, weightage } = await req.json()
     const data: Record<string, unknown> = {}
     if (title !== undefined) { if (!String(title).trim()) return new NextResponse("Title is required", { status: 400 }); data.title = String(title).trim() }
@@ -20,7 +20,7 @@ export async function PUT(req: Request, { params }: { params: { id: string; kraI
 
 export async function DELETE(_req: Request, { params }: { params: { id: string; kraId: string } }) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) return new NextResponse("Forbidden", { status: 403 })
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.edit")) return new NextResponse("Forbidden", { status: 403 })
     const kra = await prisma.kRA.findFirst({ where: { id: params.kraId, reviewId: params.id }, select: { id: true } })
     if (!kra) return new NextResponse("KRA not found", { status: 404 })
     await prisma.$transaction([

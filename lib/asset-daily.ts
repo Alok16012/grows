@@ -23,7 +23,7 @@ export async function runAssetDaily(now = new Date()) {
         const cutoff = new Date(now.getTime() - tellIssuersAfterDays * 86_400_000)
         overdue = await prisma.assetIssue.count({ where: { status: "ACTIVE", acknowledgedAt: null, issuedAt: { lt: cutoff } } })
         if (overdue) {
-            await notifyApprovers(["assets.issue", "assets.manage"], { title: "Asset receipts not confirmed", message: `${overdue} issued item(s) not confirmed by the employee for more than ${tellIssuersAfterDays} days.`, type: "asset", link: "/assets?tab=issued" })
+            await notifyApprovers(["assets.issue", "assets.edit"], { title: "Asset receipts not confirmed", message: `${overdue} issued item(s) not confirmed by the employee for more than ${tellIssuersAfterDays} days.`, type: "asset", link: "/assets?tab=issued" })
         }
     }
     // Items at or below their reorder level.
@@ -32,7 +32,7 @@ export async function runAssetDaily(now = new Date()) {
         const low: { name: string; available: number; reorderLevel: number }[] = await prisma.$queryRawUnsafe(
             `SELECT a.name, a.available, m."reorderLevel" FROM "Asset" a JOIN "AssetMeta" m ON m."assetId" = a.id WHERE a."isActive" AND m."reorderLevel" > 0 AND a.available <= m."reorderLevel" ORDER BY a.name`)
         lowStock = low.length
-        if (low.length) await notifyApprovers(["assets.issue", "assets.manage"], { title: "Low stock", message: low.slice(0, 8).map(l => `${l.name}: ${l.available} left (reorder at ${l.reorderLevel})`).join("; ") + (low.length > 8 ? "…" : ""), type: "asset", link: "/assets?tab=stock" })
+        if (low.length) await notifyApprovers(["assets.issue", "assets.edit"], { title: "Low stock", message: low.slice(0, 8).map(l => `${l.name}: ${l.available} left (reorder at ${l.reorderLevel})`).join("; ") + (low.length > 8 ? "…" : ""), type: "asset", link: "/assets?tab=stock" })
     }
     // Warranties ending soon (Assets → Register).
     let warranties = 0
@@ -43,7 +43,7 @@ export async function runAssetDaily(now = new Date()) {
             const names = new Map((await prisma.asset.findMany({ where: { id: { in: ending.map(e => e.assetId) }, isActive: true }, select: { id: true, name: true, assetCode: true } })).map(a => [a.id, `${a.name} (${a.assetCode})`]))
             const list = ending.filter(e => names.has(e.assetId))
             warranties = list.length
-            if (list.length) await notifyApprovers(["assets.manage"], { title: "Warranties ending soon", message: list.slice(0, 8).map(e => `${names.get(e.assetId)}: ${e.warrantyUntil!.toISOString().slice(0, 10)}`).join("; ") + (list.length > 8 ? "…" : ""), type: "asset", link: "/assets/register" })
+            if (list.length) await notifyApprovers(["assets.edit"], { title: "Warranties ending soon", message: list.slice(0, 8).map(e => `${names.get(e.assetId)}: ${e.warrantyUntil!.toISOString().slice(0, 10)}`).join("; ") + (list.length > 8 ? "…" : ""), type: "asset", link: "/assets/register" })
         }
     }
     return { reminded, overdue, lowStock, warranties }

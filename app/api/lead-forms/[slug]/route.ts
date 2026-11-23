@@ -31,7 +31,7 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
 // PATCH — toggle active / update (admin only)
 export async function PATCH(req: Request, { params }: { params: { slug: string } }) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.manage")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.edit")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     const body = await req.json()

@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
     const canRead =
         checkAccess(session, [], "payroll.view") ||
-        checkAccess(session, [], "payroll.manage") ||
+        checkAccess(session, [], "payroll.edit") ||
         checkAccess(session, [], "employees.viewSalary")
     if (!canRead) return new NextResponse("Forbidden", { status: 403 })
 
@@ -46,7 +46,7 @@ function readFrom(body: any): YM | null {
 export async function PUT(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
-    if (!checkAccess(session, [], "payroll.manage")) {
+    if (!checkAccess(session, [], "payroll.edit")) {
         return new NextResponse("Forbidden", { status: 403 })
     }
     const userId = session.user.id ?? "system"
@@ -89,7 +89,7 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
-    if (!checkAccess(session, [], "payroll.manage")) return new NextResponse("Forbidden", { status: 403 })
+    if (!checkAccess(session, [], "payroll.edit")) return new NextResponse("Forbidden", { status: 403 })
     const sp = new URL(req.url).searchParams
     const from = { month: Number(sp.get("month")), year: Number(sp.get("year")) }
     const problem = await deletePayrollRulesVersion(from, session.user.id ?? "system")

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
 const VIEW = ["onboarding.view", "recruitment.view"]
-const TICK = ["onboarding.view", "onboarding.manage", "onboarding.edit", "onboarding.approve"]
+const TICK = ["onboarding.view", "onboarding.edit", "onboarding.approve"]
 
 async function scopeIds(access: any): Promise<string[] | null> {
     const scope = await employeeScope(access)
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     if (g instanceof NextResponse) return g
     const sp = new URL(req.url).searchParams
     const employeeId = sp.get("employeeId")
-    const canManage = g.access.isAdmin || g.access.permissions.includes("onboarding.manage")
+    const canManage = g.access.isAdmin || g.access.permissions.includes("onboarding.edit")
     const sites = await prisma.site.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: "asc" } })
     if (employeeId) {
         const ids = await scopeIds(g.access)
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
 
 // PUT — the checklist template and approval rules.
 export async function PUT(req: Request) {
-    const g = await guard(req, "onboarding.manage")
+    const g = await guard(req, "onboarding.edit")
     if (g instanceof NextResponse) return g
     const s = await saveChecklistSettings(await req.json().catch(() => ({})), g.access.userId)
     auditLater({ actorId: g.access.userId, actorName: g.access.name, action: "onboarding.checklist_settings", targetType: "Setting", targetId: "onboardingChecklist", targetName: "Joining checklist", summary: `${s.tasks.length} task(s), ${s.tasks.filter(t => t.beforeApproval).length} before approval; override: ${s.override}`, after: s, ...requestMeta(req) })

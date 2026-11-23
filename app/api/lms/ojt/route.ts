@@ -8,14 +8,14 @@ export const dynamic = "force-dynamic"
 
 /** Sites this signer may sign off at: all for lms.manage, else their own sites. */
 async function signerSites(access: { userId: string; isAdmin: boolean; permissions: string[]; siteIds: string[] }): Promise<string[] | null> {
-    if (access.isAdmin || access.permissions.includes("lms.manage")) return null
+    if (access.isAdmin || access.permissions.includes("lms.edit")) return null
     return Array.from(new Set([...(await managerSiteIds(access.userId)), ...access.siteIds]))
 }
 
 // GET — what the signer needs on the phone: their sites; with ?siteId= the
 // staff there and the skills that apply; with ?employeeId= levels and recent sign-offs.
 export async function GET(req: Request) {
-    const g = await guard(req, ["lms.ojt", "lms.manage"])
+    const g = await guard(req, ["lms.ojt", "lms.edit"])
     if (g instanceof NextResponse) return g
     try {
         const sp = new URL(req.url).searchParams
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
 
 // POST { employeeId, skillId, level 1–4, notes?, photoUrl? } — supervisor signs off on-the-job training.
 export async function POST(req: Request) {
-    const g = await guard(req, ["lms.ojt", "lms.manage"])
+    const g = await guard(req, ["lms.ojt", "lms.edit"])
     if (g instanceof NextResponse) return g
     try {
         const b = await req.json().catch(() => ({}))

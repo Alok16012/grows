@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic"
 // (open payroll month, or the next), and whether admins may back-date.
 // Used by every "Applies from" picker.
 export async function GET(req: Request) {
-    const g = await guard(req, ["payroll.view", "payroll.manage", "employees.viewSalary", "performance.manage"])
+    const g = await guard(req, ["payroll.view", "payroll.edit", "employees.viewSalary", "performance.edit"])
     if (g instanceof NextResponse) return g
     return NextResponse.json({ ...(await effectiveWindow()), isAdmin: g.access.isAdmin })
 }

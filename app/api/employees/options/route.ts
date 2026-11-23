@@ -12,8 +12,8 @@ import { buildEmployeeWhere, employeeFiltersFromParams } from "@/lib/employee-fi
 // to their data scope like every other employee list.
 const PICKER_PERMISSIONS = [
     "employees.view", "attendance.view", "leaves.view", "leaves.approve", "expenses.view", "exit.view",
-    "helpdesk.view", "helpdesk.manage", "lms.manage", "documents.view", "documents.send", "performance.view",
-    "performance.manage", "assets.issue", "assets.approve", "assets.manage", "payroll.view", "onboarding.view",
+    "helpdesk.view", "helpdesk.assign", "lms.enroll", "documents.view", "documents.send", "performance.view",
+    "performance.edit", "assets.issue", "assets.approve", "assets.edit", "payroll.view", "onboarding.view",
 ]
 
 const OPTION_SELECT = {

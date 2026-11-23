@@ -575,9 +575,10 @@ export function AssetDrawer({ assetId, employees, onClose, onRefresh }: {
 
 // ─── Classic Inventory table (GET /api/assets) ───────────────────────────────
 
-export function LegacyInventory({ refreshKey, canManage, onIssue, onEdit, onDetails, onLoaded }: {
+export function LegacyInventory({ refreshKey, canManage, canDelete = false, onIssue, onEdit, onDetails, onLoaded }: {
     refreshKey: number
     canManage: boolean
+    canDelete?: boolean
     onIssue: (a: Asset) => void
     onEdit: (a: Asset) => void
     onDetails: (id: string) => void
@@ -691,7 +692,7 @@ export function LegacyInventory({ refreshKey, canManage, onIssue, onEdit, onDeta
                                                 {canManage && (
                                                     <button onClick={() => onEdit(asset)} title="Edit" className="p-2 md:p-1.5 hover:bg-[var(--surface2)] rounded-lg text-[var(--text3)] hover:text-[var(--text)] transition-colors"><Edit2 size={14} /></button>
                                                 )}
-                                                {canManage && (
+                                                {canDelete && (
                                                     <button onClick={() => handleDelete(asset)} title="Delete" className="p-2 md:p-1.5 hover:bg-red-50 rounded-lg text-[var(--text3)] hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
                                                 )}
                                                 <button onClick={() => onDetails(asset.id)} title="Details" className="p-2 md:p-1.5 hover:bg-[var(--surface2)] rounded-lg text-[var(--text3)] hover:text-[var(--accent)] transition-colors"><ChevronRight size={14} /></button>

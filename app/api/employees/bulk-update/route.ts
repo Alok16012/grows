@@ -69,7 +69,7 @@ const EMPLOYEE_SELECT = {
 // ── GET: template pre-filled with the employees the page is showing ─────────
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.edit")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.bulkUpdate")) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
     const { searchParams } = new URL(req.url)
@@ -160,7 +160,7 @@ export async function GET(req: Request) {
 // same file just wrote.
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.edit")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.bulkUpdate")) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

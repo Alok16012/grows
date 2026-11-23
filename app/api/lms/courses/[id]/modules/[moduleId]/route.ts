@@ -7,7 +7,7 @@ import { checkAccess } from "@/lib/permissions"
 export async function PUT(req: Request, { params }: { params: { id: string; moduleId: string } }) {
     try {
         const session = await getServerSession(authOptions)
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -37,7 +37,7 @@ export async function PUT(req: Request, { params }: { params: { id: string; modu
 export async function DELETE(req: Request, { params }: { params: { id: string; moduleId: string } }) {
     try {
         const session = await getServerSession(authOptions)
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic"
 // effective month (what is in force when), every save with before / after and
 // who did it, and their arrears.
 export async function GET(req: Request) {
-    const g = await guard(req, ["payroll.view", "payroll.manage"])
+    const g = await guard(req, ["payroll.view", "payroll.edit"])
     if (g instanceof NextResponse) return g
     const q = (new URL(req.url).searchParams.get("q") || "").trim()
     if (q.length < 2) return NextResponse.json({ error: "Type an employee code or name." }, { status: 400 })

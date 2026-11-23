@@ -13,7 +13,7 @@ const CYCLES = ["MONTHLY", "QUARTERLY", "HALF_YEARLY", "ANNUAL"]
 // Anyone who already has a review for the same period start is skipped.
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) return new NextResponse("Forbidden", { status: 403 })
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.create")) return new NextResponse("Forbidden", { status: 403 })
     try {
         const b = await req.json()
         if (!CYCLES.includes(b.cycle)) return new NextResponse("Choose a review cycle", { status: 400 })

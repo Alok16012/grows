@@ -206,8 +206,10 @@ function OnboardingCard({ employee }: { employee: Employee }) {
 // ─── Employee Detail Drawer ────────────────────────────────────────────────────
 
 function EmployeeDrawer({
-    employee, onClose, onEdit, onStatusChange, isAdmin, canViewSalary,
+    employee, onClose, onEdit, onStatusChange, isAdmin, canViewSalary, canVerifyDoc = false, canDeleteDoc = false,
 }: {
+    canVerifyDoc?: boolean
+    canDeleteDoc?: boolean
     employee: Employee | null
     onClose: () => void
     onEdit: (e: Employee) => void
@@ -900,20 +902,20 @@ function EmployeeDrawer({
                                                                 style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 600 }}
                                                             ><Eye size={12} /> {isPdf ? "View PDF" : "View File"}</button>
                                                         )}
-                                                        {isAdmin && doc.status !== "VERIFIED" && !isRejecting && (
+                                                        {canVerifyDoc && doc.status !== "VERIFIED" && !isRejecting && (
                                                             <button
                                                                 onClick={() => handleVerify(doc.id)}
                                                                 disabled={!!actionLoading}
                                                                 style={{ fontSize: 11, fontWeight: 600, color: "#14532d", background: "#dcfce7", border: "1px solid #86efac", padding: "3px 9px", borderRadius: 6, cursor: "pointer", opacity: actionLoading ? 0.6 : 1 }}
                                                             >{actionLoading === doc.id + "_verify" ? "…" : "✓ Verify"}</button>
                                                         )}
-                                                        {isAdmin && doc.status !== "REJECTED" && !isRejecting && (
+                                                        {canVerifyDoc && doc.status !== "REJECTED" && !isRejecting && (
                                                             <button
                                                                 onClick={() => { setRejectingDocId(doc.id); setRejectReason("") }}
                                                                 style={{ fontSize: 11, fontWeight: 600, color: "#991b1b", background: "#fef2f2", border: "1px solid #fecaca", padding: "3px 9px", borderRadius: 6, cursor: "pointer" }}
                                                             >✗ Reject</button>
                                                         )}
-                                                        {isAdmin && (
+                                                        {canDeleteDoc && (
                                                             <button
                                                                 onClick={() => handleDelete(doc.id)}
                                                                 disabled={actionLoading === doc.id + "_delete"}
@@ -1100,6 +1102,11 @@ function EmployeesPage() {
     const [exportCols, setExportCols] = useState<Set<string>>(new Set(EXPORT_COLUMNS))
 
     const isAdmin = can(session, "employees.edit")
+    // Each button needs its own right (Roles → Employees).
+    const canCreateEmp = can(session, "employees.create")
+    const canImportEmp = can(session, ["employees.import", "employees.create"])
+    const canBulkUpdate = can(session, "employees.bulkUpdate")
+    const canExportEmp = can(session, "employees.export")
     const canViewSalary = can(session, "employees.viewSalary")
     const canDelete = can(session, "employees.delete")
 
@@ -1592,7 +1599,7 @@ function EmployeesPage() {
                     </div>
                 </div>
                 <div className="page-actions">
-                    <div className="flex" style={{ position: "relative" }}>
+                    {canExportEmp && <div className="flex" style={{ position: "relative" }}>
                         <button
                             onClick={() => setExportOpen(o => !o)}
                             title="Export to Excel — pick rows & columns"
@@ -1639,16 +1646,16 @@ function EmployeesPage() {
                                 </div>
                             </>
                         )}
-                    </div>
-                    <button
+                    </div>}
+                    {canImportEmp && <button
                         onClick={() => { setShowImportModal(true); setImportRows([]); setImportResult(null); if (importFileRef.current) importFileRef.current.value = "" }}
                         title="Import from Excel"
                         className="inline-flex items-center justify-center gap-2 h-11 px-4 rounded-[10px] bg-[var(--surface)] border border-[var(--border2)] text-[14px] font-medium text-[var(--text)] whitespace-nowrap shadow-[0_1px_2px_rgba(15,23,41,0.04)] hover:border-[var(--accent)] transition-colors"
                     >
                         <Upload size={17} />
                         Import
-                    </button>
-                    {isAdmin && (
+                    </button>}
+                    {canBulkUpdate && (
                         <button
                             onClick={() => setShowBulkUpdate(true)}
                             title="Update existing employees (UAN / PF / ESIC, bank …) from Excel"
@@ -1658,12 +1665,12 @@ function EmployeesPage() {
                             Bulk Update
                         </button>
                     )}
-                    <button
+                    {canCreateEmp && <button
                         onClick={() => { setEditEmployee(null); setShowModal(true) }}
                         className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-[10px] text-white text-[14px] font-semibold bg-[linear-gradient(135deg,#2f6bff_0%,#1447e6_100%)] shadow-[0_8px_20px_-6px_rgba(31,95,255,0.6)] hover:brightness-110 transition"
                     >
                         <Plus size={18} /> Add Employee
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -2121,6 +2128,8 @@ function EmployeesPage() {
                 onStatusChange={handleStatusChange}
                 isAdmin={isAdmin}
                 canViewSalary={canViewSalary}
+                canVerifyDoc={can(session, "documents.verify")}
+                canDeleteDoc={can(session, "documents.delete")}
             />
 
             {showBulkUpdate && (

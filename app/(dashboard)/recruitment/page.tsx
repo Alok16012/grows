@@ -945,29 +945,29 @@ export default function RecruitmentPage() {
                             <Link2 size={15} />
                             Onboarding Link
                         </button>
-                        <button
+                        {can(session, "recruitment.export") && <button
                             onClick={handleExport}
                             title="Export to Excel"
                             style={{ display: "flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", fontSize: "13px", fontWeight: 500, borderRadius: "8px", cursor: "pointer", whiteSpace: "nowrap" }}
                         >
                             <Download size={15} />
                             Export
-                        </button>
-                        <button
+                        </button>}
+                        {can(session, "recruitment.import") && <button
                             onClick={() => { setShowImportModal(true); setImportRows([]); setImportResult(null); if (importFileRef.current) importFileRef.current.value = "" }}
                             title="Import from Excel"
                             style={{ display: "flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", fontSize: "13px", fontWeight: 500, borderRadius: "8px", cursor: "pointer", whiteSpace: "nowrap" }}
                         >
                             <Upload size={15} />
                             Import
-                        </button>
-                        <button
+                        </button>}
+                        {can(session, "recruitment.create") && <button
                             onClick={openAddForm}
                             className="flex items-center justify-center gap-2 h-9 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[13px] font-semibold rounded-[8px] transition-colors active:scale-95 shrink-0"
                         >
                             <Plus size={16} />
                             Add Candidate
-                        </button>
+                        </button>}
                     </div>
                 </div>
 
@@ -2148,10 +2148,10 @@ function ListView({ leads, onCard, onEdit, onDelete, session }: {
                                 <td className={td + " text-[var(--text2)]"}>{lead.creator?.name || "—"}</td>
                                 <td className={td} onClick={e => e.stopPropagation()}>
                                     <div className="flex items-center justify-center gap-1">
-                                        <button onClick={() => onEdit(lead)} className="p-1.5 rounded-[6px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
+                                        {can(session, "recruitment.edit") && <button onClick={() => onEdit(lead)} className="p-1.5 rounded-[6px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
                                             <Edit2 size={13} />
-                                        </button>
-                                        {can(session, "recruitment.manage") && (
+                                        </button>}
+                                        {can(session, "recruitment.delete") && (
                                             <button onClick={() => onDelete(lead.id)} className="p-1.5 rounded-[6px] hover:bg-red-50 text-[var(--text3)] hover:text-red-500 transition-colors">
                                                 <Trash2 size={13} />
                                             </button>
@@ -2257,7 +2257,7 @@ function DetailDrawer({
     })
     const [savingInterview, setSavingInterview] = useState(false)
     const router = useRouter()
-    const canEditRec = session?.user?.role === "ADMIN" || ((session?.user as any)?.permissions ?? []).includes("recruitment.manage")
+    const canEditRec = session?.user?.role === "ADMIN" || ((session?.user as any)?.permissions ?? []).includes("recruitment.edit")
     // Re-read this candidate after a v2 panel changed it (interview round, offer, link).
     const refreshLead = async (updated?: Lead) => {
         if (updated?.id) { onLeadUpdate({ ...lead, ...updated }); return }
@@ -2410,10 +2410,10 @@ function DetailDrawer({
                         </div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <button onClick={onEdit} className="p-1.5 rounded-[7px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
+                        {can(session, "recruitment.edit") && <button onClick={onEdit} className="p-1.5 rounded-[7px] hover:bg-[var(--surface2)] text-[var(--text3)] transition-colors">
                             <Edit2 size={15} />
-                        </button>
-                        {can(session, "recruitment.manage") && (
+                        </button>}
+                        {can(session, "recruitment.delete") && (
                             <button onClick={onDelete} className="p-1.5 rounded-[7px] hover:bg-red-50 text-[var(--text3)] hover:text-red-500 transition-colors">
                                 <Trash2 size={15} />
                             </button>

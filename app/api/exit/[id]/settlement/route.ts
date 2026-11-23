@@ -22,7 +22,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 // PUT — HR's manual lines, excluded auto lines and payment details.
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "exit.manage")) return new NextResponse("Forbidden", { status: 403 })
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], ["exit.edit", "exit.settleFnF"])) return new NextResponse("Forbidden", { status: 403 })
     try {
         const body = await req.json()
         const prev = await getFnfRecord(params.id)

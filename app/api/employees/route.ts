@@ -244,7 +244,7 @@ export async function POST(req: Request) {
         // Creatable by HR/employee managers, OR by recruiters converting a joined
         // candidate into an employee (Recruitment → Joined flow saves here).
         const canCreateEmployee = checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.create")
-        const canCreateViaRecruitment = checkAccess(session, [], "recruitment.manage")
+        const canCreateViaRecruitment = checkAccess(session, [], "recruitment.edit")
         if (!canCreateEmployee && !canCreateViaRecruitment) {
             return new NextResponse("Forbidden", { status: 403 })
         }

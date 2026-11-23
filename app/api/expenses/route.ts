@@ -70,7 +70,7 @@ export async function GET(req: Request) {
 
         // Privileged = can manage expenses (see everyone, approve/pay). The weaker
         // `expenses.view` is NOT sufficient — keep this in sync with the page gate.
-        const isPrivileged = checkAccess(session, ["MANAGER", "HR_MANAGER"], "expenses.manage")
+        const isPrivileged = checkAccess(session, ["MANAGER", "HR_MANAGER"], ["expenses.approve", "expenses.markPaid"])
 
         const where: Record<string, unknown> = {}
         // Team approvals (two-level approval): claims from my direct reports

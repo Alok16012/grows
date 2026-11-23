@@ -27,7 +27,7 @@ export async function GET(req: Request) {
         }
 
         // Return all feedback for admin view
-        if (checkAccess(session, ["MANAGER"], "lms.manage")) {
+        if (checkAccess(session, ["MANAGER"], ["lms.create", "lms.edit", "lms.delete", "lms.enroll", "lms.export"])) {
             const allFeedback = await prisma.courseFeedback.findMany({
                 include: {
                     course: { select: { title: true, courseCode: true } },

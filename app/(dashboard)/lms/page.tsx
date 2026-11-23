@@ -1615,6 +1615,11 @@ function CourseDrawer({ courseId, onClose, onEdit, onEnroll, onRefresh }: {
 
 export default function LMSPage() {
     const { data: session, status } = useSession()
+    // Training rights are separate: new course = Create, change / publish = Edit, remove = Delete, enrol = Enrol learners.
+    const lmsCreate = can(session, "lms.create")
+    const lmsEdit = can(session, "lms.edit")
+    const lmsDelete = can(session, "lms.delete")
+    const lmsEnroll = can(session, "lms.enroll")
     const router = useRouter()
 
     const [activeTab, setActiveTab] = useState<"dashboard" | "courses" | "enrollments" | "compliance" | "ilt" | "policies" | "notifications" | "settings" | "skills" | "engagement">("dashboard")
@@ -1743,19 +1748,19 @@ export default function LMSPage() {
                         <p className="text-[13.5px] text-[var(--text3)] mt-1">Training courses &amp; employee development.</p>
                     </div>
                     <div className="page-actions">
-                        <button
+                        {lmsEnroll && <button
                             onClick={() => { setEnrollCourseId(undefined); setShowEnrollModal(true) }}
                             className="h-[42px] px-4 text-[13px] font-semibold border border-[var(--border)] bg-[var(--surface)] rounded-[10px] text-[var(--text2)] hover:bg-[var(--surface2)] inline-flex items-center justify-center gap-2"
                         >
                             <Users size={16} /> Enroll Employees
-                        </button>
-                        <button
+                        </button>}
+                        {lmsCreate && <button
                             onClick={() => { setEditCourse(null); setShowCourseModal(true) }}
                             className="h-[42px] px-5 text-[13px] bg-[var(--accent)] text-white rounded-[10px] font-semibold inline-flex items-center justify-center gap-2 hover:opacity-90"
                             style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}
                         >
                             <Plus size={16} /> Create Course
-                        </button>
+                        </button>}
                     </div>
                 </div>
             </div>
@@ -1781,7 +1786,7 @@ export default function LMSPage() {
                         { key: "notifications", label: "Alerts", icon: <Bell size={14} /> },
                         { key: "skills", label: "Skill matrix", icon: <LayoutGrid size={14} /> },
                         { key: "engagement", label: "Engagement", icon: <Eye size={14} /> },
-                        { key: "settings", label: "Settings", icon: <Settings size={14} /> },
+                        ...(lmsEdit ? [{ key: "settings", label: "Settings", icon: <Settings size={14} /> }] : []),
                     ]).map(tab => (
                         <button
                             key={tab.key}
@@ -1914,26 +1919,26 @@ export default function LMSPage() {
                                                                     className="absolute right-0 top-8 z-20 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] shadow-lg py-1 min-w-[160px]"
                                                                     onClick={e => e.stopPropagation()}
                                                                 >
-                                                                    <button
+                                                                    {lmsEdit && <button
                                                                         onClick={() => { setEditCourse(course); setShowCourseModal(true); setOpenMenuId(null) }}
                                                                         className="flex items-center gap-2 w-full px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)]"
                                                                     >
                                                                         <Edit2 size={13} /> Edit
-                                                                    </button>
-                                                                    <button
+                                                                    </button>}
+                                                                    {lmsEdit && <button
                                                                         onClick={() => { handlePublishToggle(course); setOpenMenuId(null) }}
                                                                         className="flex items-center gap-2 w-full px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)]"
                                                                     >
                                                                         <TrendingUp size={13} />
                                                                         {course.status === "PUBLISHED" ? "Archive" : "Publish"}
-                                                                    </button>
-                                                                    <button
+                                                                    </button>}
+                                                                    {lmsEnroll && <button
                                                                         onClick={() => { setEnrollCourseId(course.id); setShowEnrollModal(true); setOpenMenuId(null) }}
                                                                         className="flex items-center gap-2 w-full px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)]"
                                                                     >
                                                                         <Users size={13} /> Enroll Employees
-                                                                    </button>
-                                                                    {session?.user?.role === "ADMIN" && (
+                                                                    </button>}
+                                                                    {lmsDelete && (
                                                                         <button
                                                                             onClick={() => { handleDeleteCourse(course.id); setOpenMenuId(null) }}
                                                                             className="flex items-center gap-2 w-full px-3 py-2 text-[12.5px] text-[var(--red)] hover:bg-[var(--surface2)]"
@@ -2140,7 +2145,7 @@ export default function LMSPage() {
                                                             )}
                                                         </td>
                                                         <td className="px-4 py-3">
-                                                            {session?.user?.role === "ADMIN" && (
+                                                            {lmsEnroll && (
                                                                 <button
                                                                     onClick={() => handleDeleteEnrollment(e.id)}
                                                                     className="p-1.5 text-[var(--text3)] hover:text-[var(--red)] transition-colors"

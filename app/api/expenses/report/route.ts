@@ -14,7 +14,7 @@ export const maxDuration = 60
 // claimant's employee code, site, approval and payment details and policy
 // flags. Approvers see their data scope only (same as the claims list).
 export async function GET(req: Request) {
-    const g = await guard(req, ["expenses.view", "expenses.manage"])
+    const g = await guard(req, ["expenses.view", "expenses.approve", "expenses.markPaid"])
     if (g instanceof NextResponse) return g
     const sp = new URL(req.url).searchParams
     const from = sp.get("from"), to = sp.get("to")

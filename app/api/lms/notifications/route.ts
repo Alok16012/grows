@@ -7,7 +7,7 @@ import { checkAccess } from "@/lib/permissions"
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions)
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], ["lms.create", "lms.edit", "lms.delete", "lms.enroll", "lms.export"])) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -106,7 +106,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.enroll")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

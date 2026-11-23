@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     try {
         const session = await getServerSession(authOptions)
         if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.edit")) {
             return NextResponse.json({ error: "You need Performance (edit) to change an appraisal's KPIs." }, { status: 403 })
         }
         const body = await req.json().catch(() => ({}))

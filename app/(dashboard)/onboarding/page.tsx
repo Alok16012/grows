@@ -13,6 +13,7 @@ import { format, formatDistanceToNow } from "date-fns"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { StatCard, statGridClass } from "@/components/StatCard"
 import { ProfileApprovals } from "@/components/onboarding/ProfileApprovals"
+import { can } from "@/lib/can"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -196,7 +197,8 @@ function PolicySignoffPanel({ employeeId }: { employeeId: string }) {
     )
 }
 
-function DetailModal({ record: listRecord, onClose, onAction }: {
+function DetailModal({ record: listRecord, onClose, onAction, canApprove }: {
+    canApprove: boolean
     record: OnboardingRecord
     onClose: () => void
     onAction: (id: string, action: "approve" | "reject", reason?: string) => Promise<void>
@@ -523,7 +525,9 @@ function DetailModal({ record: listRecord, onClose, onAction }: {
                 )}
 
                 <div style={{ padding: "16px 24px", borderTop: "1px solid var(--border)", display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-                    {record.status !== "COMPLETED" && record.status !== "ON_HOLD" ? (
+                    {!canApprove && record.status !== "COMPLETED" ? (
+                        <div style={{ fontSize: 12.5, color: "var(--text3)" }}>You can review this joiner. Approving or rejecting needs Onboarding → Approve.</div>
+                    ) : record.status !== "COMPLETED" && record.status !== "ON_HOLD" ? (
                         <>
                             <div style={{ flex: 1, minWidth: 180 }}>
                                 <label className="text-[11px] md:text-[10px]" style={{ fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Notes (optional)</label>
@@ -603,7 +607,8 @@ function PageArrow({ disabled, onClick, children }: { disabled: boolean; onClick
 }
 
 // ─── Table row ──────────────────────────────────────────────────────────────────
-function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, onApprove }: {
+function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, onApprove, canApprove }: {
+    canApprove: boolean
     record: OnboardingRecord
     expanded: boolean
     checked: boolean
@@ -732,7 +737,7 @@ function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, o
                                 { icon: CheckCircle2,  title: "Approve",        sub: "Approve onboarding",      color: "#15803d", onClick: onApprove },
                                 { icon: XCircle,       title: "Reject",         sub: "Reject onboarding",       color: "#dc2626", onClick: onOpen },
                                 { icon: ClipboardList, title: "View Checklist", sub: record.checklist?.blocking.length ? `Waiting: ${record.checklist.blocking.slice(0, 2).join(", ")}${record.checklist.blocking.length > 2 ? "…" : ""}` : "See joining tasks", color: "#6b7280", onClick: () => { window.location.href = `/onboarding/checklist?id=${record.employee.id}` } },
-                            ].map(a => (
+                            ].filter(a => canApprove || (a.title !== "Approve" && a.title !== "Reject")).map(a => (
                                 <button key={a.title} onClick={a.onClick}
                                     style={{ display: "flex", alignItems: "center", gap: 11, padding: "12px 14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", textAlign: "left" }}>
                                     <div style={{ width: 36, height: 36, borderRadius: 10, background: a.color + "18", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -759,6 +764,7 @@ export default function OnboardingPage() {
     const [records, setRecords] = useState<OnboardingRecord[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("ALL")
+    const canApproveJoiners = can(session, "onboarding.approve")
     // Joiners (the list below) or Approvals — employee updates waiting (?tab=approvals).
     const [view, setView] = useState<"joiners" | "approvals">("joiners")
     const [apprCount, setApprCount] = useState<number | null>(null)
@@ -1022,6 +1028,7 @@ export default function OnboardingPage() {
                                         onToggle={() => setExpandedId(id => id === record.id ? null : record.id)}
                                         onOpen={() => setSelected(record)}
                                         onApprove={() => { if (confirm("Approve this employee's onboarding?")) handleAction(record.id, "approve") }}
+                                        canApprove={canApproveJoiners}
                                     />
                                 ))}
                             </tbody>
@@ -1067,6 +1074,7 @@ export default function OnboardingPage() {
             {/* Detail Modal */}
             {selected && (
                 <DetailModal
+                    canApprove={canApproveJoiners}
                     record={selected}
                     onClose={() => setSelected(null)}
                     onAction={handleAction}

@@ -42,7 +42,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
         if (!task) return new NextResponse("Not Found", { status: 404 })
 
         // Non-admin users can only view their own tasks.
-        const isManager = checkAccess(session, ["MANAGER"], "field.manage")
+        const isManager = checkAccess(session, ["MANAGER"], ["projects.create", "projects.edit", "projects.delete"])
         const isAdmin = session.user.role === "ADMIN"
         if (!isManager && !isAdmin) {
             const employee = await prisma.employee.findFirst({
@@ -78,7 +78,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         const task = await prisma.fieldTask.findUnique({ where: { id: params.id } })
         if (!task) return new NextResponse("Not Found", { status: 404 })
 
-        const isAdminOrManager = checkAccess(session, ["MANAGER"], "field.manage")
+        const isAdminOrManager = checkAccess(session, ["MANAGER"], "projects.edit")
         const body = await req.json()
 
         // `status` is an enum column: an unknown value used to surface as a 500.
@@ -176,7 +176,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER"], "field.manage")) {
+        if (!checkAccess(session, ["MANAGER"], "projects.delete")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

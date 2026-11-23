@@ -12,7 +12,7 @@ const DAY = 86_400_000
 // deployed at the site is enrolled; with includeCompleted, people who already
 // passed are sent through it again.
 export async function POST(req: Request) {
-    const g = await guard(req, "lms.manage")
+    const g = await guard(req, "lms.enroll")
     if (g instanceof NextResponse) return g
     try {
         const b = await req.json().catch(() => ({}))

@@ -142,7 +142,9 @@ function PrefillNote() {
     )
 }
 
-function RowMenu({ assignment, onEdit, onDelete, onStopRecurrence, onClose, onToggleMultiPart }: {
+function RowMenu({ assignment, onEdit, onDelete, onStopRecurrence, onClose, onToggleMultiPart, canEdit = true, canDelete = true }: {
+    canEdit?: boolean
+    canDelete?: boolean
     assignment: Assignment
     onEdit: () => void
     onDelete: () => void
@@ -203,6 +205,7 @@ function RowMenu({ assignment, onEdit, onDelete, onStopRecurrence, onClose, onTo
                 <div ref={menuRef} role="menu"
                     style={{ position: "fixed", top: pos.top, left: pos.left, width: MENU_W, transform: pos.up ? "translateY(-100%)" : undefined }}
                     className="bg-white border border-[var(--border)] rounded-[10px] shadow-lg z-[1000] py-1 overflow-hidden">
+                    {canEdit && <>
                     <button role="menuitem" onClick={pick(onEdit)} className={item}>
                         <Pencil size={13} /> Edit Assignment
                     </button>
@@ -221,11 +224,14 @@ function RowMenu({ assignment, onEdit, onDelete, onStopRecurrence, onClose, onTo
                             <StopCircle size={13} /> Stop Recurrence
                         </button>
                     )}
-                    <div className="my-1 border-t border-[var(--border)]" />
+                    </>}
+                    {canDelete && <>
+                    {canEdit && <div className="my-1 border-t border-[var(--border)]" />}
                     <button role="menuitem" onClick={pick(onDelete)}
                         className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--red)] hover:bg-red-50 transition-colors text-left">
                         <Trash2 size={13} /> Delete Assignment
                     </button>
+                    </>}
                 </div>,
                 document.body,
             )}
@@ -352,7 +358,10 @@ export default function AssignmentsPage() {
     // Creating / deleting assignments needs the write permission — the API
     // already requires assignments.manage, so read-only roles must not see the
     // wizard or the row actions.
-    const canManageAssignments = can(session, "assignments.manage")
+    // New assignments need Create; the row menu needs Edit / Delete.
+    const canManageAssignments = can(session, "assignments.create")
+    const canEditAssignment = can(session, "assignments.edit")
+    const canDeleteAssignment = can(session, "assignments.delete")
 
     useEffect(() => { setMounted(true) }, [])
 
@@ -732,8 +741,8 @@ export default function AssignmentsPage() {
                     <Eye size={13} />
                 </button>
             )}
-            {canManageAssignments && !virtual && (
-                <RowMenu assignment={a} onEdit={() => setEditing(a)} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} onClose={() => handleCloseAssignment(a.id)} onToggleMultiPart={() => handleToggleMultiPart(a)} />
+            {(canEditAssignment || canDeleteAssignment) && !virtual && (
+                <RowMenu canEdit={canEditAssignment} canDelete={canDeleteAssignment} assignment={a} onEdit={() => setEditing(a)} onDelete={() => handleDelete(a.id)} onStopRecurrence={() => handleStopRecurrence(a.id)} onClose={() => handleCloseAssignment(a.id)} onToggleMultiPart={() => handleToggleMultiPart(a)} />
             )}
         </div>
     )

@@ -5,7 +5,7 @@ import { notifyApprovers } from "@/lib/hr-notify"
 import { sanitizeJoinSettings, JOIN_DUP_FIELDS, type JoinSettings } from "@/lib/join-settings"
 
 const KEY = "joinSettings"
-export const ONBOARDING_APPROVERS = ["onboarding.approve", "onboarding.manage"]
+export const ONBOARDING_APPROVERS = ["onboarding.approve"]
 const LEFT = new Set(["RESIGNED", "TERMINATED", "INACTIVE"])
 
 export async function getJoinSettings(): Promise<JoinSettings> {

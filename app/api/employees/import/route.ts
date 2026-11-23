@@ -87,7 +87,7 @@ const dt = (v?: Sv): Date | null => {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "employees.edit")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], ["employees.import", "employees.create"])) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
     const importer = accessFrom(session!)

@@ -126,7 +126,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
+    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.create")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

@@ -17,7 +17,7 @@ export default async function FormBuilderPage({ params }: { params: { id: string
     // Building a project's inspection form is a project-management action: every
     // /api/form-templates write behind this page is gated on `projects.manage`,
     // so the page guard must ask the same question (ADMIN passes implicitly).
-    if (!checkAccess(session, [], "projects.manage")) {
+    if (!checkAccess(session, [], "projects.edit")) {
         redirect("/")
     }
 

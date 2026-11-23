@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json()
-        const isManager = checkAccess(session, [], "leaves.manage")
+        const isManager = checkAccess(session, [], "leaves.create")
         let employeeId: string | undefined = isManager ? body.employeeId : undefined
         if (!employeeId) {
             const me = await prisma.employee.findUnique({ where: { userId: session.user.id }, select: { id: true } })

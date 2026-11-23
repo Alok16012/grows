@@ -16,7 +16,7 @@ export async function GET(req: Request) {
         // Every caller is a management screen (projects, assignments, reports,
         // bulk import). A self-service login must not list every client
         // project with its site and team.
-        const PROJECT_READERS = ["projects.view", "projects.manage", "assignments.view", "assignments.manage", "approvals.view", "reports.view"]
+        const PROJECT_READERS = ["projects.view", "projects.create", "projects.edit", "projects.delete", "assignments.view", "assignments.create", "assignments.edit", "assignments.delete", "approvals.view", "reports.view"]
         if (!PROJECT_READERS.some(p => checkAccess(session, [], p))) {
             return new NextResponse("Forbidden", { status: 403 })
         }
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
 
         // Creating a project is a write — same gate as PUT / DELETE on
         // /api/projects/[id]. Without this any signed-in user could create one.
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "projects.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "projects.create")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

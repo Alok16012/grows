@@ -10,7 +10,7 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "exit.manage")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "exit.edit")) {
       return new NextResponse("Forbidden", { status: 403 })
     }
 

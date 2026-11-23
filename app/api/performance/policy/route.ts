@@ -15,7 +15,7 @@ export async function GET() {
 
 export async function PUT(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) return new NextResponse("Forbidden", { status: 403 })
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.edit")) return new NextResponse("Forbidden", { status: 403 })
     const { bands } = await req.json()
     return NextResponse.json({ bands: await saveBands(bands, session!.user.id) })
 }

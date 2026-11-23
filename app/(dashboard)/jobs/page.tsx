@@ -40,7 +40,11 @@ export default function JobsPage() {
     const router = useRouter()
     const { data: session } = useSession()
     const canView = can(session, "jobs.view")
-    const canManage = can(session, "jobs.manage")
+    // Each action needs its own right (a role with only View / Publish sees no Edit).
+    const canCreate = can(session, "jobs.create")
+    const canEdit = can(session, "jobs.edit")
+    const canDelete = can(session, "jobs.delete")
+    const canManage = canCreate
 
     const [jobs, setJobs] = useState<JobPosting[]>([])
     const [loading, setLoading] = useState(true)
@@ -157,10 +161,10 @@ export default function JobsPage() {
                         className="inline-flex items-center justify-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                         <UserPlus size={16} /> Refer a candidate
                     </Link>
-                    <button onClick={exportCsv}
+                    {can(session, "jobs.export") && <button onClick={exportCsv}
                         className="inline-flex items-center justify-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                         <Download size={16} /> Export
-                    </button>
+                    </button>}
                     {canManage && (
                         <button onClick={() => toast.info("Manage Templates coming soon")}
                             className="inline-flex items-center justify-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
@@ -308,20 +312,24 @@ export default function JobsPage() {
                                         className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-[9px] border border-[var(--border)] text-[12.5px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                                         <Eye size={14} /> View
                                     </button>
-                                    {canManage && <>
+                                    {canEdit && (
                                         <button onClick={e => goTo(e, `/jobs/new?id=${job.id}`)}
                                             className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-[9px] border border-[var(--border)] text-[12.5px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                                             <Pencil size={14} /> Edit
                                         </button>
+                                    )}
+                                    {canCreate && (
                                         <button onClick={e => goTo(e, `/jobs/new?duplicate=${job.id}`)}
                                             className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-[9px] border border-[var(--border)] text-[12.5px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                                             <Copy size={14} /> Duplicate
                                         </button>
+                                    )}
+                                    {canDelete && (
                                         <button onClick={e => removeJob(e, job.id, job.title)} disabled={deletingId === job.id} title="Delete"
                                             className="inline-flex items-center justify-center w-9 h-9 rounded-[9px] border border-[var(--border)] text-[var(--text3)] hover:bg-red-50 hover:text-red-600 disabled:opacity-50">
                                             {deletingId === job.id ? <Loader2 size={14} className="animate-spin" /> : <MoreHorizontal size={16} />}
                                         </button>
-                                    </>}
+                                    )}
                                 </div>
                             </div>
                         )

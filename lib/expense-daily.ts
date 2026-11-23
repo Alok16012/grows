@@ -39,7 +39,7 @@ export async function runExpenseDaily(now = new Date()) {
             reminded += list.length
         }
         if (forFinal.length) {
-            await notifyApprovers(["expenses.manage"], { title: "Expense claims waiting for approval", message: `${forFinal.length} claim${forFinal.length === 1 ? "" : "s"} waiting more than ${remindAfterHours} h: ${forFinal.slice(0, 5).map(e => e.expenseNo).join(", ")}${forFinal.length > 5 ? "…" : ""}`, type: "expense", link: "/expenses?status=SUBMITTED" })
+            await notifyApprovers(["expenses.approve"], { title: "Expense claims waiting for approval", message: `${forFinal.length} claim${forFinal.length === 1 ? "" : "s"} waiting more than ${remindAfterHours} h: ${forFinal.slice(0, 5).map(e => e.expenseNo).join(", ")}${forFinal.length > 5 ? "…" : ""}`, type: "expense", link: "/expenses?status=SUBMITTED" })
             reminded += forFinal.length
         }
     }
@@ -65,6 +65,6 @@ async function remindAdvances(days: number, now: Date): Promise<number> {
     for (const a of due) {
         await prisma.notification.create({ data: { userId: a.requestedBy, title: "Settle your advance", message: `${a.advanceNo} (₹${a.amount.toLocaleString("en-IN")}) was paid more than ${days} days ago — file your expense claims against it so it can be settled.`, type: "expense", link: "/expenses/advances" } }).catch(() => {})
     }
-    if (due.length) await notifyApprovers(["expenses.manage"], { title: "Advances waiting to be settled", message: `${due.length} advance${due.length === 1 ? "" : "s"} paid more than ${days} days ago are not settled: ${due.slice(0, 5).map(a => a.advanceNo).join(", ")}${due.length > 5 ? "…" : ""}`, type: "expense", link: "/expenses/advances" })
+    if (due.length) await notifyApprovers(["expenses.markPaid"], { title: "Advances waiting to be settled", message: `${due.length} advance${due.length === 1 ? "" : "s"} paid more than ${days} days ago are not settled: ${due.slice(0, 5).map(a => a.advanceNo).join(", ")}${due.length > 5 ? "…" : ""}`, type: "expense", link: "/expenses/advances" })
     return due.length
 }

@@ -68,7 +68,7 @@ const STAFF_TILES: Tile[] = [
     { label: "Attendance", href: "/attendance", icon: Clock,      color: "#0d9488", tint: "#e6fffa", perms: ["attendance.view"] },
     { label: "Recruitment",href: "/recruitment", icon: Target,         color: "#7c3aed", tint: "#f5f3ff", perms: ["recruitment.view"] },
     { label: "Reports",    href: "/reports",     icon: BarChart2,      color: "#0d9488", tint: "#e6fffa", perms: ["reports.view"] },
-    { label: "Expenses",   href: "/expenses",    icon: CreditCard,     color: "#0b5cff", tint: "#e8effe", perms: ["expenses.view", "expenses.manage"] },
+    { label: "Expenses",   href: "/expenses",    icon: CreditCard,     color: "#0b5cff", tint: "#e8effe", perms: ["expenses.view", "expenses.approve"] },
     { label: "Helpdesk",   href: "/helpdesk",    icon: Headphones,     color: "#5b6478", tint: "#f0f2f8", perms: ["helpdesk.view"] },
 ]
 const INSPECTOR_TILE: Tile = { label: "Inspections", href: "/inspection", icon: HardHat, color: "#0b5cff", tint: "#e8effe" }

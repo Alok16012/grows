@@ -2,12 +2,13 @@
 // and notifying employees who now have something to sign.
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
-import { canManagePolicies, canReportPolicies, canViewPolicies } from "@/lib/permissions"
+import { canManagePolicies, canReportPolicies, canViewPolicies, policyRights } from "@/lib/permissions"
 import { PolicyError } from "@/lib/policy-signoff"
 import { designationKey, ONBOARDING_CATEGORY } from "@/lib/policy-text"
 import { isMissingTableErr } from "@/lib/asset-workflow"
 
-export type AdminCtx = { userId: string; canManage: boolean; canReport: boolean; canView: boolean }
+export type PolicyRight = "create" | "edit" | "delete" | "publish"
+export type AdminCtx = { userId: string; canManage: boolean; canReport: boolean; canView: boolean; rights: Record<PolicyRight, boolean> }
 
 export async function adminCtx(req: Request): Promise<AdminCtx> {
     const session = await getApiSession(req)
@@ -17,6 +18,7 @@ export async function adminCtx(req: Request): Promise<AdminCtx> {
         canManage: canManagePolicies(session),
         canReport: canReportPolicies(session),
         canView: canViewPolicies(session),
+        rights: policyRights(session),
     }
     if (!ctx.canView) throw new PolicyError(403, "FORBIDDEN", "Forbidden")
     return ctx
@@ -86,8 +88,11 @@ export async function onboardingPolicyMap(): Promise<{ forAll: number; byKey: Ma
     }
 }
 
-export function requireManage(ctx: AdminCtx) {
-    if (!ctx.canManage) throw new PolicyError(403, "FORBIDDEN", "Only HR with policy.manage can change policies")
+const RIGHT_LABEL: Record<PolicyRight, string> = { create: "create", edit: "edit", delete: "delete", publish: "publish" }
+/** Needs the given Policies right (Roles → Policies). Any of several when a list is given. */
+export function requireManage(ctx: AdminCtx, need: PolicyRight | PolicyRight[] = "edit") {
+    const list = Array.isArray(need) ? need : [need]
+    if (!list.some(r => ctx.rights[r])) throw new PolicyError(403, "FORBIDDEN", `You don't have the right to ${list.map(r => RIGHT_LABEL[r]).join(" or ")} policies`)
 }
 
 export function requireReport(ctx: AdminCtx) {

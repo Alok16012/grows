@@ -153,7 +153,8 @@ function NewJobWizard() {
     const dupId = searchParams.get("duplicate")
     const mode: "create" | "edit" | "duplicate" = editId ? "edit" : dupId ? "duplicate" : "create"
     const { data: session } = useSession()
-    const allowed = can(session, "jobs.manage")
+    const allowed = can(session, mode === "edit" ? "jobs.edit" : "jobs.create")
+    const canPublish = can(session, "jobs.publish")
 
     const [step, setStep] = useState(0)
     const [form, setForm] = useState<Form>(initialForm)
@@ -368,7 +369,7 @@ function NewJobWizard() {
                                 >
                                     Next <ArrowRight size={15} />
                                 </button>
-                            ) : (
+                            ) : canPublish && (
                                 <button
                                     onClick={() => submit("PUBLISHED")}
                                     disabled={saving}

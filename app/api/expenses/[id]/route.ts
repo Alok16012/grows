@@ -109,7 +109,7 @@ export async function GET(
         const approval = {
             mode: policy.approval.mode, stage,
             label: approvalLabel(policy, expense.status, stage),
-            canApprove: canApproveNow({ policy, stage, status: expense.status, submittedBy: expense.submittedBy, userId: session.user.id, isAdmin: session.user.role === "ADMIN", canManage: checkAccess(session, ["MANAGER"], "expenses.manage"), managerId }),
+            canApprove: canApproveNow({ policy, stage, status: expense.status, submittedBy: expense.submittedBy, userId: session.user.id, isAdmin: session.user.role === "ADMIN", canManage: checkAccess(session, ["MANAGER"], "expenses.approve"), managerId }),
             trail: (expense as any).approvalTrail ?? [],
         }
         return NextResponse.json({
@@ -136,13 +136,16 @@ export async function PUT(
         const expense = await findExpenseSafe(params.id)
         if (!expense) return new NextResponse("Not Found", { status: 404 })
 
-        const isPrivileged = checkAccess(session, ["MANAGER"], "expenses.manage")
+        // Sees and handles everyone's claims: approvers and the people who pay them.
+        const isPrivileged = checkAccess(session, ["MANAGER"], ["expenses.approve", "expenses.markPaid"])
+        const canApproveAll = checkAccess(session, ["MANAGER"], "expenses.approve")
+        const canPay = checkAccess(session, ["MANAGER"], "expenses.markPaid")
         const isOwner = expense.submittedBy === session.user.id
         const policy = await getExpensePolicy()
         const managerId = await managerOf(expense.submittedBy)
         const stage = Number((expense as any).approvalStage ?? 1)
         const isAdmin = session.user.role === "ADMIN"
-        const mayDecide = canApproveNow({ policy, stage, status: expense.status, submittedBy: expense.submittedBy, userId: session.user.id, isAdmin, canManage: isPrivileged, managerId })
+        const mayDecide = canApproveNow({ policy, stage, status: expense.status, submittedBy: expense.submittedBy, userId: session.user.id, isAdmin, canManage: canApproveAll, managerId })
         const actorName = session.user.name || "Someone"
         const trailEntry = (a: "SUBMITTED" | "APPROVED" | "REJECTED" | "PAID" | "FORWARDED", note?: string | null) =>
             pushTrail((expense as any).approvalTrail, { stage, action: a, by: session.user.id, byName: session.user.name ?? null, at: new Date().toISOString(), note: note ?? null })
@@ -223,7 +226,7 @@ export async function PUT(
             if (!mayDecide) return new NextResponse(policy.approval.mode === "twoLevel" && stage > 1 ? "Final approval needs the Manage Expenses permission" : "Forbidden", { status: 403 })
             // Two levels: the manager's approval passes it on for final approval
             // (above the set amount); Accounts / HR approving at stage 1 is final.
-            if (policy.approval.mode === "twoLevel" && stage <= 1 && !isPrivileged && !isAdmin && needsFinal(policy, Number(expense.amount) || 0)) {
+            if (policy.approval.mode === "twoLevel" && stage <= 1 && !canApproveAll && !isAdmin && needsFinal(policy, Number(expense.amount) || 0)) {
                 updateData.approvalStage = 2
                 updateData.approvalTrail = trailEntry("FORWARDED", "Manager approved")
                 forwarded = true
@@ -242,8 +245,8 @@ export async function PUT(
             updateData.rejectedAt = new Date()
             updateData.approvalTrail = trailEntry("REJECTED", rejectionReason)
         } else if (action === "PAID") {
-            // Admin/Manager marks APPROVED → PAID
-            if (!isPrivileged) return new NextResponse("Forbidden", { status: 403 })
+            // Needs "Mark expenses paid"
+            if (!canPay) return new NextResponse("You don't have the right to mark expenses paid", { status: 403 })
             if (expense.status !== "APPROVED") return new NextResponse("Only APPROVED can be marked paid", { status: 400 })
             if (!paymentMode) return new NextResponse("paymentMode is required", { status: 400 })
             updateData.status = "PAID"
@@ -283,11 +286,11 @@ export async function PUT(
                 // Two levels: the reporting manager first.
                 await prisma.notification.create({ data: { userId: managerId, title: "Expense to approve", message: `${actorName} submitted ${expNo} — ${expTitle} (as their reporting manager)`, type: "expense", link: `/expenses?id=${params.id}` } })
             } else if (forwarded) {
-                await notifyApprovers(["expenses.manage"], { title: "Expense for final approval", message: `${actorName} (manager) approved ${expNo} — ${expTitle}; it needs final approval`, type: "expense", link: `/expenses?id=${params.id}` }, session.user.id)
+                await notifyApprovers(["expenses.approve"], { title: "Expense for final approval", message: `${actorName} (manager) approved ${expNo} — ${expTitle}; it needs final approval`, type: "expense", link: `/expenses?id=${params.id}` }, session.user.id)
             } else if (action === "SUBMIT") {
                 // Notify everyone who can approve it. Access comes from custom-role
                 // permissions, not the base MANAGER role, so match on those.
-                await notifyApprovers(["expenses.manage"], {
+                await notifyApprovers(["expenses.markPaid"], {
                     title: expense.status === "REJECTED" ? "Expense Resubmitted" : "Expense Submitted",
                     message: `${actorName} submitted ${expNo} — ${expTitle}`,
                     type: "expense",

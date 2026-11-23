@@ -15,8 +15,8 @@ export const maxDuration = 60
 // GET  — the site's contacts for this project, channel readiness, send history.
 // POST { contactIds, channels } — sends the report PDF (+ online link) now.
 // "site" in contactIds means the contact person saved on the Site itself.
-const READ = ["approvals.view", "approvals.manage", "assignments.manage"]
-const SEND = ["approvals.manage", "assignments.manage"]
+const READ = ["approvals.view", "approvals.manage", "assignments.edit"]
+const SEND = ["approvals.manage", "assignments.edit"]
 
 async function load(id: string) {
     return prisma.inspection.findUnique({

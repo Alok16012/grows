@@ -28,7 +28,7 @@ const input = "h-9 rounded-lg border border-[var(--border)] bg-[var(--surface)] 
 export default function ArrearsPage() {
     const { data: session } = useSession()
     const router = useRouter()
-    const canManage = can(session, "payroll.manage")
+    const canManage = can(session, "payroll.edit")
     const [status, setStatus] = useState<Status>("PENDING")
     const [q, setQ] = useState("")
     const [data, setData] = useState<{ counts: Record<string, { n: number; amount: number }>; rows: Row[]; error?: string } | null>(null)
@@ -82,7 +82,7 @@ export default function ArrearsPage() {
         } catch (e: any) { toast.error(e.message); setHist(null) } finally { setBusy(null) }
     }
 
-    if (session && !canAny(session, ["payroll.view", "payroll.manage"])) return <div className="p-8 text-center text-sm text-[var(--text3)]">Access denied</div>
+    if (session && !canAny(session, ["payroll.view", "payroll.edit"])) return <div className="p-8 text-center text-sm text-[var(--text3)]">Access denied</div>
 
     const rows = data?.rows ?? []
     const allPicked = rows.length > 0 && rows.every(r => picked.has(r.id))

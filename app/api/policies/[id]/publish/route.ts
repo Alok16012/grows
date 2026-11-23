@@ -8,7 +8,7 @@ import { commNotify, employeeRecipients } from "@/lib/comm/recipients"
 export async function POST(req: Request, { params }: { params: { id: string } }) {
     try {
         const ctx = await adminCtx(req)
-        requireManage(ctx)
+        requireManage(ctx, "publish")
         const b = await req.json().catch(() => ({}))
         const result = await prisma.$transaction(async tx => {
             const p = await tx.signoffPolicy.findUnique({

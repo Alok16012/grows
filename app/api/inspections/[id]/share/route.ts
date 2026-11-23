@@ -10,7 +10,7 @@ export async function POST(
     { params }: { params: { id: string } }
 ) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER"], "assignments.manage")) {
+    if (!checkAccess(session, ["MANAGER"], "assignments.edit")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -39,7 +39,7 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER"], "assignments.manage")) {
+    if (!checkAccess(session, ["MANAGER"], "assignments.edit")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

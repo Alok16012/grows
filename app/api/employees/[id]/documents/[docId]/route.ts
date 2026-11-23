@@ -162,7 +162,7 @@ export async function DELETE(
         if (session.user.role === "CLIENT") {
             return new NextResponse("Forbidden", { status: 403 })
         }
-        if (!checkAccess(session, [], "documents.upload")
+        if (!checkAccess(session, [], "documents.delete")
             && !(await isSelf(session.user.id, params.id))) {
             return new NextResponse("Forbidden", { status: 403 })
         }

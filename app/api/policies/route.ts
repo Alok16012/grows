@@ -58,7 +58,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const ctx = await adminCtx(req)
-        requireManage(ctx)
+        requireManage(ctx, "create")
         const b = await req.json().catch(() => ({}))
         const title = cleanText(b?.title, 200)
         if (!title) throw new PolicyError(400, "TITLE_REQUIRED", "Policy title is required")

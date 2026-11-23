@@ -1,8 +1,8 @@
 import { waPhone } from "@/lib/whatsapp"
 
 // Validation shared by the customer-contact routes.
-export const CONTACT_READ = ["sites.view", "sites.manage", "approvals.view", "approvals.manage", "assignments.manage"]
-export const CONTACT_WRITE = ["sites.manage", "approvals.manage", "assignments.manage"]
+export const CONTACT_READ = ["sites.view", "projects.edit", "approvals.view", "approvals.manage", "assignments.edit"]
+export const CONTACT_WRITE = ["projects.edit", "approvals.manage", "assignments.edit"]
 export const CONTACT_MISSING = "Customer contacts aren't set up on the database yet (scripts/customer-contacts.sql)."
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

@@ -124,7 +124,7 @@ async function computeStats(isAdmin: boolean, perms: string[], scope: EmpWhere, 
         const [leaves, expenses, inspections] = await Promise.all([
             has("leaves.view") || has("leaves.approve")
                 ? safe(prisma.leave.count({ where: { status: "PENDING", ...viaEmp } }), 0) : Promise.resolve(-1),
-            has("expenses.view") || has("expenses.manage")
+            has("expenses.view") || has("expenses.approve")
                 ? safe(prisma.expense.count({ where: { status: "SUBMITTED", ...(expenseScope ? { AND: [expenseScope] } : {}) } }), 0) : Promise.resolve(-1),
             has("approvals.view")
                 ? safe(prisma.inspection.count({ where: { status: "pending" } }), 0) : Promise.resolve(-1),

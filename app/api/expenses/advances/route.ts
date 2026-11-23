@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const g = await guard(req, [])
     if (g instanceof NextResponse) return g
     const session = await getApiSession(req)
-    const canManage = !!session && checkAccess(session, ["MANAGER", "HR_MANAGER"], "expenses.manage")
+    const canManage = !!session && checkAccess(session, ["MANAGER", "HR_MANAGER"], ["expenses.approve", "expenses.markPaid"])
     const view = new URL(req.url).searchParams.get("view") === "all" && canManage ? "all" : "mine"
     const where: any = {}
     const a = g.access
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
             approvalTrail: [{ stage: 0, action: "SUBMITTED", by: g.access.userId, byName: g.access.name, at: new Date().toISOString(), note: null }] as any,
         },
     })
-    await notifyApprovers(["expenses.manage"], { title: "Advance requested", message: `${g.access.name} requested ${created.advanceNo}: ₹${created.amount.toLocaleString("en-IN")} — ${purpose}${open ? ` (already has ${open} open advance${open === 1 ? "" : "s"})` : ""}`, type: "expense", link: "/expenses/advances" }, g.access.userId)
+    await notifyApprovers(["expenses.approve"], { title: "Advance requested", message: `${g.access.name} requested ${created.advanceNo}: ₹${created.amount.toLocaleString("en-IN")} — ${purpose}${open ? ` (already has ${open} open advance${open === 1 ? "" : "s"})` : ""}`, type: "expense", link: "/expenses/advances" }, g.access.userId)
     auditLater({ actorId: g.access.userId, actorName: g.access.name, action: "expense.advance_request", targetType: "ExpenseAdvance", targetId: created.id, targetName: created.advanceNo, summary: `₹${created.amount} — ${purpose}`, ...requestMeta(req) })
     return NextResponse.json(created)
 }

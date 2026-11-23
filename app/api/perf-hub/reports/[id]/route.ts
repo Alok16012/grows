@@ -175,7 +175,7 @@ export async function PATCH(req: Request, { params }: Params) {
                 }
                 const reviewerId = r.employee.perfAssignment?.reviewerUserId
                 if (reviewerId) await notifyUser(reviewerId, note)
-                else await notifyApprovers(["performance.manage"], { ...note, type: "performance" }, ctx.userId)
+                else await notifyApprovers(["performance.edit"], { ...note, type: "performance" }, ctx.userId)
                 break
             }
             case "APPROVE":

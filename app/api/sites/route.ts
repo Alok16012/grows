@@ -56,7 +56,7 @@ export async function GET(req: Request) {
             // sites when picking one for a project / assignment.
             checkAccess(session, [], "projects.view") ||
             // Announcements, polls and surveys are targeted at sites.
-            checkAccess(session, [], "announcements.manage") ||
+            checkAccess(session, [], ["announcements.create", "announcements.edit", "announcements.delete"]) ||
             checkAccess(session, [], "polls.create") ||
             checkAccess(session, [], "surveys.create")
         if (!canListSites) {
@@ -120,7 +120,7 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "sites.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "projects.create")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
         // Resolve real DB user ID

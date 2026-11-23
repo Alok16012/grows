@@ -957,9 +957,11 @@ export default function LeavesPage({ searchParams }: { searchParams?: { status?:
     const [selected, setSelected] = useState<Set<string>>(new Set())
     const [bulkBusy, setBulkBusy] = useState(false)
 
-    const isApprover = can(session, "leaves.approve") || can(session, "leaves.manage")
+    const isApprover = can(session, "leaves.approve")
     const canView = can(session, "leaves.view")
-    const canManage = can(session, "leaves.manage")
+    // Recording leave for others = Create; the Policy tab = Change leave policy.
+    const canManage = can(session, "leaves.create")
+    const canPolicy = can(session, "leaves.policy")
     const typeOf = useTypeLookup(policy)
 
     useEffect(() => { if (status === "unauthenticated") router.push("/login") }, [status, router])
@@ -1075,7 +1077,7 @@ export default function LeavesPage({ searchParams }: { searchParams?: { status?:
         { key: "requests", label: canView ? "Requests" : "My Requests", icon: ListChecks, show: true },
         { key: "calendar", label: "Team Calendar", icon: Calendar, show: canView },
         { key: "balances", label: "Balances", icon: Wallet, show: canView },
-        { key: "policy", label: "Policy", icon: Settings2, show: canManage },
+        { key: "policy", label: "Policy", icon: Settings2, show: canPolicy },
     ]
 
     return (
@@ -1128,7 +1130,7 @@ export default function LeavesPage({ searchParams }: { searchParams?: { status?:
 
             {tab === "calendar" && canView && <LeaveCalendar typeOf={typeOf} onOpen={setSelectedLeave} />}
             {tab === "balances" && canView && <BalancesTab policy={policy} />}
-            {tab === "policy" && canManage && policy && <PolicyTab policy={policy} defaults={defaults} onSaved={setPolicy} />}
+            {tab === "policy" && canPolicy && policy && <PolicyTab policy={policy} defaults={defaults} onSaved={setPolicy} />}
 
             {tab === "requests" && (
                 <>

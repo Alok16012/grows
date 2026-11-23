@@ -86,11 +86,14 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, [], "jobs.manage")) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     try {
         const body = await req.json()
+        // Publishing needs "Publish job posts"; closing / reopening needs Publish or Edit; any other field needs Edit.
+        const onlyStatus = Object.keys(body).every(k => k === "status")
+        const may = (p: string) => checkAccess(session, [], p)
+        if (body.status === "PUBLISHED" && !may("jobs.publish")) return NextResponse.json({ error: "You don't have the right to publish jobs" }, { status: 403 })
+        if (onlyStatus ? !(may("jobs.publish") || may("jobs.edit")) : !may("jobs.edit")) return NextResponse.json({ error: "You don't have the right to edit jobs" }, { status: 403 })
         const data: any = {}
 
         // Only touch fields that were sent so partial updates (e.g. status flip) work.
@@ -143,8 +146,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, [], "jobs.manage")) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!session || !checkAccess(session, [], "jobs.delete")) {
+        return NextResponse.json({ error: "You don't have the right to delete jobs" }, { status: 403 })
     }
     try {
         await prisma.jobPosting.delete({ where: { id: params.id } })

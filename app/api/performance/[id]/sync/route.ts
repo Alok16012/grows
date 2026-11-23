@@ -12,7 +12,7 @@ export async function POST(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
         // Writes KPI actuals — manager territory, like editing a KPI by hand.
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) return new NextResponse("Forbidden", { status: 403 })
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.edit")) return new NextResponse("Forbidden", { status: 403 })
 
         const reviewId = params.id
         const review = await prisma.performanceReview.findUnique({

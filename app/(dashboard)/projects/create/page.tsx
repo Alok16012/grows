@@ -290,7 +290,7 @@ function CreateProjectForm() {
 
     const sectionCls = "bg-white border border-[var(--border)] rounded-[14px] p-5"
     // Work can't be issued on an archived project (the API refuses it).
-    const assignAvailable = can(session, "assignments.manage") && form.status !== "ARCHIVED"
+    const assignAvailable = can(session, "assignments.create") && form.status !== "ARCHIVED"
     const personName = (id: string) => inspectors.find(p => p.id === id)?.name || "Inspector"
 
     return (

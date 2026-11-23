@@ -233,7 +233,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             links: [
                 { name: "Employee Documents", href: "/employees/documents", permission: "documents.view" },
                 { name: "Letters & Documents", href: "/documents/send", permissionAny: ["documents.send", "documents.view"] },
-                { name: "Policies", href: "/policies", permissionAny: ["policy.view", "policy.manage", "policy.report"] },
+                { name: "Policies", href: "/policies", permissionAny: ["policy.view", "policy.report", "policies.create", "policies.edit", "policies.delete", "policies.publish"] },
                 { name: "Document Types", href: "/documents/types", permission: "documents.view" },
             ],
         },
@@ -252,9 +252,9 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             icon: TrendingUp,
             links: [
                 { name: "Performance", href: "/performance/hub", permission: "performance.view", matchPrefixes: ["/performance"] },
-                { name: "Training (LMS)", href: "/lms", permission: "lms.manage" },
+                { name: "Training (LMS)", href: "/lms", permissionAny: ["lms.create", "lms.edit", "lms.delete", "lms.enroll", "lms.export"] },
                 // Supervisors sign off on-the-job training from their phone.
-                { name: "OJT sign-off", href: "/lms/ojt", permissionAny: ["lms.ojt", "lms.manage"] },
+                { name: "OJT sign-off", href: "/lms/ojt", permissionAny: ["lms.ojt", "lms.edit"] },
             ],
         },
         {
@@ -265,7 +265,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 { name: "Announcements", href: "/announcements", permission: "announcements.view" },
                 { name: "Helpdesk", href: "/helpdesk", permission: "helpdesk.view" },
                 // Requesters / approvers / store staff work here without assets.view.
-                { name: "Asset Register", href: "/assets", permissionAny: ["assets.view", "assets.manage", "assets.request", "assets.approve", "assets.issue"] },
+                { name: "Asset Register", href: "/assets", permissionAny: ["assets.view", "assets.edit", "assets.request", "assets.approve", "assets.issue"] },
             ],
         },
         {

@@ -32,7 +32,7 @@ export function InspectionStepper() {
     if (role === "CLIENT") return null
     // Anyone who works with assignments gets the rail: the separate
     // "Inspection Assignments" menu link is hidden for them (it's a step here).
-    if (!canAny(session, ["projects.manage", "assignments.manage", "assignments.view"])) return null
+    if (!canAny(session, ["projects.create", "projects.edit", "assignments.create", "assignments.edit", "assignments.view"])) return null
 
     const currentIndex = STEPS.findIndex(
         (s) => pathname === s.href || pathname.startsWith(s.href + "/")

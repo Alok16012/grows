@@ -26,7 +26,7 @@ export async function GET(req: Request) {
             // recruitment). A self-service login — every field worker has
             // one — must not be able to pull every colleague's email and role.
             const perms = session.user.permissions ?? []
-            const ASSIGNERS = ["helpdesk.manage", "helpdesk.view", "recruitment.view", "recruitment.manage", "onboarding.manage"]
+            const ASSIGNERS = ["helpdesk.assign", "helpdesk.view", "recruitment.view", "recruitment.edit", "onboarding.edit"]
             if (!ASSIGNERS.some(p => perms.includes(p))) {
                 return NextResponse.json({ error: "Forbidden" }, { status: 403 })
             }

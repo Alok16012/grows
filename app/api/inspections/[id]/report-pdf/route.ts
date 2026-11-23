@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic"
 
 // GET — the approved report as the PDF customers receive (preview / download).
 export async function GET(req: Request, { params }: { params: { id: string } }) {
-    const g = await guard(req, ["approvals.view", "approvals.manage", "assignments.manage"])
+    const g = await guard(req, ["approvals.view", "approvals.manage", "assignments.edit"])
     if (g instanceof NextResponse) return g
     const r = await renderInspectionReport(params.id)
     if (!r) return new NextResponse("Only approved inspections have a report PDF.", { status: 404 })

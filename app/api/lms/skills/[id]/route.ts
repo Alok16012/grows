@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic"
 
 // PATCH — edit a skill (name, category, site, linked course, active).
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-    const g = await guard(req, "lms.manage")
+    const g = await guard(req, "lms.edit")
     if (g instanceof NextResponse) return g
     try {
         const data = parseSkill(await req.json().catch(() => ({})), true)

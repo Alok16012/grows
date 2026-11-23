@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic"
 
 // GET — skills on the matrix (with site and linked course names).
 export async function GET(req: Request) {
-    const g = await guard(req, ["lms.view", "lms.manage", "lms.ojt"])
+    const g = await guard(req, ["lms.view", "lms.edit", "lms.ojt"])
     if (g instanceof NextResponse) return g
     try {
         const skills = await prisma.skill.findMany({ orderBy: [{ isActive: "desc" }, { code: "asc" }], include: { _count: { select: { levels: true } } } })
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
 
 // POST — add a skill.
 export async function POST(req: Request) {
-    const g = await guard(req, "lms.manage")
+    const g = await guard(req, "lms.edit")
     if (g instanceof NextResponse) return g
     try {
         const data = parseSkill(await req.json().catch(() => ({})), false) as any

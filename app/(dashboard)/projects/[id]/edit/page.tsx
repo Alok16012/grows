@@ -189,7 +189,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     // Optional "Also assign work" (components/AssignWork). Everyone ticked in the
     // team is pre-picked for work, including those already on it; untick to skip.
     const { data: session } = useSession()
-    const canAssign = can(session, "assignments.manage")
+    const canAssign = can(session, "assignments.create")
     const [assignWork, setAssignWork] = useAssignWork(inspectorIds)
 
     useEffect(() => {

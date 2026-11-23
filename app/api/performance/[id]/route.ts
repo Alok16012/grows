@@ -57,7 +57,7 @@ async function notifyReviewStep(review: { id: string; employeeId: string; status
     } else if (review.status === "COMPLETED") {
         await notifyEmployee(review.employeeId, { title: "Performance review completed", message: "Your performance review has been approved by HR.", type: "performance", link })
     } else if (review.status === "ACKNOWLEDGED" && !actorIsManager) {
-        await notifyApprovers(["performance.manage"], { title: "Review acknowledged", message: "An employee has acknowledged their performance review.", type: "performance", link })
+        await notifyApprovers(["performance.edit"], { title: "Review acknowledged", message: "An employee has acknowledged their performance review.", type: "performance", link })
     }
 }
 
@@ -126,7 +126,7 @@ export async function PATCH(
         // Ratings, increments and status are manager/HR territory. The employee
         // the review belongs to may only fill in their self-appraisal and
         // acknowledge the finished review.
-        const canManage = checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")
+        const canManage = checkAccess(session, ["MANAGER", "HR_MANAGER"], ["performance.edit", "performance.approve"])
         if (!canManage) {
             const target = await prisma.performanceReview.findUnique({
                 where: { id: params.id },
@@ -234,7 +234,7 @@ export async function PUT(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -324,7 +324,7 @@ export async function DELETE(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

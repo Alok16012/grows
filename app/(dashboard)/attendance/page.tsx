@@ -783,6 +783,12 @@ function SelfServiceView() {
 // ─── Admin / Manager View ─────────────────────────────────────────────────────
 
 function AdminView() {
+    // View shows the register; marking, changing, bulk marking and rules each need their own right.
+    const { data: viewer } = useSession()
+    const canMark = can(viewer, "attendance.create")
+    const canEditAtt = can(viewer, "attendance.edit")
+    const canBulk = can(viewer, ["attendance.import", "attendance.create"])
+    const canRules = can(viewer, "attendance.rules")
     const [tab, setTab] = useState<"daily" | "muster" | "settings">("daily")
     const [selectedDate, setSelectedDate] = useState(new Date())
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"))
@@ -911,20 +917,20 @@ function AdminView() {
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">Track and manage employee attendance</p>
                 </div>
                 <div className="page-actions">
-                    <button onClick={() => setBulkModal(true)}
+                    {canBulk && <button onClick={() => setBulkModal(true)}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-[8px] border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
                         <Users size={15} /> Bulk Mark
-                    </button>
-                    <button onClick={() => { setSelectedEmployee(null); setExistingRecord(null); setMarkModal(true) }}
+                    </button>}
+                    {canMark && <button onClick={() => { setSelectedEmployee(null); setExistingRecord(null); setMarkModal(true) }}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium hover:opacity-90 transition-opacity">
                         <Plus size={15} /> Mark Attendance
-                    </button>
+                    </button>}
                 </div>
             </div>
 
             {/* Sub-tabs */}
             <div className="z-tabs-wrap"><div className="z-tabs" role="tablist">
-                {(["daily", "muster", "settings"] as const).map(t => (
+                {(canRules ? ["daily", "muster", "settings"] as const : ["daily", "muster"] as const).map(t => (
                     <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
                         className={`z-tab ${tab === t ? "is-active" : ""}`}>
                         {t === "daily" ? "Daily View" : t === "muster" ? "Muster Roll" : "Rules"}
@@ -962,7 +968,7 @@ function AdminView() {
                             {isOffDay
                                 ? <span className="font-semibold">{holidayName ? `Holiday — ${holidayName}` : `${format(selectedDate, "EEEE")} is a weekly off`}. Only people who actually worked need marking.</span>
                                 : <span><b className="text-[var(--text)]">{unmarkedIds.length}</b> employee{unmarkedIds.length === 1 ? "" : "s"} not marked for {format(selectedDate, "dd MMM")}{isFutureDay ? " (future date)" : ""}.</span>}
-                            {!isOffDay && !isFutureDay && unmarkedIds.length > 0 && (
+                            {canBulk && !isOffDay && !isFutureDay && unmarkedIds.length > 0 && (
                                 <button onClick={() => setBulkModal(true)} className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-[8px] bg-[var(--accent)] text-white text-[12.5px] font-semibold">
                                     <Users size={13} /> Bulk mark
                                 </button>
@@ -1041,7 +1047,7 @@ function AdminView() {
                                                         {att?.overtimeHrs ? `${att.overtimeHrs}h` : "0h"}
                                                     </td>
                                                     <td className="px-5 py-3 text-right">
-                                                        <button onClick={() => {
+                                                        {(att ? canEditAtt : canMark) && <button onClick={() => {
                                                             setSelectedEmployee(emp)
                                                             setExistingRecord(att || null)
                                                             setMarkModal(true)
@@ -1049,7 +1055,7 @@ function AdminView() {
                                                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors">
                                                             {att ? <Edit2 size={12} /> : <Plus size={12} />}
                                                             {att ? "Edit" : "Mark"}
-                                                        </button>
+                                                        </button>}
                                                     </td>
                                                 </tr>
                                             )
@@ -1073,9 +1079,9 @@ function AdminView() {
                     </div>
                     <MusterRoll month={selectedMonth} siteId={siteFilter} />
                 </>
-            ) : (
+            ) : canRules ? (
                 <AttendanceSettings />
-            )}
+            ) : null}
 
             {/* Modals */}
             <MarkAttendanceModal

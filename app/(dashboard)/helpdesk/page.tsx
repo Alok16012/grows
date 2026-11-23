@@ -308,6 +308,10 @@ function TicketDrawer({
     isPrivileged: boolean
     users: TicketUser[]
 }) {
+    // Status needs Edit, the assignee needs "Assign tickets".
+    const drawerSession = useSession().data
+    const canStatus = can(drawerSession, "helpdesk.edit")
+    const canAssign = can(drawerSession, "helpdesk.assign")
     const [detail, setDetail] = useState<Ticket | null>(null)
     const [loading, setLoading] = useState(true)
     const [comment, setComment] = useState("")
@@ -478,8 +482,8 @@ function TicketDrawer({
                                     return (
                                         <div key={s} className="flex items-center flex-1">
                                             <button
-                                                onClick={() => isPrivileged && !updatingStatus && handleStatusChange(s)}
-                                                disabled={!isPrivileged || updatingStatus}
+                                                onClick={() => canStatus && !updatingStatus && handleStatusChange(s)}
+                                                disabled={!canStatus || updatingStatus}
                                                 className={`flex-1 py-1.5 px-1 text-[11px] md:text-[10.5px] font-semibold rounded-[6px] text-center transition-all ${
                                                     isCurrent
                                                         ? "text-white"
@@ -504,7 +508,7 @@ function TicketDrawer({
                         </div>
 
                         {/* Assign To */}
-                        {isPrivileged && (
+                        {canAssign && (
                             <div className="px-5 py-4 border-b border-[var(--border)]">
                                 <p className="text-[11px] text-[var(--text3)] mb-2 font-semibold uppercase tracking-wide">Assign To</p>
                                 <select
@@ -623,7 +627,8 @@ export default function HelpdeskPage() {
 
     // Status / assignee / internal notes are helpdesk.manage actions server-side
     // (PUT returns 403 otherwise), so a view-only user must not see the controls.
-    const isPrivileged = can(session, "helpdesk.manage")
+    // Helpdesk staff: Edit works tickets (status), Assign tickets picks the person.
+    const isPrivileged = can(session, ["helpdesk.edit", "helpdesk.assign"])
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login")

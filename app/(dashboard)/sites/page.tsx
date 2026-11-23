@@ -1232,7 +1232,7 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                         )}
                     </div>
 
-                    <SiteTeamSection siteId={site.id} canManage={can(session, "sites.manage")} />
+                    <SiteTeamSection siteId={site.id} canManage={can(session, "projects.edit")} />
 
                     {/* Geofence Section */}
                     {hasGeo && (

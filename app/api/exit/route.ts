@@ -79,7 +79,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "exit.manage")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "exit.create")) {
       return new NextResponse("Forbidden", { status: 403 })
     }
 

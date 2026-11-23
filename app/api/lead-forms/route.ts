@@ -43,7 +43,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.manage")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "recruitment.edit")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     const { title, description, siteId, formType } = await req.json()

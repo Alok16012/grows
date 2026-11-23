@@ -72,7 +72,7 @@ const attInput: React.CSSProperties = { width: 50, padding: "3px 4px", borderRad
 // `latest`: the newest created month; the pickers stop there (see lib/payroll-period).
 export default function ProcessPanel({ onClose, onDone, initialMonth, initialYear, latest }: { onClose: () => void; onDone?: (period?: { month: number; year: number }) => void; initialMonth?: number; initialYear?: number; latest?: { month: number; year: number } }) {
     const { data: session } = useSession()
-    const canManage = can(session, "payroll.manage")
+    const canManage = can(session, "payroll.edit")
     const canLock   = can(session, "payroll.lock")
     const canUnlock = can(session, "payroll.unlock")
 

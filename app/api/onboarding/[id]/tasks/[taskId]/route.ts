@@ -10,7 +10,7 @@ export async function PUT(
 ) {
     try {
         const session = await getServerSession(authOptions)
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "onboarding.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "onboarding.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -66,7 +66,7 @@ export async function DELETE(
 ) {
     try {
         const session = await getServerSession(authOptions)
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "onboarding.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "onboarding.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

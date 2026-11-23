@@ -20,7 +20,7 @@ export async function GET(req: Request, { params }: { params: { enrollmentId: st
     })
     if (!e) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const mine = e.employee.userId === g.access.userId
-    if (!mine && !g.access.isAdmin && !g.access.permissions.includes("lms.manage")) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (!mine && !g.access.isAdmin && !["lms.edit", "lms.enroll", "lms.export"].some(p => g.access.permissions.includes(p))) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     if (!e.certificate || !e.completedAt) return NextResponse.json({ error: "This course isn't completed yet" }, { status: 400 })
     const validUntil = e.course.validityDays ? new Date(e.completedAt.getTime() + e.course.validityDays * 86_400_000) : null
     const origin = process.env.NEXTAUTH_URL?.startsWith("https://") ? process.env.NEXTAUTH_URL.replace(/\/$/, "") : new URL(req.url).origin

@@ -8,7 +8,7 @@ import { resolveUserId } from "@/lib/resolveUserId"
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER"], "recruitment.manage")) {
+    if (!checkAccess(session, ["MANAGER"], "recruitment.edit")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

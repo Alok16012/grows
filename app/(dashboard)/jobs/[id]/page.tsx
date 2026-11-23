@@ -13,7 +13,11 @@ export default function JobDetailPage() {
     const { id } = useParams<{ id: string }>()
     const router = useRouter()
     const { data: session } = useSession()
-    const canManage = can(session, "jobs.manage")
+    const canCreate = can(session, "jobs.create")
+    const canEdit = can(session, "jobs.edit")
+    const canDelete = can(session, "jobs.delete")
+    const canPublish = can(session, "jobs.publish")
+    const canManage = canCreate || canEdit || canDelete || canPublish
 
     const [job, setJob] = useState<JobPosting | null>(null)
     const [loading, setLoading] = useState(true)
@@ -82,30 +86,30 @@ export default function JobDetailPage() {
             <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
                 {canManage && (
                     <div className="flex items-center gap-2">
-                        <button onClick={() => router.push(`/jobs/new?id=${id}`)} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-50">
+                        {canEdit && <button onClick={() => router.push(`/jobs/new?id=${id}`)} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-50">
                             <Pencil size={14} /> Edit
-                        </button>
-                        <button onClick={() => router.push(`/jobs/new?duplicate=${id}`)} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-50">
+                        </button>}
+                        {canCreate && <button onClick={() => router.push(`/jobs/new?duplicate=${id}`)} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-50">
                             <Copy size={14} /> Duplicate
-                        </button>
-                        {job.status !== "PUBLISHED" && (
+                        </button>}
+                        {canPublish && job.status !== "PUBLISHED" && (
                             <button onClick={() => setStatus("PUBLISHED")} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[12px] font-medium hover:opacity-90 disabled:opacity-50">
                                 <Send size={14} /> Publish
                             </button>
                         )}
-                        {job.status === "PUBLISHED" && (
+                        {(canPublish || canEdit) && job.status === "PUBLISHED" && (
                             <button onClick={() => setStatus("CLOSED")} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-50">
                                 <Ban size={14} /> Close
                             </button>
                         )}
-                        {job.status === "CLOSED" && (
+                        {(canPublish || canEdit) && job.status === "CLOSED" && (
                             <button onClick={() => setStatus("DRAFT")} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text2)] hover:bg-[var(--surface2)] disabled:opacity-50">
                                 <RotateCcw size={14} /> Reopen as draft
                             </button>
                         )}
-                        <button onClick={remove} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
+                        {canDelete && <button onClick={remove} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
                             <Trash2 size={14} /> Delete
-                        </button>
+                        </button>}
                     </div>
                 )}
             </div>

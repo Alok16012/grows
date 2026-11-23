@@ -21,7 +21,7 @@ import { recordSiteChange, actorOf } from "@/lib/site-history"
 // Converts a SELECTED/JOINED lead into a full Employee with salary + deployment
 export async function POST(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.manage")) {
+    if (!session || !checkAccess(session, [Role.MANAGER, Role.HR_MANAGER], "recruitment.edit")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

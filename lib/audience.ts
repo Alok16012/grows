@@ -18,7 +18,7 @@ import { resolveUserId } from "@/lib/resolveUserId"
  */
 export async function audienceWhere(session: Session | null): Promise<any | null> {
     if (!session) return { AND: [{ targetSiteIds: { isEmpty: true } }, { targetRoleIds: { isEmpty: true } }] }
-    if (checkAccess(session, ["MANAGER", "HR_MANAGER"], "announcements.manage")) return null
+    if (checkAccess(session, ["MANAGER", "HR_MANAGER"], ["announcements.create", "announcements.edit", "announcements.delete"])) return null
 
     const uid = await resolveUserId(session)
     let siteIds: string[] = []

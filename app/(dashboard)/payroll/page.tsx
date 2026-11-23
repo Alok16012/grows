@@ -224,7 +224,7 @@ export default function PayrollPage() {
     const totalGrossYTD = runs.reduce((s, r) => s + r.totalGross, 0)
     const totalNetYTD   = runs.reduce((s, r) => s + r.totalNet, 0)
     const periodLabel   = periodPicked ? `${MONTHS[period.month - 1]} ${period.year}` : "Loading…"
-    const canManage     = can(session, "payroll.manage")
+    const canManage     = can(session, "payroll.edit")
     // Lock, reopen and mark paid are separate switches on a role.
     const canLock       = can(session, "payroll.lock")
     const canUnlock     = can(session, "payroll.unlock")

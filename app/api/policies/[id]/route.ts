@@ -107,7 +107,7 @@ export async function PATCH(req: Request, { params }: Params) {
 export async function DELETE(req: Request, { params }: Params) {
     try {
         const ctx = await adminCtx(req)
-        requireManage(ctx)
+        requireManage(ctx, "delete")
         const p = await load(params.id)
         if (p.versions.length === 0) {
             await prisma.$transaction(async tx => {

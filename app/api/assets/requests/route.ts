@@ -137,7 +137,7 @@ export async function POST(req: Request) {
             return r
         }))
 
-        await notifyApprovers(["assets.approve", "assets.manage"], {
+        await notifyApprovers(["assets.approve"], {
             title: "Asset request raised",
             message: `Asset request ${created.requestNo} raised for ${employeeIds.length} employee(s)`,
             type: "asset",

@@ -66,7 +66,7 @@ export async function PUT(
         // broader manage). A read-only `leaves.view` role must NOT be able to
         // approve — it may only cancel its own pending request below.
         const isAdminOrManager =
-            checkAccess(session, [], "leaves.approve") || checkAccess(session, [], "leaves.manage")
+            checkAccess(session, [], "leaves.approve")
 
         if (!isAdminOrManager) {
             // Owner can only cancel their own PENDING leave. The ownership check
@@ -165,7 +165,7 @@ export async function PUT(
         await syncLeaveStatus(leave.employeeId)
 
         if (!isAdminOrManager && existing.status === "APPROVED") {
-            await notifyApprovers(["leaves.approve", "leaves.manage"], {
+            await notifyApprovers(["leaves.approve"], {
                 title: "Approved leave withdrawn",
                 message: `${leave.employee.firstName} ${leave.employee.lastName} cancelled their approved ${leave.type} leave from ${leave.startDate.toISOString().slice(0, 10)}`,
                 type: "leave", link: `/leaves?id=${leave.id}`,
@@ -209,7 +209,7 @@ export async function DELETE(
         const existing = await prisma.leave.findUnique({ where: { id: params.id } })
         if (!existing) return new NextResponse("Not found", { status: 404 })
 
-        const isAdminOrManager = checkAccess(session, [], "leaves.manage")
+        const isAdminOrManager = checkAccess(session, [], "leaves.edit")
 
         // Only admin/manager or the leave's own employee (PENDING only). The
         // ownership half of that rule was never enforced, so any signed-in user

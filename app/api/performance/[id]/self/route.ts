@@ -51,7 +51,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     }
     const saved = await saveSelfAssessment(params.id, body.entries || {}, submit, session.user.id)
     if (submit) {
-        await notifyApprovers(["performance.manage"], {
+        await notifyApprovers(["performance.edit"], {
             title: "Self-assessment submitted",
             message: `${review.employee.firstName} ${review.employee.lastName} has submitted their self-assessment — ready for your evaluation`,
             type: "performance", link: `/performance/hub/appraisals?id=${params.id}`,

@@ -243,6 +243,6 @@ export async function selfResign(userId: string, input: { lastWorkingDate?: stri
             clearanceTasks: { create: s.clearance.map((c, i) => ({ title: c.title, department: c.owner, order: i + 1, status: "PENDING" })) },
         },
     })
-    await notifyApprovers(["exit.manage"], { title: "Resignation received", message: `${emp.firstName} ${emp.lastName ?? ""} resigned — requested last working day ${lwd.toISOString().slice(0, 10)}. Review it in Exit.`, type: "exit", link: "/exit" })
+    await notifyApprovers(["exit.edit"], { title: "Resignation received", message: `${emp.firstName} ${emp.lastName ?? ""} resigned — requested last working day ${lwd.toISOString().slice(0, 10)}. Review it in Exit.`, type: "exit", link: "/exit" })
     return ex
 }

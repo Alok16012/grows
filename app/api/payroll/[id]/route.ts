@@ -55,7 +55,7 @@ export async function PUT(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
         // Writing amounts/status is a manage operation — payroll.view is read-only.
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -216,7 +216,7 @@ export async function DELETE(
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
         // Deleting a payroll row is a manage operation — payroll.view is read-only.
-        if (!checkAccess(session, [], "payroll.manage")) {
+        if (!checkAccess(session, [], "payroll.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

@@ -66,7 +66,7 @@ export async function POST(req: Request) {
   const perms = session.user.permissions ?? []
   const canWrite =
     session.user.role === "ADMIN" ||
-    (key.startsWith("TRAVEL_PER_KM_RATE") && perms.includes("expenses.manage"))
+    (key.startsWith("TRAVEL_PER_KM_RATE") && perms.includes("expenses.edit"))
   if (!canWrite) return new NextResponse("Forbidden", { status: 403 })
   try {
     const s = await withTable<any>(() => (prisma as any).appSetting.upsert({

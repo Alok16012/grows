@@ -87,7 +87,7 @@ function TeamAvatars({ team }: { team?: TeamMember[] }) {
     )
 }
 
-function ProjectMenu({ project, onDelete }: { project: Project; onDelete: () => void }) {
+function ProjectMenu({ project, onDelete, canEdit }: { project: Project; onDelete?: () => void; canEdit: boolean }) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
     useEffect(() => {
@@ -105,6 +105,7 @@ function ProjectMenu({ project, onDelete }: { project: Project; onDelete: () => 
             </button>
             {open && (
                 <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[var(--border)] rounded-[10px] shadow-lg z-20 py-1 overflow-hidden">
+                    {canEdit && <>
                     <Link href={`/projects/${project.id}/edit`} className="flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-colors">
                         <Pencil size={13} /> Edit Project
                     </Link>
@@ -114,11 +115,14 @@ function ProjectMenu({ project, onDelete }: { project: Project; onDelete: () => 
                     <Link href={`/projects/${project.id}/report-config`} className="flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)] transition-colors">
                         <Settings2 size={13} /> Report Config
                     </Link>
-                    <div className="my-1 border-t border-[var(--border)]" />
+                    </>}
+                    {onDelete && <>
+                    {canEdit && <div className="my-1 border-t border-[var(--border)]" />}
                     <button onClick={() => { setOpen(false); onDelete() }}
                         className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--red)] hover:bg-red-50 transition-colors">
                         <Trash2 size={13} /> Delete Project
                     </button>
+                    </>}
                 </div>
             )}
         </div>
@@ -128,7 +132,11 @@ function ProjectMenu({ project, onDelete }: { project: Project; onDelete: () => 
 export default function ProjectsPage() {
     const { data: session } = useSession()
     // Create / edit / delete needs the write permission, not just read access.
-    const canManageProjects = can(session, "projects.manage")
+    // Add / change / remove are separate rights.
+    const canCreateProject = can(session, "projects.create")
+    const canEditProject = can(session, "projects.edit")
+    const canDeleteProject = can(session, "projects.delete")
+    const canManageProjects = canEditProject
 
     const [projects, setProjects] = useState<Project[]>([])
     const [loading, setLoading] = useState(true)
@@ -258,7 +266,7 @@ export default function ProjectsPage() {
                 <h3 className="text-[14.5px] font-bold text-[var(--text)] uppercase tracking-[0.2px] leading-tight truncate">{project.name}</h3>
                 <div className="flex items-center gap-1 shrink-0">
                     <StatusBadge status={project.status} />
-                    {canManageProjects && <ProjectMenu project={project} onDelete={() => handleDelete(project)} />}
+                    {(canEditProject || canDeleteProject) && <ProjectMenu project={project} canEdit={canEditProject} onDelete={canDeleteProject ? () => handleDelete(project) : undefined} />}
                 </div>
             </div>
             <p className="flex items-center gap-1.5 text-[11.5px] font-medium text-[var(--text2)] mb-2 truncate">
@@ -321,7 +329,7 @@ export default function ProjectsPage() {
                     </h1>
                     <p className="text-[13px] text-[var(--text3)] mt-0.5">Manage inspection projects across client sites.</p>
                 </div>
-                {canManageProjects && (
+                {canCreateProject && (
                     <div className="page-actions">
                         <Link href="/projects/create"
                             className="inline-flex items-center justify-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity">
@@ -460,7 +468,7 @@ export default function ProjectsPage() {
                             {hasFilters ? "Try adjusting your filters." : "Create your first project to get started."}
                         </p>
                     </div>
-                    {canManageProjects && !hasFilters && (
+                    {canCreateProject && !hasFilters && (
                         <Link href="/projects/create"
                             className="inline-flex items-center gap-2 bg-[var(--accent)] text-white rounded-[10px] text-[13px] font-medium px-4 py-2 hover:opacity-90 transition-opacity">
                             <Plus size={15} /> Create Project

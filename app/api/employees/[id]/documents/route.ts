@@ -53,7 +53,7 @@ export async function POST(
         if (session.user.role === "CLIENT") {
             return new NextResponse("Forbidden", { status: 403 })
         }
-        if (!checkAccess(session, [], "documents.upload")
+        if (!checkAccess(session, [], "documents.create")
             && !(await isSelf(session.user.id, params.id))) {
             return new NextResponse("Forbidden", { status: 403 })
         }

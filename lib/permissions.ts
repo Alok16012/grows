@@ -308,7 +308,7 @@ export const HR_MANAGER_DEFAULT_PERMISSIONS: string[] = [
 export function checkAccess(
     session: { user: { role: string; permissions?: string[] } } | null | undefined,
     allowedRoles: string[],
-    permission?: string
+    permission?: string | string[]
 ): boolean {
     if (!session) return false
     // ADMIN is the ONLY role with implicit access. Every other user — including
@@ -318,6 +318,8 @@ export function checkAccess(
     // call-site signature compatibility but no longer grants access on its own.
     void allowedRoles
     if (session.user.role === "ADMIN") return true
+    // A list means "any of these".
+    if (Array.isArray(permission)) return permission.some(p => !!session.user.permissions?.includes(p))
     return !!(permission && session.user.permissions?.includes(permission))
 }
 
@@ -351,7 +353,7 @@ export function canAccessInspection(session: PermSession): boolean {
 
 // Permissions that mean "you oversee this work" rather than "you perform it".
 // Holding one of these must cancel inspector self-scoping.
-export const ASSIGNMENT_OVERSIGHT_PERMISSIONS = ["assignments.view", "assignments.manage"]
+export const ASSIGNMENT_OVERSIGHT_PERMISSIONS = ["assignments.view", "assignments.create", "assignments.edit", "assignments.delete"]
 
 // Should this caller only ever see their OWN rows? ADMIN is deliberately excluded
 // — the superuser must keep seeing everyone's work, so self-scoping never catches it.
@@ -392,15 +394,15 @@ export function canViewDocuments(session: PermSession): boolean {
 // `assets.manage` predates the request → approve → issue split, so it implies
 // all three: roles granted it before the split keep every asset capability.
 export function canRequestAssets(session: PermSession): boolean {
-    return checkAccess(session, [], "assets.request") || checkAccess(session, [], "assets.manage")
+    return checkAccess(session, [], ["assets.request", "assets.create"])
 }
 
 export function canApproveAssets(session: PermSession): boolean {
-    return checkAccess(session, [], "assets.approve") || checkAccess(session, [], "assets.manage")
+    return checkAccess(session, [], "assets.approve")
 }
 
 export function canIssueAssets(session: PermSession): boolean {
-    return checkAccess(session, [], "assets.issue") || checkAccess(session, [], "assets.manage")
+    return checkAccess(session, [], ["assets.issue", "assets.edit"])
 }
 
 // Sees every asset request / issue, not just the ones they raised.
@@ -413,7 +415,7 @@ export function canOverseeAssets(session: PermSession): boolean {
 // views also open to performance.view; reviewers get their reviewees through
 // PerfAssignment data, not a permission.
 export function canManagePerfHub(session: PermSession): boolean {
-    return checkAccess(session, [], "performance.manage")
+    return checkAccess(session, [], "performance.edit")
 }
 
 export function canViewPerfHub(session: PermSession): boolean {
@@ -431,7 +433,14 @@ export function canSelfServePerfHub(session: PermSession): boolean {
 // policy.manage writes policies; policy.report reads who signed what. Signing
 // itself is the employee's own (self-service / onboarding link), not a permission.
 export function canManagePolicies(session: PermSession): boolean {
-    return checkAccess(session, [], "policy.manage")
+    return checkAccess(session, [], ["policies.create", "policies.edit", "policies.delete", "policies.publish"])
+}
+
+export function policyRights(session: PermSession) {
+    return {
+        create: checkAccess(session, [], "policies.create"), edit: checkAccess(session, [], "policies.edit"),
+        delete: checkAccess(session, [], "policies.delete"), publish: checkAccess(session, [], "policies.publish"),
+    }
 }
 
 export function canReportPolicies(session: PermSession): boolean {

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic"
 // minutes vs planned, video % watched, forward skips, PDF pages seen, quiz
 // score — with flags for rushed or skipped learning.
 export async function GET(req: Request) {
-    const g = await guard(req, "lms.manage")
+    const g = await guard(req, ["lms.create", "lms.edit", "lms.delete", "lms.enroll", "lms.export"])
     if (g instanceof NextResponse) return g
     try {
         const courseId = new URL(req.url).searchParams.get("courseId")

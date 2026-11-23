@@ -35,7 +35,7 @@ export async function GET(req: Request) {
 // POST — create an announcement (management permission only).
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "announcements.manage")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "announcements.create")) {
         return new NextResponse("Forbidden", { status: 403 })
     }
 

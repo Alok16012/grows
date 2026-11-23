@@ -10,7 +10,7 @@ export const maxDuration = 60
 // GET — approved claims waiting to be paid, plus claims already put on a salary
 // that can still be taken off, and which payroll months are open.
 export async function GET(req: Request) {
-    const g = await guard(req, "expenses.manage")
+    const g = await guard(req, "expenses.markPaid")
     if (g instanceof NextResponse) return g
     const w = await settleWindow()
     const claims = await prisma.expense.findMany({
@@ -44,7 +44,7 @@ export async function GET(req: Request) {
 //      { action: "salary", ids, month, year }
 //      { action: "unsettle", ids }
 export async function POST(req: Request) {
-    const g = await guard(req, "expenses.manage")
+    const g = await guard(req, "expenses.markPaid")
     if (g instanceof NextResponse) return g
     const b = await req.json().catch(() => ({}))
     const ids: string[] = Array.isArray(b?.ids) ? b.ids.filter((x: unknown) => typeof x === "string").slice(0, 500) : []

@@ -378,7 +378,7 @@ export default function ReviewInspectionPage() {
                                     {sharing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
                                     {shareToken ? "Copy Link" : "Share Report"}
                                 </button>
-                                {canAny(session, ["approvals.manage", "assignments.manage"]) && (
+                                {canAny(session, ["approvals.manage", "assignments.edit"]) && (
                                     <button onClick={() => setSendOpen(true)}
                                         className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#0b5cff] border border-[#0b5cff] rounded-[9px] text-[12.5px] text-white font-medium hover:bg-[#0847c7] transition-colors shadow-sm">
                                         <Send className="h-3.5 w-3.5" /> Send to customer

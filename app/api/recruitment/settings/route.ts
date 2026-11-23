@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic"
 export async function GET(req: Request) {
     const s = await getApiSession(req)
     if (!s || !canView(s)) return NextResponse.json({ error: "No access" }, { status: 403 })
-    const roles = await prisma.customRole.findMany({ where: { permissions: { hasSome: ["recruitment.manage", "recruitment.create", "recruitment.edit"] } }, select: { id: true } }).catch(() => [])
+    const roles = await prisma.customRole.findMany({ where: { permissions: { hasSome: ["recruitment.create", "recruitment.edit"] } }, select: { id: true } }).catch(() => [])
     const recruiters = await prisma.user.findMany({ where: { isActive: true, OR: [{ role: "ADMIN" as any }, { customRoleId: { in: roles.map(r => r.id) } }] }, select: { id: true, name: true }, orderBy: { name: "asc" }, take: 300 })
     return NextResponse.json({ settings: await getRecSettings(), recruiters, canEdit: s.user.role === "ADMIN" || canApprove(s) })
 }

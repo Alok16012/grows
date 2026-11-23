@@ -146,7 +146,7 @@ const ALL_ACTIONS: { perm: string[]; href: string; icon: React.ElementType; labe
     { perm: ["recruitment.view"],                    href: "/recruitment",          icon: Target,         label: "Recruitment",       sub: "Candidate pipeline",  color: "#8b5cf6", bg: "#f5f3ff" },
     { perm: ["onboarding.view"],                     href: "/onboarding",           icon: ClipboardList,  label: "Onboarding",        sub: "Review candidates",   color: "#0d9488", bg: "#f0fdfa" },
     { perm: ["leaves.view", "leaves.approve"],       href: "/leaves",               icon: CalendarOff,    label: "Leaves",            sub: "Requests & balances", color: "#f59e0b", bg: "#fef3c7" },
-    { perm: ["expenses.view", "expenses.manage"],    href: "/expenses",             icon: CreditCard,     label: "Expenses",          sub: "Claims & approvals",  color: "#b45309", bg: "#fef3c7" },
+    { perm: ["expenses.view", "expenses.approve"],    href: "/expenses",             icon: CreditCard,     label: "Expenses",          sub: "Claims & approvals",  color: "#b45309", bg: "#fef3c7" },
     { perm: ["payroll.view"],                        href: "/payroll",              icon: Wallet,         label: "Payroll",           sub: "Salary processing",   color: "#3b82f6", bg: "#eff6ff" },
     { perm: ["projects.view"],                       href: "/projects",             icon: Folder,         label: "Projects",          sub: "All projects",        color: "#7c3aed", bg: "#f5f3ff" },
     { perm: ["sites.view"],                          href: "/sites",                icon: MapPin,         label: "Sites",             sub: "Site management",     color: "#0891b2", bg: "#ecfeff" },
@@ -155,7 +155,7 @@ const ALL_ACTIONS: { perm: string[]; href: string; icon: React.ElementType; labe
     { perm: ["users.manage"],                        href: "/admin/employee-logins", icon: KeyRound,      label: "Employee Logins",   sub: "IDs & passwords",     color: "#dc2626", bg: "#fef2f2" },
     { perm: ["helpdesk.view"],                       href: "/helpdesk",             icon: Headphones,     label: "Helpdesk",          sub: "Support tickets",     color: "#6b7280", bg: "#f3f4f6" },
     { perm: ["reports.view"],                        href: "/reports",              icon: BarChart2,      label: "Reports",           sub: "Analytics & exports", color: "#0d9488", bg: "#f0fdfa" },
-    { perm: ["lms.view", "lms.manage"],              href: "/lms/learn",            icon: GraduationCap,  label: "Training",          sub: "Courses & learning",  color: "#8b5cf6", bg: "#f5f3ff" },
+    { perm: ["lms.view", "lms.edit"],              href: "/lms/learn",            icon: GraduationCap,  label: "Training",          sub: "Courses & learning",  color: "#8b5cf6", bg: "#f5f3ff" },
 ]
 
 // Phones get the Zavtoo-style MobileHome; md and up keep this dashboard.

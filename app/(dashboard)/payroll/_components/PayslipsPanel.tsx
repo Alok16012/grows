@@ -56,7 +56,7 @@ const sel: React.CSSProperties = { padding:"6px 10px", borderRadius:7, border:"1
 // `latest`: the newest created month; the pickers stop there (see lib/payroll-period).
 export default function PayslipsPanel({ onClose, initialMonth, initialYear, latest }: { onClose: () => void; initialMonth?: number; initialYear?: number; latest?: { month: number; year: number } }) {
     const { data: session } = useSession()
-    const canManage = can(session, "payroll.manage")
+    const canManage = can(session, "payroll.edit")
 
     // The hub passes the history row's month/year so "Slips" on August opens August.
     const [month,    setMonth]    = useState(initialMonth ?? currentPayrollMonth())

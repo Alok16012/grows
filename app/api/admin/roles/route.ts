@@ -9,7 +9,7 @@ import {
 // role, the role picker on the employee form) read the short list.
 const NAME_READERS = [
     "roles.view", "users.view", "users.edit", "users.manage", "employees.create", "employees.edit",
-    "announcements.create", "announcements.manage", "documents.send", "documents.view",
+    "announcements.create", "announcements.edit", "documents.send", "documents.view",
     // Poll / survey creators target them at roles.
     "polls.create", "polls.edit", "surveys.create", "surveys.edit",
 ]

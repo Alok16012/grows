@@ -25,7 +25,7 @@ type NavItem = { href: string; label: string; icon: React.ReactNode; badge?: num
 
 export function useHubPerms() {
     const { data: session, status } = useSession()
-    const canManage = can(session, "performance.manage")
+    const canManage = can(session, "performance.edit")
     const canView = can(session, "performance.view") || canManage
     return { session, status, canManage, canView }
 }

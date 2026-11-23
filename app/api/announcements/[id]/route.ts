@@ -6,7 +6,7 @@ import { checkAccess } from "@/lib/permissions"
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "announcements.manage")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "announcements.edit")) {
         return new NextResponse("Forbidden", { status: 403 })
     }
     const body = await req.json().catch(() => ({}))
@@ -20,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "announcements.manage")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "announcements.delete")) {
         return new NextResponse("Forbidden", { status: 403 })
     }
     await prisma.announcement.delete({ where: { id: params.id } })

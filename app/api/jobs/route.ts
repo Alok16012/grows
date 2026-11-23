@@ -105,13 +105,15 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!session || !checkAccess(session, [], "jobs.manage")) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!session || !checkAccess(session, [], "jobs.create")) {
+        return NextResponse.json({ error: "You don't have the right to post jobs" }, { status: 403 })
     }
 
     try {
         const body = await req.json()
-        const { title, status } = body
+        const { title } = body
+        // Going live needs "Publish job posts"; without it the job is saved as a draft.
+        const status = body.status === "PUBLISHED" && checkAccess(session, [], "jobs.publish") ? "PUBLISHED" : "DRAFT"
 
         if (!title || !String(title).trim()) {
             return NextResponse.json({ error: "Job title is required" }, { status: 400 })

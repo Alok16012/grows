@@ -26,7 +26,7 @@ export async function PUT(
     { params }: { params: { id: string } }
 ) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER"], "projects.manage")) {
+    if (!checkAccess(session, ["MANAGER"], "projects.edit")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

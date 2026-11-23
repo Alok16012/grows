@@ -39,7 +39,7 @@ export async function GET(req: Request) {
 // POST — add a holiday (management permission only).
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "announcements.manage")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "announcements.create")) {
         return new NextResponse("Forbidden", { status: 403 })
     }
     const body = await req.json().catch(() => ({}))

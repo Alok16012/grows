@@ -26,7 +26,7 @@ export async function GET(req: Request) {
         let acknowledgments: Record<string, Date> = {}
         // A manager can look up anyone's acknowledgements; without employeeId
         // (or without the permission) it's the caller's own.
-        if (employeeId && checkAccess(session, ["MANAGER"], "lms.manage")) {
+        if (employeeId && checkAccess(session, ["MANAGER"], ["lms.create", "lms.edit", "lms.delete", "lms.enroll", "lms.export"])) {
             const acks = await prisma.policyAcknowledgment.findMany({
                 where: { employeeId },
                 select: { policyId: true, acknowledgedAt: true },
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
         // Resolve real DB user ID

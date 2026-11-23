@@ -34,7 +34,7 @@ export async function POST(req: Request, { params }: { params: { employeeId: str
     // Writing a salary structure requires the manage permission, not just
     // viewSalary. `employees.viewSalary` is accepted on reads (see CAN_READ_SALARY
     // above) but must not grant write access.
-    if (!session || !checkAccess(session, [], "payroll.manage")) {
+    if (!session || !checkAccess(session, [], "payroll.edit")) {
         return new NextResponse("Forbidden", { status: 403 })
     }
 

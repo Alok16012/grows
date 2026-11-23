@@ -111,7 +111,7 @@ export async function POST(req: Request) {
         // Self-service: anyone WITHOUT leaves.manage can apply only for their own
         // linked employee. Creating leave for an arbitrary employeeId requires
         // leaves.manage — a read-only leaves.view role falls through to here.
-        const isManager = checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.manage")
+        const isManager = checkAccess(session, ["MANAGER", "HR_MANAGER"], "leaves.create")
         let employeeId: string
         if (isManager) {
             if (!body.employeeId) return new NextResponse("employeeId is required", { status: 400 })
@@ -153,7 +153,7 @@ export async function POST(req: Request) {
 
         const who = `${leave.employee.firstName} ${leave.employee.lastName}`.trim()
         const span = `${check.breakdown.days} day${check.breakdown.days === 1 ? "" : "s"} from ${startDate.slice(0, 10)}`
-        await notifyApprovers(["leaves.approve", "leaves.manage"], {
+        await notifyApprovers(["leaves.approve"], {
             title: "Leave request", message: `${who} applied for ${check.type} — ${span}`, type: "leave", link: `/leaves?id=${leave.id}`,
         }, session.user.id)
         if (isManager) {

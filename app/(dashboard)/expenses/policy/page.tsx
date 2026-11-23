@@ -31,7 +31,7 @@ const money = (v: string): number | null => { if (v.trim() === "") return null; 
 
 export default function ExpensePolicyPage() {
     const { data: session } = useSession()
-    const canManage = can(session, "expenses.manage")
+    const canManage = can(session, "expenses.edit")
     const [p, setP] = useState<ExpensePolicy>(DEFAULT_EXPENSE_POLICY)
     const [rate2W, setRate2W] = useState("")
     const [rate4W, setRate4W] = useState("")

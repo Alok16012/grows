@@ -68,8 +68,10 @@ function avatarColor(name: string) {
 
 // ─── Doc Cell ─────────────────────────────────────────────────────────────────
 function DocCell({
-    doc, empId, docType, onView, onDelete, onUploaded, isAdmin,
+    doc, empId, docType, onView, onDelete, onUploaded, isAdmin, canDel = false, canVer = false,
 }: {
+    canDel?: boolean
+    canVer?: boolean
     doc: Doc | undefined; empId: string; docType: string
     onView: (url: string, name: string) => void
     onDelete: (empId: string, docId: string) => void
@@ -202,7 +204,7 @@ function DocCell({
             </span>
             <div className="flex items-center gap-3 flex-wrap">
                 {/* Verify link for pending docs */}
-                {isAdmin && !isVerified && doc.id !== PROFILE_PHOTO_ID && (
+                {canVer && !isVerified && doc.id !== PROFILE_PHOTO_ID && (
                     <button onClick={handleVerify} disabled={verifying}
                         className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#2563eb] hover:underline disabled:opacity-50">
                         {verifying ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Verify
@@ -216,7 +218,7 @@ function DocCell({
                     className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#15803d] hover:underline disabled:opacity-50">
                     <Download size={12} /> Download
                 </button>
-                {isAdmin && doc.id !== PROFILE_PHOTO_ID && (
+                {canDel && doc.id !== PROFILE_PHOTO_ID && (
                     <button onClick={handleDelete} disabled={deleting}
                         className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#dc2626] hover:underline disabled:opacity-50">
                         {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
@@ -473,7 +475,7 @@ export default function MasterDocumentsPage() {
     const [policies, setPolicies]   = useState<Record<string, PolicySignoff[]>>({})
     const [policiesLoading, setPoliciesLoading] = useState(false)
     // Same rule as the sign-off API: the Policies report permission (or manage).
-    const canPolicies = canAny(session, ["policy.report", "policy.manage"])
+    const canPolicies = canAny(session, ["policy.report", "policies.create", "policies.edit", "policies.publish"])
 
     useEffect(() => { setPage(1) }, [search, siteFilter, statusFilter, docTypeFilter, perPage])
 
@@ -590,7 +592,10 @@ export default function MasterDocumentsPage() {
 
     // Upload/manage rights are permission-driven: ADMIN, or any custom role that
     // has been granted "Upload Documents". Base roles get nothing implicitly.
-    const isAdmin = can(session, "documents.upload")
+    // Upload, delete and verify are separate rights (Roles → Documents).
+    const isAdmin = can(session, "documents.create")
+    const canDelDoc = can(session, "documents.delete")
+    const canVerDoc = can(session, "documents.verify")
 
     return (
         <div className="p-4 lg:p-0 max-w-full mx-auto flex flex-col gap-5">
@@ -732,6 +737,8 @@ export default function MasterDocumentsPage() {
                                                             onDelete={handleDeleteLocal}
                                                             onUploaded={fetchAll}
                                                             isAdmin={isAdmin}
+                                                            canDel={canDelDoc}
+                                                            canVer={canVerDoc}
                                                         />
                                                     </td>
                                                 )

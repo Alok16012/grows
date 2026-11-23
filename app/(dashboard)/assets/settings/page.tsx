@@ -27,7 +27,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 
 export default function AssetSettingsPage() {
     const { data: session } = useSession()
-    const canManage = can(session, "assets.manage")
+    const canManage = can(session, "assets.edit")
     const [s, setS] = useState<AssetSettings>(DEFAULT_ASSET_SETTINGS)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)

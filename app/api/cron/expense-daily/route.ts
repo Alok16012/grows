@@ -17,7 +17,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-    const g = await guard(req, "expenses.manage")
+    const g = await guard(req, "expenses.approve")
     if (g instanceof NextResponse) return g
     try { return NextResponse.json({ ok: true, ...(await runExpenseDaily()) }) }
     catch (e) { console.error("[EXPENSE_DAILY_RUN]", e); return NextResponse.json({ error: "Internal Error" }, { status: 500 }) }

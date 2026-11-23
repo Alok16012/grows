@@ -9,11 +9,11 @@ export const dynamic = "force-dynamic"
 export async function GET(req: Request) {
     const g = await guard(req, LINK_USERS)
     if (g instanceof NextResponse) return g
-    return NextResponse.json({ settings: await getJoinSettings(), canEdit: g.access.isAdmin || g.access.permissions.includes("onboarding.manage") })
+    return NextResponse.json({ settings: await getJoinSettings(), canEdit: g.access.isAdmin || g.access.permissions.includes("onboarding.edit") })
 }
 
 export async function PUT(req: Request) {
-    const g = await guard(req, "onboarding.manage")
+    const g = await guard(req, "onboarding.edit")
     if (g instanceof NextResponse) return g
     const s = await saveJoinSettings(await req.json().catch(() => ({})), g.access.userId)
     auditLater({ actorId: g.access.userId, actorName: g.access.name, action: "join.settings", targetType: "Setting", targetId: "joinSettings", targetName: "Join link settings", summary: "Join link settings saved", after: s, ...requestMeta(req) })

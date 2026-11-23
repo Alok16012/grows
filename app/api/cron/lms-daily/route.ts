@@ -22,7 +22,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-    const g = await guard(req, "lms.manage")
+    const g = await guard(req, "lms.edit")
     if (g instanceof NextResponse) return g
     try {
         return NextResponse.json({ ok: true, ...(await runLmsDaily()) })

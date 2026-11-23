@@ -253,7 +253,7 @@ export default function SendDocumentsPage() {
     // the same PUT endpoint and refresh the list; history is kept server-side.
     const [busyId, setBusyId] = useState<string | null>(null)
     const [historyDoc, setHistoryDoc] = useState<IssuedDoc | null>(null)
-    const canManage = canAny(session, ["documents.send", "documents.view", "documents.upload"])
+    const canManage = canAny(session, ["documents.send", "documents.view", "documents.create"])
 
     const recallDoc = async (d: IssuedDoc) => {
         const reason = window.prompt(

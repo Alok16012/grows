@@ -187,69 +187,18 @@ export function normalizePermissions(input: string[]): string[] {
 // Catalogue key → the keys existing routes and pages check. Expanded at
 // sign-in, so a role saved in the new editor keeps every older screen working.
 
+// Catalogue key → earlier keys still checked somewhere. Every screen and route
+// now checks the exact catalogue key (jobs.edit, leaves.policy …), so a narrow
+// switch must never grant a broad earlier key: "Publish job posts" used to grant
+// jobs.manage, which unlocked Post / Edit / Delete for a view-only role (Nov 2026).
+// Only one-to-one meanings stay here.
 const ALIASES: Record<string, string[]> = {
     "projects.view":        ["projects.view", "sites.view", "field.view", "groups.view"],
-    "projects.create":      ["projects.manage", "sites.manage", "field.manage", "groups.manage"],
-    "projects.edit":        ["projects.manage", "sites.manage", "field.manage", "groups.manage"],
-    "projects.delete":      ["projects.manage", "sites.manage", "field.manage", "groups.manage"],
     "inspection.submit":    ["inspection.view", "inspection.submit", "inspection.history"],
     "approvals.approve":    ["approvals.manage"],
-    "assignments.create":   ["assignments.manage"],
-    "assignments.edit":     ["assignments.manage"],
-    "assignments.delete":   ["assignments.manage"],
-    "recruitment.create":   ["recruitment.manage"],
-    "recruitment.edit":     ["recruitment.manage"],
-    "recruitment.delete":   ["recruitment.manage"],
-    "recruitment.import":   ["recruitment.manage"],
-    "jobs.create":          ["jobs.manage"],
-    "jobs.edit":            ["jobs.manage"],
-    "jobs.delete":          ["jobs.manage"],
-    "jobs.publish":         ["jobs.manage"],
-    "onboarding.edit":      ["onboarding.manage"],
-    "onboarding.approve":   ["onboarding.manage"],
     "policies.view":        ["policy.view", "policy.report"],
-    "policies.create":      ["policy.manage"],
-    "policies.edit":        ["policy.manage"],
-    "policies.delete":      ["policy.manage"],
-    "policies.publish":     ["policy.manage"],
-    "documents.create":     ["documents.upload"],
-    "documents.delete":     ["documents.upload"],
     "documents.approve":    ["documents.verify"],
-    "attendance.create":    ["attendance.manage"],
-    "attendance.edit":      ["attendance.manage"],
-    "attendance.import":    ["attendance.manage"],
-    "attendance.rules":     ["attendance.manage"],
-    "leaves.create":        ["leaves.manage"],
-    "leaves.edit":          ["leaves.manage"],
-    "leaves.policy":        ["leaves.manage"],
-    "payroll.edit":         ["payroll.manage"],
-    "payroll.import":       ["payroll.manage"],
     "assets.create":        ["assets.request"],
-    // Adding, editing, assigning and returning asset records is checked as
-    // assets.manage (11 places). No catalogue key produced it, so the Assets
-    // module's Edit / Delete boxes did nothing and only Admin could run the
-    // asset register.
-    "assets.edit":          ["assets.issue", "assets.manage"],
-    "assets.delete":        ["assets.issue", "assets.manage"],
-    "expenses.approve":     ["expenses.manage"],
-    "expenses.markPaid":    ["expenses.manage"],
-    "exit.create":          ["exit.manage"],
-    "exit.edit":            ["exit.manage"],
-    "exit.approve":         ["exit.manage"],
-    "exit.settleFnF":       ["exit.manage"],
-    "performance.create":   ["performance.manage"],
-    "performance.edit":     ["performance.manage"],
-    "performance.approve":  ["performance.manage"],
-    "lms.create":           ["lms.manage"],
-    "lms.edit":             ["lms.manage"],
-    "lms.delete":           ["lms.manage"],
-    "lms.enroll":           ["lms.manage"],
-    "announcements.create": ["announcements.manage"],
-    "announcements.edit":   ["announcements.manage"],
-    "announcements.delete": ["announcements.manage"],
-    "helpdesk.create":      ["helpdesk.manage"],
-    "helpdesk.edit":        ["helpdesk.manage"],
-    "helpdesk.assign":      ["helpdesk.manage"],
     "users.edit":           ["users.manage"],
 }
 
@@ -267,6 +216,9 @@ export function expandPermissions(stored: string[], scope: DataScope | null): st
             continue
         }
         for (const k of ALIASES[p] ?? []) out.add(k)
+        // An earlier key (jobs.manage, leaves.manage …) on a role not re-saved
+        // since the catalogue: give it the exact switches it stood for.
+        if (!isCataloguePermission(p)) for (const k of LEGACY_TO_CATALOGUE[p] ?? []) out.add(k)
     }
     out.add(SELF_PERMISSION)
     // Every signed-in user lands on the dashboard; nothing checks this switch.

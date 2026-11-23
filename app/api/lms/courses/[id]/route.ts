@@ -7,7 +7,7 @@ import { checkAccess } from "@/lib/permissions"
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
         const session = await getServerSession(authOptions)
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], ["lms.create", "lms.edit", "lms.delete", "lms.enroll", "lms.export"])) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -57,7 +57,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
     try {
         const session = await getServerSession(authOptions)
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "lms.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -89,7 +89,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (session.user.role !== "ADMIN") {
+        if (!checkAccess(session, [], "lms.delete")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

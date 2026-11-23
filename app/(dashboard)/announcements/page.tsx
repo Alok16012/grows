@@ -132,7 +132,10 @@ function HolidayTypeBadge({ type }: { type: string }) {
 
 export default function AnnouncementsPage() {
     const { data: session } = useSession()
-    const canManage = can(session, "announcements.manage")
+    // Add, change and remove are separate rights (a Create-only role sees no delete).
+    const canCreate = can(session, "announcements.create")
+    const canDelete = can(session, "announcements.delete")
+    const canManage = canCreate || canDelete || can(session, "announcements.edit")
     const permsFor = (m: "polls" | "surveys") => ({
         view: can(session, `${m}.view`), create: can(session, `${m}.create`), edit: can(session, `${m}.edit`),
         delete: can(session, `${m}.delete`), export: can(session, `${m}.export`),
@@ -230,7 +233,7 @@ export default function AnnouncementsPage() {
                     <h1 className="text-[26px] font-bold text-[var(--text)] tracking-[-0.5px]">Announcements</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Company notices, holidays, polls and surveys.</p>
                 </div>
-                {canManage && tab === "notices" && (
+                {canCreate && tab === "notices" && (
                     <div className="page-actions">
                         <button onClick={() => setShowHolForm(true)}
                             className="inline-flex items-center justify-center gap-2 h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold hover:bg-[var(--surface2)] transition-colors">
@@ -310,7 +313,7 @@ export default function AnnouncementsPage() {
                                             <h3 className="text-[15px] font-semibold text-[var(--text)]">{a.title}</h3>
                                             <CategoryBadge category={a.category} />
                                         </div>
-                                        {canManage && (
+                                        {canDelete && (
                                             <button onClick={() => handleDeleteAnn(a.id)}
                                                 className="p-2 md:p-1 text-[var(--text3)] hover:text-[var(--red)] rounded-md hover:bg-[var(--surface2)] shrink-0">
                                                 <Trash2 size={14} />
@@ -464,7 +467,7 @@ export default function AnnouncementsPage() {
                                                 </p>
                                             )}
                                         </div>
-                                        {canManage && (
+                                        {canDelete && (
                                             <button onClick={() => handleDeleteHoliday(h.id)}
                                                 className="p-2 md:p-1 text-[var(--text3)] hover:text-[var(--red)] rounded-md hover:bg-[var(--surface2)] shrink-0">
                                                 <Trash2 size={14} />

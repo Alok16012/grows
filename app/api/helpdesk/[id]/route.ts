@@ -24,7 +24,7 @@ export async function GET(
 
         if (!ticket) return new NextResponse("Not Found", { status: 404 })
 
-        const isPrivileged = checkAccess(session, ["MANAGER"], "helpdesk.manage")
+        const isPrivileged = checkAccess(session, ["MANAGER"], ["helpdesk.edit", "helpdesk.assign"])
         if (!isPrivileged && ticket.raisedBy !== session.user.id) {
             return new NextResponse("Forbidden", { status: 403 })
         }
@@ -74,7 +74,7 @@ export async function PUT(
         const ticket = await prisma.ticket.findUnique({ where: { id: params.id } })
         if (!ticket) return new NextResponse("Not Found", { status: 404 })
 
-        const isPrivileged = checkAccess(session, ["MANAGER"], "helpdesk.manage")
+        const isPrivileged = checkAccess(session, ["MANAGER"], ["helpdesk.edit", "helpdesk.assign"])
         if (!isPrivileged && ticket.raisedBy !== session.user.id) {
             return new NextResponse("Forbidden", { status: 403 })
         }
@@ -88,6 +88,9 @@ export async function PUT(
         if (!isPrivileged && (status !== undefined || assignedTo !== undefined)) {
             return new NextResponse("Only helpdesk staff can change a ticket's status or assignee", { status: 403 })
         }
+        // Status needs Helpdesk → Edit; the assignee needs "Assign tickets".
+        if (status !== undefined && !checkAccess(session, [], "helpdesk.edit")) return new NextResponse("You don't have the right to change ticket status", { status: 403 })
+        if (assignedTo !== undefined && !checkAccess(session, [], "helpdesk.assign")) return new NextResponse("You don't have the right to assign tickets", { status: 403 })
         if (status !== undefined && !Object.values(TicketStatus).includes(status)) {
             return new NextResponse(`Unknown status: ${status}`, { status: 400 })
         }
@@ -137,7 +140,7 @@ export async function DELETE(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "helpdesk.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "helpdesk.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

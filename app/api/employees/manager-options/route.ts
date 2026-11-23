@@ -7,7 +7,7 @@ import { managerOptions } from "@/lib/employee-manager"
 // by name and role only (see lib/employee-manager). `include` keeps the
 // current manager listed even if they would no longer qualify.
 export async function GET(req: Request) {
-    const g = await guard(req, ["employees.view", "employees.create", "employees.edit", "recruitment.manage"])
+    const g = await guard(req, ["employees.view", "employees.create", "employees.edit", "recruitment.edit"])
     if (g instanceof NextResponse) return g
     try {
         const include = new URL(req.url).searchParams.get("include")

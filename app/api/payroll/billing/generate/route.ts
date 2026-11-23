@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER"], "payroll.manage")) {
+        if (!checkAccess(session, ["MANAGER"], "payroll.edit")) {
             return new NextResponse("Unauthorized", { status: 401 })
         }
 

@@ -9,9 +9,10 @@ import {
     inputCls, filterCls, btnPrimary, btnGhost, btnSmall, btnSmallAccent, thCls, tdCls, fmtDate,
 } from "./shared"
 
-export function StockTab({ refreshKey, canManage, canIssue, onIssue, onEdit, onDetails, onChanged, onLoaded }: {
+export function StockTab({ refreshKey, canManage, canDelete = false, canIssue, onIssue, onEdit, onDetails, onChanged, onLoaded }: {
     refreshKey: number
     canManage: boolean
+    canDelete?: boolean
     canIssue: boolean
     onIssue: (s: StockItem) => void
     onEdit: (assetId: string) => void
@@ -133,7 +134,7 @@ export function StockTab({ refreshKey, canManage, canIssue, onIssue, onEdit, onD
                                                             <button className={menuItem} onClick={() => setLedger(s)}><BookOpen size={13} />Ledger</button>
                                                             <button className={menuItem} onClick={() => onDetails(s.id)}><ChevronRight size={13} />Details</button>
                                                             {canManage && <button className={menuItem} onClick={() => onEdit(s.id)}><Edit2 size={13} />Edit asset</button>}
-                                                            {canManage && <button className={`${menuItem} text-red-600`} onClick={() => remove(s)}><Trash2 size={13} />Delete</button>}
+                                                            {canDelete && <button className={`${menuItem} text-red-600`} onClick={() => remove(s)}><Trash2 size={13} />Delete</button>}
                                                         </div>
                                                     </>
                                                 )}

@@ -41,7 +41,7 @@ export async function POST(
     // sibling route that records the document. The previous "any logged-in user who
     // isn't a CLIENT" test let the base role decide, so every staff account could
     // push files into any colleague's KYC folder.
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.upload")
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "documents.create")
         && !(await isSelf(session.user.id, params.id))) {
         return new NextResponse("Forbidden", { status: 403 })
     }

@@ -12,7 +12,7 @@ export const maxDuration = 60
 // "Recalculate draft payroll now"; saves of settings / salary / switches do
 // this automatically for what they affect.)
 export async function POST(req: Request) {
-    const g = await guard(req, "payroll.manage")
+    const g = await guard(req, "payroll.edit")
     if (g instanceof NextResponse) return g
     const from = await openPayrollMonth()
     const result = await recalcDraftPayroll({ from })

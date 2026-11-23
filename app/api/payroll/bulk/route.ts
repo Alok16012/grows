@@ -25,7 +25,7 @@ async function _disabledLegacyBulk(req: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], ["payroll.import", "payroll.edit"])) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

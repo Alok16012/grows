@@ -32,7 +32,7 @@ export async function POST(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
@@ -81,7 +81,7 @@ export async function PATCH(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

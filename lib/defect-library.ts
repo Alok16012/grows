@@ -68,7 +68,7 @@ export async function autoLinkDefects(projectId?: string): Promise<number> {
 }
 
 export const QUALITY_VIEW = ["reports.view", "approvals.view", "projects.view"]
-export const QUALITY_MANAGE = ["projects.manage", "approvals.manage"]
+export const QUALITY_MANAGE = ["projects.edit", "approvals.manage"]
 export const canManageQuality = (a: { isAdmin: boolean; permissions: string[] }) => a.isAdmin || QUALITY_MANAGE.some(p => a.permissions.includes(p))
 
 /** Shared validation for create / edit. */

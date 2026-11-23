@@ -49,7 +49,8 @@ export default function AssetsPage({ searchParams }: { searchParams?: { tab?: st
     const router = useRouter()
 
     // ── Permissions ──
-    const canManage = can(session, "assets.manage")
+    const canManage = can(session, "assets.edit")
+    const canDeleteAsset = can(session, "assets.delete")
     const canView = can(session, "assets.view") || canManage
     const canRequest = can(session, "assets.request") || canManage
     const canApprove = can(session, "assets.approve") || canManage
@@ -274,10 +275,10 @@ export default function AssetsPage({ searchParams }: { searchParams?: { tab?: st
                                 </>
                             )}
                             {tab === "stock" && (missing ? (
-                                <LegacyInventory refreshKey={refreshKey} canManage={canManage} onIssue={setLegacyIssueAsset}
+                                <LegacyInventory refreshKey={refreshKey} canManage={canManage} canDelete={canDeleteAsset} onIssue={setLegacyIssueAsset}
                                     onEdit={setEditAsset} onDetails={setDrawerAssetId} onLoaded={setLegacyAssets} />
                             ) : (
-                                <StockTab refreshKey={refreshKey} canManage={canManage} canIssue={canIssue}
+                                <StockTab refreshKey={refreshKey} canManage={canManage} canDelete={canDeleteAsset} canIssue={canIssue}
                                     onIssue={setDirectIssue} onEdit={openEdit} onDetails={setDrawerAssetId} onChanged={refresh} />
                             ))}
                             {tab === "reports" && <ReportsTab />}

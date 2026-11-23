@@ -146,6 +146,9 @@ function Avatar({ first, last, photo, size = 38 }: { first: string; last: string
 
 export default function ExitPage() {
   const { data: session, status } = useSession()
+  // Start an exit = Create; move it along / cancel = Edit.
+  const canCreateExit = can(session, "exit.create")
+  const canEditExit = can(session, "exit.edit")
   const router = useRouter()
 
   const [exits, setExits] = useState<ExitRequest[]>([])
@@ -266,7 +269,7 @@ export default function ExitPage() {
           <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 4 }}>Manage employee exits, clearance &amp; F&amp;F settlements. <a href="/exit/settings" style={{ color: "var(--accent)", fontWeight: 600 }}>Settings &amp; past leavers →</a></p>
         </div>
         <div className="page-actions">
-        <button
+        {canCreateExit && <button
           onClick={() => setShowInitModal(true)}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
@@ -277,7 +280,7 @@ export default function ExitPage() {
           }}
         >
           <Plus size={16} /> Initiate Exit
-        </button>
+        </button>}
         </div>
       </div>
 
@@ -470,7 +473,7 @@ export default function ExitPage() {
                       exit.status === "FULL_FINAL_PENDING" ? { label: "Mark Completed", action: () => { handleStatusChange(exit.id, "COMPLETED"); setOpenMenu(null) } } : null,
                       exit.status !== "COMPLETED" && exit.status !== "CANCELLED" ? { label: "Cancel", action: () => { handleStatusChange(exit.id, "CANCELLED"); setOpenMenu(null) } } : null,
                       exit.status === "INITIATED" && session?.user?.role === "ADMIN" ? { label: "Delete", action: () => { handleDelete(exit.id); setOpenMenu(null) }, danger: true } : null,
-                    ].filter(Boolean).map((item, i) => item && (
+                    ].filter(it => it && (it.label === "View Details" || canEditExit)).map((item, i) => item && (
                       <button
                         key={i}
                         onClick={item.action}
@@ -874,6 +877,7 @@ function TimelineTab({
   const [hrComments, setHrComments] = useState(exit.hrComments || "")
   const [saving, setSaving] = useState(false)
   const [statusLoading, setStatusLoading] = useState(false)
+  const canEditExit = can(session, "exit.edit")
 
   const statusOrder: ExitStatus[] = ["INITIATED", "NOTICE_PERIOD", "CLEARANCE_PENDING", "FULL_FINAL_PENDING", "COMPLETED"]
   const currentIdx = statusOrder.indexOf(exit.status)
@@ -997,7 +1001,7 @@ function TimelineTab({
             resize: "vertical", fontFamily: "inherit", boxSizing: "border-box",
           }}
         />
-        <button
+        {canEditExit && <button
           onClick={handleSaveComments}
           disabled={saving}
           style={{
@@ -1007,11 +1011,11 @@ function TimelineTab({
           }}
         >
           {saving ? "Saving..." : "Save Comments"}
-        </button>
+        </button>}
       </div>
 
       {/* Status Action Buttons */}
-      {exit.status !== "COMPLETED" && exit.status !== "CANCELLED" && (
+      {canEditExit && exit.status !== "COMPLETED" && exit.status !== "CANCELLED" && (
         <div style={{
           padding: "14px", background: "var(--surface2)", borderRadius: 10,
           border: "1px solid var(--border)",
@@ -1095,6 +1099,8 @@ function TimelineTab({
 // ─── Clearance Tab ────────────────────────────────────────────────────────────
 
 function ClearanceTab({ exit, onRefresh }: { exit: ExitRequest; onRefresh: () => void }) {
+  // Ticking clearance items needs Exit → Edit.
+  const canEditExit = can(useSession().data, "exit.edit")
   const [tasks, setTasks] = useState<ClearanceTask[]>(exit.clearanceTasks || [])
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [remarksMap, setRemarksMap] = useState<Record<string, string>>(
@@ -1111,6 +1117,7 @@ function ClearanceTab({ exit, onRefresh }: { exit: ExitRequest; onRefresh: () =>
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
 
   const handleTaskUpdate = async (taskId: string, status: string, remarks?: string) => {
+    if (!canEditExit) return
     setUpdatingId(taskId)
     try {
       const res = await fetch(`/api/exit/${exit.id}/clearance/${taskId}`, {
@@ -1313,8 +1320,9 @@ function FnFTab({
     paymentMode: "NEFT",
     reference: "",
   })
-  const canEdit = can(session, "exit.manage")
-  const canApprove = can(session, "exit.approve") || canEdit
+  const canEdit = can(session, "exit.edit")
+  const canApprove = can(session, "exit.approve")
+  const canSettle = can(session, "exit.settleFnF")
   const paid = !!exit.fnfPaidAt
   // F&F approval (Exit settings) and the letters issued after payment.
   const [flow, setFlow] = useState<{ approval: { approvedAt?: string | null; approvedByName?: string | null; approvedNet?: number | null; preparedBy?: string | null }; letters: { docNumber: string; status: string; type: { name: string } }[]; me: string } | null>(null)
@@ -1515,7 +1523,7 @@ function FnFTab({
         </div>
       )}
 
-      {canEdit && !paid && (
+      {canSettle && !paid && (
         <div style={{ padding: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
           <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", marginBottom: 14 }}>Record payment</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>

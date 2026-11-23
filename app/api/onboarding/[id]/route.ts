@@ -113,12 +113,17 @@ export async function PUT(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["ADMIN", "MANAGER", "HR_MANAGER"], "onboarding.manage")) {
+        if (!checkAccess(session, ["ADMIN", "MANAGER", "HR_MANAGER"], ["onboarding.edit", "onboarding.approve"])) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 
         const body = await req.json()
         const { status, notes, assignedTo, action, rejectionReason } = body
+        // Approving / rejecting a joiner needs Onboarding → Approve; other changes need Edit.
+        const deciding = action === "approve" || action === "reject"
+        if (!checkAccess(session, [], deciding ? "onboarding.approve" : "onboarding.edit")) {
+            return new NextResponse(deciding ? "You don't have the right to approve joiners" : "You don't have the right to edit onboarding", { status: 403 })
+        }
 
         // Handle approve / reject actions
         const onboardingRecord = await prisma.onboardingRecord.findUnique({

@@ -8,7 +8,7 @@ import { applyTemplate } from "@/lib/performance-server"
 // POST { role } — load a role's KRA/KPI template onto a draft review.
 export async function POST(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.manage")) return new NextResponse("Forbidden", { status: 403 })
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "performance.edit")) return new NextResponse("Forbidden", { status: 403 })
     const { role } = await req.json()
     const review = await prisma.performanceReview.findUnique({ where: { id: params.id }, select: { status: true } })
     if (!review) return new NextResponse("Review not found", { status: 404 })

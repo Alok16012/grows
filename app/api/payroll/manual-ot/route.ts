@@ -14,7 +14,7 @@ export const maxDuration = 60
 // with payroll at the site that month) with their own OT rate from Salary
 // Master and the manual OT amount entered for that month.
 export async function GET(req: Request) {
-    const g = await guard(req, "payroll.manage")
+    const g = await guard(req, "payroll.edit")
     if (g instanceof NextResponse) return g
     const sp = new URL(req.url).searchParams
     const siteId = sp.get("siteId") ?? ""
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
 // monthly OT amounts (only for the months change control allows) and
 // recalculates those employees' draft payroll from that month.
 export async function PUT(req: Request) {
-    const g = await guard(req, "payroll.manage")
+    const g = await guard(req, "payroll.edit")
     if (g instanceof NextResponse) return g
     const body = await req.json().catch(() => null)
     const p = { month: Number(body?.month), year: Number(body?.year) }

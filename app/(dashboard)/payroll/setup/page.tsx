@@ -360,7 +360,7 @@ export default function PayrollPage() {
     }
 
     const processPayroll = async () => {
-        if (!can(session, "payroll.manage")) {
+        if (!can(session, "payroll.edit")) {
             toast.error("You don't have permission to process payroll")
             return
         }
@@ -381,7 +381,7 @@ export default function PayrollPage() {
     }
 
     const exportExcel = async () => {
-        if (!can(session, "payroll.manage")) {
+        if (!can(session, "payroll.edit")) {
             toast.error("You don't have permission to export payroll data")
             return
         }

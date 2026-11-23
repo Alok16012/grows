@@ -52,7 +52,7 @@ type PayrollRecord = {
 
 function SalarySlipsInner() {
     const { data: session } = useSession()
-    const canManage = can(session, "payroll.manage")
+    const canManage = can(session, "payroll.edit")
 
     const router = useRouter()
     const [month,    setMonth]    = useState(new Date().getMonth() + 1)

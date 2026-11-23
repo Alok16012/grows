@@ -116,7 +116,7 @@ export async function runDwmDaily(now = new Date()) {
             message: `Not submitted by the deadline (yesterday): ${shown}.`,
             link: "/performance/hub/team",
         }
-        if (rid === "__hr__") await notifyApprovers(["performance.manage"], { ...note, type: "performance" })
+        if (rid === "__hr__") await notifyApprovers(["performance.edit"], { ...note, type: "performance" })
         else await notifyUser(rid, note)
         res.missedLists++
     }
@@ -163,12 +163,12 @@ export async function runDwmDaily(now = new Date()) {
             message: `Waiting more than ${s.review.targetDays} day${s.review.targetDays === 1 ? "" : "s"}. Open the Review Queue to approve or return them.`,
             link: "/performance/hub/review",
         }
-        if (rid === "__hr__") await notifyApprovers(["performance.manage"], { ...note, type: "performance" })
+        if (rid === "__hr__") await notifyApprovers(["performance.edit"], { ...note, type: "performance" })
         else await notifyUser(rid, note)
         res.reviewReminders += n
     }
     if (escalate) {
-        await notifyApprovers(["performance.manage"], {
+        await notifyApprovers(["performance.edit"], {
             title: `${escalate} KPI report${escalate === 1 ? "" : "s"} not reviewed for ${s.review.escalateAfterDays}+ days`,
             message: "These reports are past the escalation limit in DWM Settings. Review them or change the reviewer.",
             type: "performance", link: "/performance/hub/review",

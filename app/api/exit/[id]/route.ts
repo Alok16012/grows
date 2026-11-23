@@ -76,12 +76,18 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "exit.manage")) {
+    if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], ["exit.edit", "exit.approve", "exit.settleFnF"])) {
       return new NextResponse("Forbidden", { status: 403 })
     }
 
     const body = await req.json()
     const { status, lastWorkingDate, hrComments, fnfAmount, fnfPaidAt, fnfPaidBy, approvedBy, force } = body
+    // Recording the F&F payment needs "Settle F&F"; approving needs Approve; anything else needs Edit.
+    const fnfPaying = fnfAmount !== undefined || fnfPaidAt !== undefined || fnfPaidBy !== undefined
+    const need = fnfPaying ? "exit.settleFnF" : approvedBy ? "exit.approve" : "exit.edit"
+    if (!checkAccess(session, [], need)) {
+      return new NextResponse(fnfPaying ? "You don't have the right to settle F&F" : approvedBy ? "You don't have the right to approve exits" : "You don't have the right to edit exits", { status: 403 })
+    }
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() }
     if (status !== undefined) {

@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
-    const g = await guard(req, "expenses.manage")
+    const g = await guard(req, "expenses.edit")
     if (g instanceof NextResponse) return g
     const policy = await saveExpensePolicy(await req.json().catch(() => ({})), g.access.userId)
     auditLater({ actorId: g.access.userId, actorName: g.access.name, action: "expense.policy", targetType: "Setting", targetId: "expensePolicy", targetName: "Expense policy", summary: "Expense policy saved", after: policy, ...requestMeta(req) })

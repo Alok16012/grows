@@ -17,7 +17,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     const g = await guard(req, [])
     if (g instanceof NextResponse) return g
     const session = await getApiSession(req)
-    const canManage = !!session && checkAccess(session, ["MANAGER", "HR_MANAGER"], "expenses.manage")
+    const canManage = !!session && checkAccess(session, ["MANAGER", "HR_MANAGER"], ["expenses.approve", "expenses.markPaid"])
+    const canApproveAdv = !!session && checkAccess(session, ["MANAGER", "HR_MANAGER"], "expenses.approve")
+    const canPayAdv = !!session && checkAccess(session, ["MANAGER", "HR_MANAGER"], "expenses.markPaid")
     const adv = await prisma.expenseAdvance.findUnique({ where: { id: params.id } })
     if (!adv) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const b = await req.json().catch(() => ({}))
@@ -34,7 +36,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         await prisma.expenseAdvance.delete({ where: { id: adv.id } })
         return NextResponse.json({ ok: true })
     }
-    if (!canManage) return NextResponse.json({ error: "Needs the Manage Expenses permission" }, { status: 403 })
+    if (!canManage) return NextResponse.json({ error: "Needs Expenses → Approve or Mark expenses paid" }, { status: 403 })
+    if ((action === "APPROVE" || action === "REJECT") && !canApproveAdv) return NextResponse.json({ error: "You don't have the right to approve expenses" }, { status: 403 })
+    if ((action === "PAY" || action === "SETTLE") && !canPayAdv) return NextResponse.json({ error: "You don't have the right to mark expenses paid" }, { status: 403 })
     if (own && !g.access.isAdmin) return NextResponse.json({ error: "You can't approve, pay or settle your own advance" }, { status: 403 })
 
     let updated: any

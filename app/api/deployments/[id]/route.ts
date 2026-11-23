@@ -18,7 +18,7 @@ export async function PUT(
     try {
         const session = await getServerSession(authOptions)
         if (!session) return new NextResponse("Unauthorized", { status: 401 })
-        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "sites.manage")) {
+        if (!checkAccess(session, ["MANAGER", "HR_MANAGER"], "projects.edit")) {
             return new NextResponse("Forbidden", { status: 403 })
         }
 

@@ -891,6 +891,8 @@ function ExpenseDrawer({
     // Receipt verification: which receipts the approver has viewed + verified,
     // and which one is open in the one-by-one viewer (null = closed).
     const viewerRole = useSession().data?.user?.role
+    // Recording payment needs "Mark expenses paid" (not just Approve).
+    const canPayHere = can(useSession().data, "expenses.markPaid")
     const [verified, setVerified] = useState<boolean[]>([])
     const [verifierIdx, setVerifierIdx] = useState<number | null>(null)
 
@@ -1453,7 +1455,7 @@ function ExpenseDrawer({
                             )}
 
                             {/* Admin/Manager + APPROVED */}
-                            {isPrivileged && expense.status === "APPROVED" && (
+                            {canPayHere && expense.status === "APPROVED" && (
                                 <>
                                     {!showPayBox ? (
                                         <button
@@ -2059,6 +2061,8 @@ async function downloadExpenseDetails(fileName: string, title: string, subtitle:
 
 // ─── Employee Summary Tab (team-wide table + per-employee drill-down) ─────────
 function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
+    // The per-km travel rate is expense setup: Expenses → Edit.
+    const canRates = can(useSession().data, "expenses.edit")
     const now = new Date()
     const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
     const [teamData, setTeamData] = useState<any>(null)
@@ -2266,7 +2270,7 @@ function EmployeeSummaryTab({ isPrivileged }: { isPrivileged: boolean }) {
                     </>
                 )}
 
-                {isPrivileged && (
+                {canRates && (
                     <>
                         <button onClick={() => setShowRateSetting(s => !s)}
                             style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: showRateSetting ? "var(--accent)" : "white", color: showRateSetting ? "white" : "var(--text2)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, whiteSpace: "nowrap" }}>
@@ -2520,7 +2524,9 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
     // approve/reject, set global rates) requires the *manage* capability — not the
     // weaker `expenses.view`, which may be granted broadly. A regular employee, even
     // if their role carries a stray `expenses.view`, only sees their own "My Expenses".
-    const isPrivileged = can(session, "expenses.manage")
+    // Approvers and payers see everyone's claims; paying needs "Mark expenses paid", rates need Edit.
+    const isPrivileged = can(session, ["expenses.approve", "expenses.markPaid"])
+    const canPayExp = can(session, "expenses.markPaid")
 
     // sessionReady flips true exactly once — after the first non-loading session status.
     // This prevents fetchExpenses from firing before we know the user's role and have
@@ -2800,7 +2806,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Track and manage employee expense claims.</p>
                 </div>
                 <div className="page-actions">
-                    {isPrivileged && (
+                    {canPayExp && (
                         <>
                             <button onClick={() => setSettleOpen(true)} title="Pay approved claims together — by bank or with salary"
                                 className="h-[42px] px-4 border border-[var(--border)] bg-[var(--surface)] text-[var(--text2)] text-[13px] font-semibold rounded-[10px] hover:bg-[var(--surface2)] inline-flex items-center justify-center gap-2 transition-colors">

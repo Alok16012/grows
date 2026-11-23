@@ -71,7 +71,12 @@ function CategoryTag({ category }: { category: string | null }) {
 
 export default function PoliciesPage() {
     const { data: session, status: authStatus } = useSession()
-    const canManage = can(session, "policy.manage")
+    // Create / edit / delete / publish are separate rights.
+    const canCreateP = can(session, "policies.create")
+    const canEditP = can(session, "policies.edit")
+    const canDeleteP = can(session, "policies.delete")
+    const canPublishP = can(session, "policies.publish")
+    const canManage = canCreateP || canEditP || canDeleteP || canPublishP
     const canReport = canManage || can(session, "policy.report")
     const canView = canReport || can(session, "policy.view")
     const { missing, fail } = usePolicyApi()
@@ -154,10 +159,10 @@ export default function PoliciesPage() {
                     <h1 className="text-[24px] sm:text-[26px] font-bold text-[var(--text)] tracking-[-0.5px] leading-tight">Policy Sign-off</h1>
                     <p className="text-[13.5px] text-[var(--text3)] mt-1">Mapped by designation. <b className="font-semibold text-[var(--text2)]">Onboarding</b> policies are signed on the employee onboarding form; other categories from each employee&apos;s My Policies.</p>
                 </div>
-                {canManage && !missing && (
+                {(canCreateP || canEditP) && !missing && (
                     <div className="page-actions flex gap-2 flex-wrap">
-                        <button className={btnGhost} onClick={() => setBulkOpen(true)}><Layers size={15} /> Bulk assign</button>
-                        <button className={btnPrimary} onClick={() => setEditing("new")}><Plus size={15} /> New policy</button>
+                        {canEditP && <button className={btnGhost} onClick={() => setBulkOpen(true)}><Layers size={15} /> Bulk assign</button>}
+                        {canCreateP && <button className={btnPrimary} onClick={() => setEditing("new")}><Plus size={15} /> New policy</button>}
                     </div>
                 )}
             </div>
@@ -203,7 +208,7 @@ export default function PoliciesPage() {
                         {loading ? <Loading /> : rows.length === 0 ? (
                             <Empty icon={<FileSignature size={40} />} title="No policies yet"
                                 sub={canManage ? "Create a policy, assign designations and publish it — joiners then sign it on step 3." : "HR hasn't published any policies yet."}
-                                action={canManage ? <button className={btnPrimary} onClick={() => setEditing("new")}><Plus size={15} /> New policy</button> : undefined} />
+                                action={canCreateP ? <button className={btnPrimary} onClick={() => setEditing("new")}><Plus size={15} /> New policy</button> : undefined} />
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-[13px]">
@@ -253,9 +258,9 @@ export default function PoliciesPage() {
                                                     <td className={tdCls}><Pill tone={STATUS_TONE[r.status]} /></td>
                                                     <td className={`${tdCls} text-right whitespace-nowrap`}>
                                                         <div className="inline-flex gap-1">
-                                                            <button className={btnIcon} title={canManage ? "Edit" : "View"} aria-label={canManage ? "Edit" : "View"} onClick={() => setEditing(r.id)}>{canManage ? <Pencil size={14} /> : <Eye size={14} />}</button>
+                                                            <button className={btnIcon} title={canEditP || canPublishP ? "Edit" : "View"} aria-label={canEditP || canPublishP ? "Edit" : "View"} onClick={() => setEditing(r.id)}>{canEditP || canPublishP ? <Pencil size={14} /> : <Eye size={14} />}</button>
                                                             {canReport && r.currentVersionNo && <button className={btnIcon} title="Sign-offs" aria-label="Sign-offs" onClick={() => setReport(r)}><Users size={14} /></button>}
-                                                            {canManage && (r.status === "ARCHIVED"
+                                                            {(r.status === "ARCHIVED" || r.currentVersionNo ? canEditP : canDeleteP) && (r.status === "ARCHIVED"
                                                                 ? <button className={btnIcon} title="Restore" aria-label="Restore" onClick={() => archive(r, "RESTORE")}><RotateCcw size={14} /></button>
                                                                 : r.currentVersionNo
                                                                     ? <button className={btnIcon} title="Archive" aria-label="Archive" onClick={() => archive(r, "ARCHIVE")}><Archive size={14} /></button>
@@ -274,7 +279,7 @@ export default function PoliciesPage() {
             )}
 
             {editing && (
-                <PolicyEditor id={editing === "new" ? null : editing} canManage={canManage} designationOpts={designations} fail={fail}
+                <PolicyEditor id={editing === "new" ? null : editing} canManage={editing === "new" ? canCreateP : canEditP} canPublish={canPublishP} designationOpts={designations} fail={fail}
                     onClose={() => setEditing(null)}
                     onChanged={() => { load(); loadDesignations() }} />
             )}
@@ -346,8 +351,8 @@ function DesignationPicker({ value, onChange, options, appliesToAll, onAppliesTo
 
 const FORMAT_HELP = "Plain text. Start a line with # for a heading, - for a bullet, 1. for a numbered point. Leave a blank line between paragraphs."
 
-function PolicyEditor({ id, canManage, designationOpts, fail, onClose, onChanged }: {
-    id: string | null; canManage: boolean; designationOpts: DesignationOpt[]
+function PolicyEditor({ id, canManage, canPublish, designationOpts, fail, onClose, onChanged }: {
+    id: string | null; canManage: boolean; canPublish: boolean; designationOpts: DesignationOpt[]
     fail: (e: unknown, f?: string) => void; onClose: () => void; onChanged: () => void
 }) {
     const [policyId, setPolicyId] = useState<string | null>(id)
@@ -443,12 +448,12 @@ function PolicyEditor({ id, canManage, designationOpts, fail, onClose, onChanged
                     </p>
                 </div>
             }
-            footer={canManage && !archived ? (
+            footer={(canManage || canPublish) && !archived ? (
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="text-[11.5px] text-[var(--text3)]">{dirty ? "Unsaved changes" : ""}</span>
                     <div className="flex gap-2">
-                        <button className={btnGhost} onClick={() => save()} disabled={saving}>{saving ? <Loader2 size={14} className="animate-spin" /> : null} Save draft</button>
-                        <button className={btnPrimary} onClick={startPublish} disabled={saving}><Send size={14} /> Publish{detail?.currentVersionNo ? ` v${detail.currentVersionNo + 1}` : ""}</button>
+                        {canManage && <button className={btnGhost} onClick={() => save()} disabled={saving}>{saving ? <Loader2 size={14} className="animate-spin" /> : null} Save draft</button>}
+                        {canPublish && <button className={btnPrimary} onClick={startPublish} disabled={saving}><Send size={14} /> Publish{detail?.currentVersionNo ? ` v${detail.currentVersionNo + 1}` : ""}</button>}
                     </div>
                 </div>
             ) : undefined}>

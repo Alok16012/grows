@@ -61,7 +61,7 @@ function monthYear(sp: { month?: unknown; year?: unknown }) {
     return { month, year }
 }
 
-const guard = (session: any) => checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.manage")
+const guard = (session: any) => checkAccess(session, ["MANAGER", "HR_MANAGER"], "payroll.edit")
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
