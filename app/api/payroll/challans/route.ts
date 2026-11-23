@@ -27,6 +27,7 @@ export async function GET(req: Request) {
 }
 
 // POST { action: "record", type, month, year, amount, trrnNumber?, paymentDate?, documentUrl?, status? }
+//      { action: "attach", id, documentUrl } (paid challan file for an existing record)
 //      { action: "remove", id } | { action: "settings", ... } | { action: "deleteDrafts", months: [{year, month}], confirm }
 export async function POST(req: Request) {
     const g = await guard(req, "payroll.view")
@@ -53,6 +54,16 @@ export async function POST(req: Request) {
         await prisma.statutoryChallan.delete({ where: { id: c.id } })
         auditLater({ actorId: actor.id, actorName: actor.name, action: "payroll.challan_remove", targetType: "StatutoryChallan", targetId: c.id, targetName: `${c.type} ${c.month}/${c.year}`, summary: `Challan removed: ${c.type} ${c.month}/${c.year} ₹${c.amount}${c.trrnNumber ? ` (${c.trrnNumber})` : ""}`, before: c, ...requestMeta(req) })
         return NextResponse.json({ ok: true })
+    }
+    // { action: "attach", id, documentUrl } — the paid challan (PDF / photo) for a record saved without it.
+    if (b?.action === "attach" && typeof b.id === "string") {
+        const url = typeof b.documentUrl === "string" && (/^sb:\/\//.test(b.documentUrl) || /^https:\/\//.test(b.documentUrl)) ? b.documentUrl : null
+        if (!url) return NextResponse.json({ error: "Upload the challan file" }, { status: 400 })
+        const c = await prisma.statutoryChallan.findUnique({ where: { id: b.id } })
+        if (!c) return NextResponse.json({ error: "Not found" }, { status: 404 })
+        const u = await prisma.statutoryChallan.update({ where: { id: c.id }, data: { documentUrl: url } })
+        auditLater({ actorId: actor.id, actorName: actor.name, action: "payroll.challan_attach", targetType: "StatutoryChallan", targetId: c.id, targetName: `${c.type} ${c.month}/${c.year}`, summary: `Paid challan uploaded: ${c.type} ${c.month}/${c.year} ₹${c.amount}`, ...requestMeta(req) })
+        return NextResponse.json({ challan: u })
     }
     if (b?.action === "record") {
         const type = String(b.type) as ChallanType

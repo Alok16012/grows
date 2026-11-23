@@ -129,7 +129,7 @@ export async function monthRegister(month: number, year: number, now = new Date(
 export async function recentMonths(count = 6, now = new Date()) {
     const months: { year: number; month: number }[] = await prisma.$queryRawUnsafe(`SELECT DISTINCT year, month FROM "Payroll" WHERE status::text <> 'DRAFT' ORDER BY year DESC, month DESC LIMIT ${Math.max(1, Math.min(24, count))}`)
     const out = []
-    for (const m of months) { const r = await monthRegister(m.month, m.year, now); out.push({ month: m.month, year: m.year, rows: r.rows.map(x => ({ type: x.type, due: x.due, paid: x.paid, status: x.status, dueDate: x.dueDate })) }) }
+    for (const m of months) { const r = await monthRegister(m.month, m.year, now); out.push({ month: m.month, year: m.year, rows: r.rows.map(x => ({ type: x.type, due: x.due, paid: x.paid, status: x.status, dueDate: x.dueDate, challans: x.challans.map(c => ({ id: c.id, documentUrl: c.documentUrl ? "1" : null })) })) }) }
     return out
 }
 

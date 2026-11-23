@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { AlertTriangle, ArrowLeft, Info, Loader2, Plus, Trash2, X } from "lucide-react"
+import { AlertTriangle, ArrowLeft, FileText, Info, Loader2, Paperclip, Plus, Trash2, Upload, X } from "lucide-react"
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const TYPES = ["PF", "ESI", "PT", "LWF", "TDS"] as const
@@ -24,6 +24,7 @@ export default function ChallansPage() {
     const [tab, setTab] = useState<"months" | "settings" | "drafts">("months")
     const [ov, setOv] = useState<any>(null)
     const [pick, setPick] = useState<{ month: number; year: number } | null>(null)
+    const [upload, setUpload] = useState(false)
     const load = useCallback(() => { fetch("/api/payroll/challans").then(r => r.json()).then(setOv).catch(() => toast.error("Couldn't load")) }, [])
     useEffect(() => { load() }, [load])
     return (
@@ -31,8 +32,12 @@ export default function ChallansPage() {
             <div>
                 <Link href="/payroll/compliance" className="inline-flex items-center gap-1 text-[12.5px] text-[var(--text3)] hover:text-[var(--text)]"><ArrowLeft className="h-3.5 w-3.5" /> Compliance</Link>
                 <h1 className="text-[22px] font-bold text-[var(--text)] mt-1">Statutory challans</h1>
-                <p className="text-[12.5px] text-[var(--text3)]">What is owed each month (worked out from payroll, same figures as the ECR and challan reports), what has been paid, and when it is due.</p>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <p className="text-[12.5px] text-[var(--text3)] max-w-[760px]">What is owed each month (worked out from payroll, same figures as the ECR and challan reports), what has been paid, and when it is due. Upload each month&apos;s paid challan to keep the compliance record complete.</p>
+                    {ov?.canRecord && <button onClick={() => setUpload(true)} className={btn}><Upload size={14} /> Upload paid challan</button>}
+                </div>
             </div>
+            {upload && ov && <RecordModal months={ov.months.map((x: any) => ({ month: x.month, year: x.year, rows: x.rows }))} requireFile onClose={() => setUpload(false)} onSaved={() => { setUpload(false); load(); setPick(p => p ? { ...p } : p) }} />}
             <div className="flex gap-1 border-b border-[var(--border)]">
                 {([["months", "Months"], ["settings", "Due dates & alerts"], ["drafts", `Old drafts${ov?.oldDrafts?.length ? ` (${ov.oldDrafts.length})` : ""}`]] as const).map(([k, l]) => (
                     <button key={k} onClick={() => setTab(k)} className={`px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === k ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text3)]"}`}>{l}</button>
@@ -55,7 +60,7 @@ function Overview({ ov, onPick }: { ov: any; onPick: (m: { month: number; year: 
                 <tbody>{ov.months.map((m: any) => (
                     <tr key={`${m.year}-${m.month}`}>
                         <td className={`${td} font-semibold`}>{MONTHS[m.month - 1]} {m.year}</td>
-                        {TYPES.map(t => { const r = m.rows.find((x: any) => x.type === t); const [l, c] = STATUS[r?.status ?? "NOTHING_DUE"]; return <td key={t} className={td}>{r && r.due > 0 ? <><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${c}`}>{l}</span><span className="block text-[11px] text-[var(--text3)] mt-0.5">{inr(r.paid)} / {inr(r.due)} · due {day(r.dueDate)}</span></> : <span className="text-[var(--text3)]">—</span>}</td> })}
+                        {TYPES.map(t => { const r = m.rows.find((x: any) => x.type === t); const [l, c] = STATUS[r?.status ?? "NOTHING_DUE"]; return <td key={t} className={td}>{r && r.due > 0 ? <><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${c}`}>{l}</span><span className="block text-[11px] text-[var(--text3)] mt-0.5">{inr(r.paid)} / {inr(r.due)} · due {day(r.dueDate)}</span>{(() => { const n = (r.challans ?? []).filter((c: any) => c.documentUrl).length; const missing = (r.challans ?? []).length - n; return n || missing ? <span className={`mt-0.5 inline-flex items-center gap-1 text-[11px] ${missing ? "text-amber-700" : "text-green-700"}`} title={missing ? `${missing} payment(s) without the challan file` : "Paid challan uploaded"}><Paperclip size={11} />{n}{missing ? ` · ${missing} missing` : ""}</span> : null })()}</> : <span className="text-[var(--text3)]">—</span>}</td> })}
                         <td className={`${td} text-right`}><button onClick={() => onPick({ month: m.month, year: m.year })} className={btn2}>Open</button></td>
                     </tr>
                 ))}</tbody>
@@ -111,20 +116,57 @@ function MonthView({ m, canRecord, onBack }: { m: { month: number; year: number 
                             <td className={td}>{r.due > 0 ? day(r.dueDate) : "—"}</td>
                             <td className={`${td} tabular-nums`}>{inr(r.paid)}{r.paid > 0 && r.paid !== r.due && <span className={`block text-[11px] ${r.paid > r.due ? "text-amber-700" : "text-red-600"}`}>{r.paid > r.due ? "+" : ""}{inr(r.paid - r.due)} vs due</span>}</td>
                             <td className={td}><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${c}`}>{l}</span></td>
-                            <td className={`${td} text-[11.5px]`}>{r.challans.map((c: any) => <div key={c.id} className="flex items-center gap-1.5">{inr(c.amount)} · {c.trrnNumber ?? "no ref"} · {day(c.paymentDate)}{c.status !== "PAID" && ` (${c.status.toLowerCase()})`}{c.documentUrl && <a href={c.documentUrl} target="_blank" rel="noreferrer" className="text-[var(--accent)]">receipt</a>}{canRecord && <button onClick={() => remove(c.id)} aria-label="Remove" className="text-red-600"><Trash2 size={12} /></button>}</div>)}</td>
+                            <td className={`${td} text-[11.5px]`}>{r.challans.map((c: any) => <div key={c.id} className="flex items-center gap-1.5">{inr(c.amount)} · {c.trrnNumber ?? "no ref"} · {day(c.paymentDate)}{c.status !== "PAID" && ` (${c.status.toLowerCase()})`}{c.documentUrl
+                                ? <a href={c.documentUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-semibold text-[var(--accent)]"><FileText size={12} /> View challan</a>
+                                : canRecord && <AttachButton id={c.id} onDone={load} />}{canRecord && <button onClick={() => remove(c.id)} aria-label="Remove" className="text-red-600"><Trash2 size={12} /></button>}</div>)}</td>
                             <td className={`${td} text-right`}>{canRecord && (r.due > 0 || r.challans.length > 0) && <button onClick={() => setRec(r.type)} className={btn2}><Plus size={12} /> Record</button>}</td>
                         </tr>
                     ) })}</tbody>
                 </table>
             </div>
-            {rec && <RecordModal type={rec} m={m} due={Math.max(0, (d.rows.find((r: any) => r.type === rec)?.due ?? 0) - (d.rows.find((r: any) => r.type === rec)?.paid ?? 0))} onClose={() => setRec(null)} onSaved={() => { setRec(null); load() }} />}
+            {rec && <RecordModal months={[{ month: m.month, year: m.year, rows: d.rows }]} type={rec} onClose={() => setRec(null)} onSaved={() => { setRec(null); load() }} />}
         </div>
     )
 }
 
-function RecordModal({ type, m, due, onClose, onSaved }: { type: string; m: { month: number; year: number }; due: number; onClose: () => void; onSaved: () => void }) {
+/** Upload a paid challan file and attach it to a record saved without one. */
+function AttachButton({ id, onDone }: { id: string; onDone: () => void }) {
+    const [busy, setBusy] = useState(false)
+    async function pickFile(file: File) {
+        setBusy(true)
+        try {
+            const fd = new FormData(); fd.append("file", file); fd.append("kind", "document")
+            const up = await fetch("/api/upload", { method: "POST", body: fd }); const j = await up.json().catch(() => ({}))
+            if (!up.ok || !j.url) throw new Error(j.error || "Upload failed")
+            const r = await fetch("/api/payroll/challans", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "attach", id, documentUrl: j.url }) })
+            if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || "Could not save")
+            toast.success("Paid challan uploaded"); onDone()
+        } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
+    }
+    return (
+        <label className="inline-flex items-center gap-0.5 font-semibold text-amber-700 cursor-pointer" title="Upload the paid challan (PDF / photo)">
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Attach challan
+            <input type="file" accept=".pdf,image/*" hidden disabled={busy} onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) pickFile(f) }} />
+        </label>
+    )
+}
+
+type MonthOpt = { month: number; year: number; rows: any[] }
+function RecordModal({ months, type: fixedType, requireFile, onClose, onSaved }: { months: MonthOpt[]; type?: string; requireFile?: boolean; onClose: () => void; onSaved: () => void }) {
+    const [mk, setMk] = useState(months[0] ? `${months[0].year}-${months[0].month}` : "")
+    const mo = months.find(x => `${x.year}-${x.month}` === mk) ?? months[0]
+    const m = { month: mo?.month ?? 0, year: mo?.year ?? 0 }
+    // From the top button: first type with something still to pay that month.
+    const firstOpen = (o?: MonthOpt) => (o?.rows ?? []).find((r: any) => r.due > 0 && r.paid < r.due)?.type ?? "PF"
+    const [type, setType] = useState<string>(fixedType ?? firstOpen(mo))
+    const outstanding = (o: MonthOpt | undefined, t: string) => { const r = (o?.rows ?? []).find((x: any) => x.type === t); return Math.max(0, (r?.due ?? 0) - (r?.paid ?? 0)) }
+    const due = outstanding(mo, type)
     const [f, setF] = useState({ amount: String(due || ""), trrnNumber: "", paymentDate: new Date().toISOString().slice(0, 10), status: "PAID" })
     const [file, setFile] = useState<File | null>(null)
+    const choose = (nextMk: string, nextType: string) => {
+        const o = months.find(x => `${x.year}-${x.month}` === nextMk)
+        setMk(nextMk); setType(nextType); setF(x => ({ ...x, amount: String(outstanding(o, nextType) || "") }))
+    }
     const [busy, setBusy] = useState(false)
     useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }; document.addEventListener("keydown", k); return () => document.removeEventListener("keydown", k) }, [onClose])
     async function save() {
@@ -139,23 +181,29 @@ function RecordModal({ type, m, due, onClose, onSaved }: { type: string; m: { mo
             }
             const r = await fetch("/api/payroll/challans", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "record", type, month: m.month, year: m.year, ...f, amount: Number(f.amount), documentUrl }) })
             const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j?.error || "Could not save")
-            toast.success("Challan recorded"); onSaved()
+            toast.success(documentUrl ? "Paid challan uploaded" : "Challan recorded"); onSaved()
         } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
     }
     const lbl = "block text-[11px] font-semibold uppercase text-[var(--text3)]"
     return (
         <div onMouseDown={e => { if (e.target === e.currentTarget) onClose() }} className="fixed inset-0 z-[1000] bg-black/40 flex items-center justify-center p-4">
             <div role="dialog" aria-modal="true" aria-label="Record challan" className="w-full max-w-md bg-white rounded-[14px] border border-[var(--border)] shadow-xl">
-                <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[var(--border)]"><h3 className="text-[15px] font-semibold">{TYPE_LABEL[type]} — {MONTHS[m.month - 1]} {m.year}</h3><button onClick={onClose} aria-label="Close" className="p-1 text-[var(--text3)]"><X size={18} /></button></div>
+                <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[var(--border)]"><h3 className="text-[15px] font-semibold">{fixedType ? `${TYPE_LABEL[type]} — ${MONTHS[m.month - 1]} ${m.year}` : "Upload paid challan"}</h3><button onClick={onClose} aria-label="Close" className="p-1 text-[var(--text3)]"><X size={18} /></button></div>
                 <div className="p-5 space-y-3">
+                    {!fixedType && (
+                        <div className="grid grid-cols-2 gap-3">
+                            <label className={lbl}>Wage month<select value={mk} onChange={e => choose(e.target.value, firstOpen(months.find(x => `${x.year}-${x.month}` === e.target.value)))} className={`${box} w-full`}>{months.map(o => <option key={`${o.year}-${o.month}`} value={`${o.year}-${o.month}`}>{MONTHS[o.month - 1]} {o.year}</option>)}</select></label>
+                            <label className={lbl}>Challan<select value={type} onChange={e => choose(mk, e.target.value)} className={`${box} w-full`}>{TYPES.map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}</select></label>
+                        </div>
+                    )}
                     <label className={lbl}>Amount paid (₹){due > 0 && <span className="normal-case font-normal"> — outstanding {inr(due)}</span>}<input type="number" value={f.amount} onChange={e => setF(x => ({ ...x, amount: e.target.value }))} className={`${box} w-full`} /></label>
                     <label className={lbl}>{type === "PF" ? "TRRN" : "Challan / reference no."}<input value={f.trrnNumber} onChange={e => setF(x => ({ ...x, trrnNumber: e.target.value }))} className={`${box} w-full`} /></label>
                     <div className="grid grid-cols-2 gap-3">
                         <label className={lbl}>Payment date<input type="date" value={f.paymentDate} onChange={e => setF(x => ({ ...x, paymentDate: e.target.value }))} className={`${box} w-full`} /></label>
                         <label className={lbl}>Status<select value={f.status} onChange={e => setF(x => ({ ...x, status: e.target.value }))} className={`${box} w-full`}><option value="PAID">Paid</option><option value="PENDING">Generated, not paid yet</option></select></label>
                     </div>
-                    <label className={lbl}>Receipt (PDF / image, optional)<input type="file" accept=".pdf,image/*" onChange={e => setFile(e.target.files?.[0] ?? null)} className="block text-[12.5px] mt-1" /></label>
-                    <div className="flex justify-end gap-2"><button onClick={onClose} className={btn2}>Cancel</button><button onClick={save} disabled={busy || !(Number(f.amount) > 0)} className={btn}>{busy && <Loader2 size={14} className="animate-spin" />}Save</button></div>
+                    <label className={lbl}>Paid challan (PDF / photo){requireFile ? <span className="text-red-600"> *</span> : <span className="normal-case font-normal"> — optional, can be attached later</span>}<input type="file" accept=".pdf,image/*" onChange={e => setFile(e.target.files?.[0] ?? null)} className="block text-[12.5px] mt-1" /></label>
+                    <div className="flex justify-end gap-2"><button onClick={onClose} className={btn2}>Cancel</button><button onClick={save} disabled={busy || !(Number(f.amount) > 0) || !m.month || (requireFile && !file)} className={btn}>{busy && <Loader2 size={14} className="animate-spin" />}Save</button></div>
                 </div>
             </div>
         </div>
