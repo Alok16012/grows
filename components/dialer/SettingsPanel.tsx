@@ -4,10 +4,35 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Loader2, Plus, Trash2 } from "lucide-react"
-import { STAGES, type DialerSettings } from "@/lib/dialer"
+import { STAGES, type DialerSettings, type TextBlock } from "@/lib/dialer"
 
 const box = "h-9 rounded-[9px] border border-[var(--border)] px-2.5 text-[13px] bg-white"
 const lbl = "block text-[11px] font-semibold uppercase text-[var(--text3)] mb-1"
+
+const FOR: Record<TextBlock["for"], string> = { ALL: "Everyone", SALES_LEAD: "Sales leads", CANDIDATE: "Candidates", EMPLOYEE: "Employees", UNKNOWN: "Unknown numbers" }
+
+function Blocks({ title, hint, list, canEdit, onChange }: { title: string; hint: string; list: TextBlock[]; canEdit: boolean; onChange: (l: TextBlock[]) => void }) {
+    const set = (i: number, patch: Partial<TextBlock>) => { const x = [...list]; x[i] = { ...x[i], ...patch }; onChange(x) }
+    return (
+        <section className="rounded-[12px] border border-[var(--border)] bg-white p-4">
+            <h3 className="text-[14px] font-bold mb-1">{title}</h3>
+            <p className="text-[11.5px] text-[var(--text3)] mb-3">{hint} Placeholders: <code>{"{name}"}</code> <code>{"{company}"}</code> <code>{"{me}"}</code> <code>{"{our_company}"}</code>.</p>
+            <div className="space-y-3">
+                {list.map((b, i) => (
+                    <div key={i} className="rounded-[10px] border border-[var(--border)] p-3 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <input disabled={!canEdit} className={`${box} w-[240px]`} value={b.title} onChange={e => set(i, { title: e.target.value })} aria-label="Title" />
+                            <select disabled={!canEdit} className={box} value={b.for} onChange={e => set(i, { for: e.target.value as TextBlock["for"] })}>{(["ALL", "SALES_LEAD", "CANDIDATE", "EMPLOYEE"] as const).map(k => <option key={k} value={k}>For: {FOR[k]}</option>)}</select>
+                            {canEdit && <button onClick={() => onChange(list.filter((_, j) => j !== i))} className="p-1.5 text-[var(--text3)] hover:text-red-600 ml-auto" aria-label="Remove"><Trash2 size={14} /></button>}
+                        </div>
+                        <textarea disabled={!canEdit} rows={4} className="w-full rounded-[9px] border border-[var(--border)] px-2.5 py-1.5 text-[12.5px]" value={b.body} onChange={e => set(i, { body: e.target.value })} />
+                    </div>
+                ))}
+                {canEdit && <button onClick={() => onChange([...list, { key: "", title: "New", for: "ALL", body: "" }])} className="h-8 px-3 rounded-[8px] border border-[var(--border)] text-[12px] font-semibold inline-flex items-center gap-1"><Plus size={13} /> Add</button>}
+            </div>
+        </section>
+    )
+}
 
 export function SettingsPanel() {
     const [s, setS] = useState<DialerSettings | null>(null)
@@ -65,6 +90,12 @@ export function SettingsPanel() {
                     {canEdit && <button onClick={() => setS({ ...s, outcomes: [...s.outcomes, { key: "", label: "New outcome" }] })} className="h-8 px-3 rounded-[8px] border border-[var(--border)] text-[12px] font-semibold inline-flex items-center gap-1"><Plus size={13} /> Add outcome</button>}
                 </div>
             </section>
+            <section className="rounded-[12px] border border-[var(--border)] bg-white p-4">
+                <h3 className="text-[14px] font-bold mb-3">Auto-dial</h3>
+                <div className="grid sm:grid-cols-3 gap-3">{n("autoDialGapSec", "Seconds before the next call", "After a caller saves the outcome, the next number dials after this pause.")}</div>
+            </section>
+            <Blocks title="Call scripts" hint="Talking points shown in the call panel while the call is on. Pick who each script is for." list={s.scripts} canEdit={canEdit} onChange={scripts => setS({ ...s, scripts })} />
+            <Blocks title="WhatsApp messages" hint="One-tap messages after a call. They open WhatsApp on the phone (or WhatsApp Web on a laptop) with the text filled in, and are noted on the call." list={s.waTemplates} canEdit={canEdit} onChange={waTemplates => setS({ ...s, waTemplates })} />
             {canEdit && <div className="flex justify-end"><button onClick={save} disabled={busy} className="h-9 px-5 rounded-[9px] bg-[var(--accent)] text-white text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">{busy && <Loader2 size={14} className="animate-spin" />} Save settings</button></div>}
         </div>
     )

@@ -3,8 +3,10 @@
 // My day as a caller: calls waiting for an outcome, then who to call (follow-ups due,
 // new leads, new candidates). Works on a laptop (rings the paired phone) and in the phone app.
 import { useCallback, useEffect, useState } from "react"
-import { AlertTriangle, CheckCircle2, Loader2, Smartphone } from "lucide-react"
+import { toast } from "sonner"
+import { AlertTriangle, CheckCircle2, Loader2, Play, Smartphone } from "lucide-react"
 import { CallButton, OutcomeForm } from "@/components/dialer/CallButton"
+import { AutoDial, type DialItem } from "@/components/dialer/AutoDial"
 import { fmtDur, TARGET_TYPES, type TargetType } from "@/lib/dialer"
 
 type Q = {
@@ -18,7 +20,9 @@ export function MyCalls() {
     const [q, setQ] = useState<Q | null>(null)
     const [open, setOpen] = useState<string | null>(null)
     const [filter, setFilter] = useState<"all" | TargetType>("all")
+    const [auto, setAuto] = useState<DialItem[] | null>(null)
     const load = useCallback(() => fetch("/api/dialer/queue").then(r => r.json()).then(setQ).catch(() => {}), [])
+    const finishAuto = useCallback((n: number) => { setAuto(null); if (n) toast.success(`Auto-dial finished — ${n} call(s) noted`); load() }, [load])
     useEffect(() => { load(); const t = setInterval(load, 30_000); return () => clearInterval(t) }, [load])
     if (!q) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-[var(--text3)]" /></div>
     const list = q.toCall.filter(x => filter === "all" || x.type === filter)
@@ -49,7 +53,10 @@ export function MyCalls() {
 
             <section className="rounded-[12px] border border-[var(--border)] bg-white">
                 <div className="px-4 pt-3 flex items-center justify-between gap-2 flex-wrap">
-                    <h3 className="text-[14px] font-bold text-[var(--text)]">To call ({list.length})</h3>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-[14px] font-bold text-[var(--text)]">To call ({list.length})</h3>
+                        {list.length > 0 && !auto && <button onClick={() => setAuto(list.map(x => ({ type: x.type, id: x.id, name: x.name, sub: x.sub, phone: x.phone })))} className="h-7 px-2.5 rounded-full bg-green-600 text-white text-[11.5px] font-semibold inline-flex items-center gap-1" title="Call the list one after another; the next number dials itself after you save the outcome"><Play size={11} /> Start auto-dial</button>}
+                    </div>
                     <div className="flex gap-1">
                         {(["all", "SALES_LEAD", "CANDIDATE"] as const).map(f => <button key={f} onClick={() => setFilter(f)} className={`h-7 px-2.5 rounded-full text-[11.5px] font-semibold border ${filter === f ? "bg-gray-900 text-white border-gray-900" : "bg-white border-[var(--border)] text-[var(--text2)]"}`}>{f === "all" ? "All" : f === "SALES_LEAD" ? "Sales leads" : "Candidates"}</button>)}
                     </div>
@@ -72,6 +79,7 @@ export function MyCalls() {
                     </ul>
                 )}
             </section>
+            {auto && <AutoDial queue={auto} onFinish={finishAuto} onProgress={load} />}
         </div>
     )
 }

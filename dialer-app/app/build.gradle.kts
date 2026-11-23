@@ -22,8 +22,8 @@ android {
         applicationId = "com.growus.dialer"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         // The ERP this app talks to. Override for testing: ./gradlew assembleDebug -PerpUrl=http://192.168.1.5:3000
         buildConfigField("String", "ERP_URL", "\"${(project.findProperty("erpUrl") as String?) ?: "https://www.growuserp.com"}\"")
     }

@@ -3,18 +3,40 @@
 // Click-to-call from anywhere in the ERP. The call is placed by the user's paired phone
 // (Growus Dialer app): laptop click → phone dials → call syncs back → "What happened?" form.
 // Inside the app itself the phone dials at once through the app bridge.
-import { useEffect, useRef, useState } from "react"
+// While the call is on, the panel shows the call script; after it, WhatsApp follow-up messages.
+import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Loader2, Phone, PhoneOff, Smartphone, X } from "lucide-react"
-import { fmtDur, type Outcome, type TargetType } from "@/lib/dialer"
+import { ChevronDown, ChevronUp, FileText, Loader2, MessageCircle, Phone, PhoneOff, Smartphone, X } from "lucide-react"
+import { COMPANY } from "@/lib/company"
+import { fillText, fmtDur, forTarget, type DialerSettings, type Outcome, type TargetType } from "@/lib/dialer"
 
 declare global { interface Window { GrowusDialer?: { dial: (phone: string, requestId: string) => void; isApp?: () => boolean } } }
 
 type Call = { id: string; connected: boolean; durationSec: number; outcome: string | null; notes?: string | null; targetName?: string | null; targetType?: string; phone?: string }
-let outcomesCache: Promise<Outcome[]> | null = null
-export function loadOutcomes() {
-    outcomesCache ??= fetch("/api/dialer/settings").then(r => r.json()).then(j => j?.settings?.outcomes ?? []).catch(() => { outcomesCache = null; return [] })
-    return outcomesCache
+
+// Settings + my name, loaded once per page.
+type Ctx = { settings: DialerSettings | null; me: string }
+let ctxCache: Promise<Ctx> | null = null
+export function loadDialerCtx(): Promise<Ctx> {
+    ctxCache ??= Promise.all([
+        fetch("/api/dialer/settings").then(r => r.json()).then(j => j?.settings ?? null),
+        fetch("/api/dialer/meta").then(r => r.json()).then(j => j?.name ?? "").catch(() => ""),
+    ]).then(([settings, me]) => ({ settings, me })).catch(() => { ctxCache = null; return { settings: null, me: "" } })
+    return ctxCache
+}
+export function loadOutcomes(): Promise<Outcome[]> { return loadDialerCtx().then(c => c.settings?.outcomes ?? []) }
+function useDialerCtx() {
+    const [c, setC] = useState<Ctx>({ settings: null, me: "" })
+    useEffect(() => { loadDialerCtx().then(setC) }, [])
+    return c
+}
+
+/** WhatsApp click-to-chat link (opens the WhatsApp app on a phone, WhatsApp Web on a laptop). Indian 10-digit numbers get +91. */
+export function waLink(phone: string, text: string) {
+    let d = String(phone).replace(/\D/g, "")
+    if (d.length === 11 && d.startsWith("0")) d = d.slice(1)
+    if (d.length === 10) d = "91" + d
+    return `https://wa.me/${d}?text=${encodeURIComponent(text)}`
 }
 
 const btnS = "inline-flex items-center justify-center gap-1 rounded-[8px] border border-[var(--border)] bg-white text-[var(--text2)] hover:bg-green-50 hover:text-green-700 hover:border-green-300 font-semibold disabled:opacity-50"
@@ -42,11 +64,17 @@ export function CallHost() {
 }
 
 type State = { step: "starting" | "waiting" | "dialing" | "done" | "error" | "pair"; msg?: string; requestId?: string; deviceName?: string | null; online?: boolean; call?: Call | null }
+/** How a call panel ended — auto-dial uses it to go on or stop. */
+export type CallEnd = "saved" | "closed" | "failed"
 
-export function CallPanel({ phone, targetType, targetId, name, onClose }: { phone: string; targetType?: TargetType; targetId?: string; name?: string; onClose: () => void }) {
+export function CallPanel({ phone, targetType, targetId, name, onClose, onDone, banner }: {
+    phone: string; targetType?: TargetType; targetId?: string; name?: string; onClose: () => void
+    onDone?: (how: CallEnd) => void; banner?: React.ReactNode
+}) {
     const [s, setS] = useState<State>({ step: "starting" })
     const [mounted, setMounted] = useState(false)
     const started = useRef(false)
+    const finish = (how: CallEnd) => { onDone?.(how); onClose() }
     useEffect(() => setMounted(true), [])
     useEffect(() => {
         if (started.current) return
@@ -54,12 +82,13 @@ export function CallPanel({ phone, targetType, targetId, name, onClose }: { phon
         ;(async () => {
             const r = await fetch("/api/dialer/dial", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone, targetType, targetId }) })
             const j = await r.json().catch(() => ({}))
-            if (r.status === 403) { window.location.href = `tel:${phone}`; onClose(); return }
+            if (r.status === 403) { window.location.href = `tel:${phone}`; onDone?.("failed"); onClose(); return }
             if (!r.ok) { setS({ step: j?.needsPairing ? "pair" : "error", msg: j?.error }); return }
             if (window.GrowusDialer) { try { window.GrowusDialer.dial(phone, j.id) } catch {} }
             setS({ step: "waiting", requestId: j.id, deviceName: j.deviceName, online: j.online })
         })().catch(() => setS({ step: "error", msg: "Network error" }))
-    }, [phone, targetType, targetId, onClose])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
     // Follow the request until the call has synced (up to 30 minutes for long calls).
     useEffect(() => {
         if (!s.requestId || s.step === "done" || s.step === "error") return
@@ -74,10 +103,11 @@ export function CallPanel({ phone, targetType, targetId, name, onClose }: { phon
         }, 2000)
         return () => clearInterval(t)
     }, [s.requestId, s.step])
-    const cancel = async () => { if (s.requestId && s.step === "waiting") await fetch(`/api/dialer/dial?id=${s.requestId}`, { method: "DELETE" }).catch(() => {}); onClose() }
+    const cancel = async () => { if (s.requestId && s.step === "waiting") await fetch(`/api/dialer/dial?id=${s.requestId}`, { method: "DELETE" }).catch(() => {}); finish(s.step === "error" || s.step === "pair" ? "failed" : "closed") }
     if (!mounted) return null
     return createPortal(
-        <div className="fixed bottom-4 right-4 z-[80] w-[340px] max-w-[calc(100vw-2rem)] rounded-[14px] border border-[var(--border)] bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed bottom-4 right-4 z-[80] w-[380px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[14px] border border-[var(--border)] bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+            {banner}
             <div className="flex items-center justify-between px-4 pt-3">
                 <div className="min-w-0">
                     <div className="text-[14px] font-bold text-[var(--text)] truncate">{name || phone}</div>
@@ -85,7 +115,7 @@ export function CallPanel({ phone, targetType, targetId, name, onClose }: { phon
                 </div>
                 <button onClick={cancel} className="p-1 rounded hover:bg-gray-100" aria-label="Close"><X size={16} /></button>
             </div>
-            <div className="p-4 pt-3 text-[13px]">
+            <div className="p-4 pt-3 text-[13px] space-y-3">
                 {s.step === "starting" && <div className="flex items-center gap-2 text-[var(--text2)]"><Loader2 size={15} className="animate-spin" /> Sending to your phone…</div>}
                 {(s.step === "waiting" || s.step === "dialing") && (
                     <div className="space-y-2">
@@ -107,21 +137,48 @@ export function CallPanel({ phone, targetType, targetId, name, onClose }: { phon
                     </div>
                 )}
                 {s.step === "error" && <div className="flex items-start gap-2 text-red-700"><PhoneOff size={15} className="mt-0.5 shrink-0" /> {s.msg || "Could not call"}</div>}
-                {s.step === "done" && s.call && <OutcomeForm call={s.call} onSaved={onClose} />}
+                {s.step !== "done" && s.step !== "pair" && <Script targetType={targetType} name={name} />}
+                {s.step === "done" && s.call && <OutcomeForm call={{ ...s.call, phone, targetName: name ?? null, targetType }} onSaved={() => finish("saved")} />}
             </div>
         </div>, document.body)
 }
 
+/** The talking points for this kind of call, with the person's name filled in. */
+function Script({ targetType, name }: { targetType?: string; name?: string }) {
+    const { settings, me } = useDialerCtx()
+    const list = useMemo(() => forTarget(settings?.scripts ?? [], targetType ?? "UNKNOWN"), [settings, targetType])
+    const [open, setOpen] = useState(true)
+    const [pick, setPick] = useState(0)
+    if (!list.length) return null
+    const sc = list[Math.min(pick, list.length - 1)]
+    return (
+        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface2)]/40">
+            <button type="button" onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-3 py-2 text-[12.5px] font-semibold text-[var(--text)]">
+                <span className="inline-flex items-center gap-1.5"><FileText size={13} /> Script{list.length === 1 ? `: ${sc.title}` : ""}</span>{open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            {open && (
+                <div className="px-3 pb-3 space-y-2">
+                    {list.length > 1 && <div className="flex flex-wrap gap-1">{list.map((x, i) => <button key={x.key} type="button" onClick={() => setPick(i)} className={`px-2 py-0.5 rounded-full border text-[11.5px] ${i === pick ? "bg-gray-900 text-white border-gray-900" : "bg-white border-[var(--border)] text-[var(--text2)]"}`}>{x.title}</button>)}</div>}
+                    <div className="text-[12.5px] leading-relaxed text-[var(--text2)] whitespace-pre-line">{fillText(sc.body, { name, me, ourCompany: COMPANY.name })}</div>
+                </div>
+            )}
+        </div>
+    )
+}
+
 export function OutcomeForm({ call, onSaved, compact }: { call: Call; onSaved: (c: any) => void; compact?: boolean }) {
-    const [outcomes, setOutcomes] = useState<Outcome[]>([])
+    const { settings, me } = useDialerCtx()
+    const outcomes = settings?.outcomes ?? []
+    const wa = forTarget(settings?.waTemplates ?? [], call.targetType ?? "UNKNOWN")
     const [outcome, setOutcome] = useState(call.outcome ?? "")
     const [notes, setNotes] = useState(call.notes ?? "")
     const [follow, setFollow] = useState("")
     const [busy, setBusy] = useState(false)
     const [err, setErr] = useState("")
-    useEffect(() => { loadOutcomes().then(setOutcomes) }, [])
     const o = outcomes.find(x => x.key === outcome)
     const quick = (days: number) => { const d = new Date(Date.now() + days * 86400_000); d.setHours(days === 0 ? d.getHours() + 2 : 11, 0, 0, 0); const p = (n: number) => String(n).padStart(2, "0"); setFollow(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`) }
+    // Opening a WhatsApp message also notes it on the call.
+    const sentWa = (title: string) => setNotes(n => n.includes(`WhatsApp: ${title}`) ? n : `${n ? n.trimEnd() + "\n" : ""}WhatsApp: ${title}`)
     const save = async () => {
         if (!outcome) { setErr("Pick what happened"); return }
         setBusy(true); setErr("")
@@ -147,6 +204,14 @@ export function OutcomeForm({ call, onSaved, compact }: { call: Call; onSaved: (
                         <button type="button" onClick={() => quick(1)} className="text-[11.5px] underline text-[var(--text3)]">Tomorrow</button>
                         <button type="button" onClick={() => quick(3)} className="text-[11.5px] underline text-[var(--text3)]">3 days</button>
                         {follow && <button type="button" onClick={() => setFollow("")} className="text-[11.5px] underline text-[var(--text3)]">None</button>}
+                    </div>
+                </div>
+            )}
+            {call.phone && wa.length > 0 && (
+                <div className="space-y-1">
+                    <div className="text-[11px] font-semibold uppercase text-[var(--text3)] inline-flex items-center gap-1"><MessageCircle size={12} /> Send on WhatsApp</div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {wa.map(t => <a key={t.key} href={waLink(call.phone!, fillText(t.body, { name: call.targetName, me, ourCompany: COMPANY.name }))} target="_blank" rel="noopener noreferrer" onClick={() => sentWa(t.title)} className="px-2.5 py-1 rounded-full border border-green-300 bg-green-50 text-green-800 text-[12px] font-medium hover:bg-green-100">{t.title}</a>)}
                     </div>
                 </div>
             )}

@@ -15,7 +15,6 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
 import android.telephony.PhoneStateListener
-import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import org.json.JSONObject
 
@@ -30,7 +29,9 @@ class DialerService : Service() {
     companion object {
         private const val CH_RUN = "dialer_running"
         private const val CH_CALL = "dialer_outcome"
+        private const val CH_CALLER = "dialer_caller_id"
         private const val ID_RUN = 1
+        private const val ID_CALLER = 2
         fun start(c: Context) {
             val i = Intent(c, DialerService::class.java)
             if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(i) else c.startService(i)
@@ -128,7 +129,9 @@ class DialerService : Service() {
     private fun backoff() = minOf(60_000L, 5000L * (1L shl minOf(failures, 4)))
 
     // ─── Call state ─────────────────────────────────────────────────────────
-    private fun onState(state: Int) {
+    private fun onState(state: Int, number: String?) {
+        if (state == TelephonyManager.CALL_STATE_RINGING && !number.isNullOrBlank()) callerId(number)
+        if (state == TelephonyManager.CALL_STATE_IDLE) getSystemService(NotificationManager::class.java).cancel(ID_CALLER)
         val was = onCall
         onCall = state == TelephonyManager.CALL_STATE_OFFHOOK
         if (onCall != was) schedule(0)
@@ -136,30 +139,39 @@ class DialerService : Service() {
         if (was && state == TelephonyManager.CALL_STATE_IDLE) { worker.postDelayed({ schedule(0) }, 1500); worker.postDelayed({ schedule(0) }, 6000) }
     }
 
+    // PhoneStateListener (not TelephonyCallback) because it also hands over the ringing number (with Call logs permission) for caller ID.
     @SuppressLint("MissingPermission")
+    @Suppress("DEPRECATION")
     private fun listenCallState() {
         if (!has(Manifest.permission.READ_PHONE_STATE)) return
         val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         try {
-            if (Build.VERSION.SDK_INT >= 31) {
-                val cb = object : TelephonyCallback(), TelephonyCallback.CallStateListener { override fun onCallStateChanged(state: Int) = onState(state) }
-                tm.registerTelephonyCallback(mainExecutor, cb)
-                stateCallback = cb
-            } else {
-                @Suppress("DEPRECATION")
-                val l = object : PhoneStateListener() { @Deprecated("old API") override fun onCallStateChanged(state: Int, phoneNumber: String?) = onState(state) }
-                @Suppress("DEPRECATION")
-                tm.listen(l, PhoneStateListener.LISTEN_CALL_STATE)
-                stateCallback = l
-            }
+            val l = object : PhoneStateListener() { @Deprecated("old API") override fun onCallStateChanged(state: Int, phoneNumber: String?) = onState(state, phoneNumber) }
+            tm.listen(l, PhoneStateListener.LISTEN_CALL_STATE)
+            stateCallback = l
         } catch (_: SecurityException) { }
     }
 
+    @Suppress("DEPRECATION")
     private fun unlistenCallState() {
         val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-        val cb = stateCallback ?: return
-        if (Build.VERSION.SDK_INT >= 31 && cb is TelephonyCallback) tm.unregisterTelephonyCallback(cb)
-        else if (cb is PhoneStateListener) { @Suppress("DEPRECATION") tm.listen(cb, PhoneStateListener.LISTEN_NONE) }
+        (stateCallback as? PhoneStateListener)?.let { tm.listen(it, PhoneStateListener.LISTEN_NONE) }
+    }
+
+    /** Ringing: ask the ERP who it is and show it on top of the incoming-call screen. Unknown numbers show nothing. */
+    private fun callerId(number: String) {
+        Thread {
+            try {
+                val m = Api.post(this, "/api/dialer/device/lookup", JSONObject().put("phone", number)).optJSONObject("match") ?: return@Thread
+                val text = listOf(m.optString("line1"), m.optString("line2")).filter { it.isNotBlank() }.joinToString("\n")
+                val n = Notification.Builder(this, CH_CALLER).setSmallIcon(R.drawable.ic_stat_phone)
+                    .setContentTitle("📞 " + m.optString("title")).setContentText(m.optString("line1"))
+                    .setStyle(Notification.BigTextStyle().bigText(text))
+                    .setCategory(Notification.CATEGORY_CALL).setAutoCancel(true)
+                    .setContentIntent(openApp("/dialer?tab=my", ID_CALLER)).build()
+                getSystemService(NotificationManager::class.java).notify(ID_CALLER, n)
+            } catch (_: Exception) { }
+        }.start()
     }
 
     // ─── Notifications ──────────────────────────────────────────────────────
@@ -167,6 +179,7 @@ class DialerService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CH_RUN, "Dialer running", NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(false) })
         nm.createNotificationChannel(NotificationChannel(CH_CALL, "After a call", NotificationManager.IMPORTANCE_HIGH))
+        nm.createNotificationChannel(NotificationChannel(CH_CALLER, "Caller ID", NotificationManager.IMPORTANCE_HIGH).apply { setSound(null, null); enableVibration(false) })
     }
 
     private fun openApp(path: String, req: Int): PendingIntent =

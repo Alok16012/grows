@@ -34,6 +34,45 @@ export const DEFAULT_OUTCOMES: Outcome[] = [
     { key: "DONE", label: "Work done / resolved", positive: true },
 ]
 
+/** Talking points (scripts) and WhatsApp messages, per kind of call. Placeholders: {name} {company} {me} {our_company}. */
+export type TextBlock = { key: string; title: string; for: "ALL" | TargetType; body: string }
+export const DEFAULT_SCRIPTS: TextBlock[] = [
+    { key: "SALES_INTRO", title: "Sales — first call", for: "SALES_LEAD", body: `Namaste {name}, this is {me} from {our_company}.
+1. We provide manpower, security and inspection services to manufacturing companies.
+2. Ask: How do you manage manpower / quality inspection today? Any shortage or attrition issues?
+3. Ask: How many people, which shifts, from when?
+4. Offer: a short visit or a quote by WhatsApp / email.
+5. Fix the next step: meeting date or call-back time.` },
+    { key: "SALES_FOLLOWUP", title: "Sales — follow-up", for: "SALES_LEAD", body: `Namaste {name}, {me} from {our_company} — following up on our last talk.
+1. Did you get a chance to look at our proposal / brochure?
+2. Any questions on rates, shifts or start date?
+3. Ask for the decision maker and timeline.
+4. Fix the next step.` },
+    { key: "CANDIDATE_SCREEN", title: "Candidate screening", for: "CANDIDATE", body: `Namaste {name}, this is {me} from {our_company} about the job you applied for.
+1. Confirm: current location, experience, current / expected salary.
+2. Confirm: notice period / can join from when?
+3. Explain: job role, site location, shift, salary, PF / ESIC.
+4. If interested: fix interview date and time, ask to bring Aadhaar, PAN, bank passbook, photos.` },
+    { key: "EMPLOYEE_HR", title: "Employee — HR call", for: "EMPLOYEE", body: `Namaste {name}, this is {me} from HR, {our_company}.
+1. Reason for the call (attendance / documents / salary / joining).
+2. Listen to the issue and note it.
+3. Tell them the next step and by when.` },
+]
+export const DEFAULT_WA: TextBlock[] = [
+    { key: "SALES_THANKS", title: "Thanks + brochure", for: "SALES_LEAD", body: "Namaste {name}, thank you for your time on the call. I am {me} from {our_company}. As discussed, sharing our details — please let me know a convenient time to meet. 🙏" },
+    { key: "SALES_NOANSWER", title: "Tried to call", for: "SALES_LEAD", body: "Namaste {name}, this is {me} from {our_company}. I tried calling you regarding manpower / inspection services. Please let me know a good time to talk. 🙏" },
+    { key: "CANDIDATE_INTERVIEW", title: "Interview details", for: "CANDIDATE", body: "Namaste {name}, this is {me} from {our_company}. As discussed, please come for the interview on ____ at ____. Bring Aadhaar, PAN, bank passbook and 2 photos. Location: ____" },
+    { key: "CANDIDATE_NOANSWER", title: "Tried to call", for: "CANDIDATE", body: "Namaste {name}, this is {me} from {our_company} about your job application. I tried calling you — please call back or reply here when free." },
+    { key: "EMPLOYEE_NOTE", title: "HR message", for: "EMPLOYEE", body: "Namaste {name}, this is {me} from HR, {our_company}. " },
+]
+/** Fills {name} {company} {me} {our_company}. A "Contact (Company)" display name is split into the two. */
+export function fillText(body: string, v: { name?: string | null; me?: string | null; ourCompany?: string }) {
+    const m = /^(.*?)\s*\((.+)\)\s*$/.exec(v.name ?? "")
+    const name = (m ? m[1] : v.name ?? "").trim(), company = (m ? m[2] : "").trim()
+    return body.replace(/\{name\}/g, name || "Sir/Madam").replace(/\{company\}/g, company).replace(/\{me\}/g, v.me ?? "").replace(/\{our_company\}/g, v.ourCompany ?? "")
+}
+export const forTarget = (list: TextBlock[], t?: string | null) => list.filter(x => x.for === "ALL" || x.for === t)
+
 export type DialerSettings = {
     /** daily targets per caller */
     targetCalls: number
@@ -52,13 +91,26 @@ export type DialerSettings = {
     workStart: string
     workEnd: string
     outcomes: Outcome[]
+    scripts: TextBlock[]
+    waTemplates: TextBlock[]
+    /** seconds before auto-dial calls the next number */
+    autoDialGapSec: number
 }
 export const DEFAULT_SETTINGS: DialerSettings = {
     targetCalls: 100, targetConnected: 50, targetTalkMin: 90, minConnectedSec: 10, idleAfterMin: 15,
     syncIncoming: true, syncUnknown: true, appUrl: "", workStart: "09:30", workEnd: "18:30", outcomes: DEFAULT_OUTCOMES,
+    scripts: DEFAULT_SCRIPTS, waTemplates: DEFAULT_WA, autoDialGapSec: 5,
 }
 const num = (v: unknown, d: number, lo: number, hi: number) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : d }
 const hhmm = (v: unknown, d: string) => typeof v === "string" && /^\d{2}:\d{2}$/.test(v) ? v : d
+function blocks(v: unknown, d: TextBlock[]): TextBlock[] {
+    if (!Array.isArray(v)) return d
+    return v.filter((b: any) => b && typeof b.title === "string" && b.title.trim() && typeof b.body === "string").slice(0, 30).map((b: any, i: number): TextBlock => ({
+        key: String(b.key || b.title).toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || `T${i}`,
+        title: b.title.trim().slice(0, 60), body: b.body.slice(0, 3000),
+        for: ["ALL", "SALES_LEAD", "CANDIDATE", "EMPLOYEE"].includes(b.for) ? b.for : "ALL",
+    }))
+}
 export function sanitizeSettings(v: any): DialerSettings {
     const d = DEFAULT_SETTINGS
     const outs = Array.isArray(v?.outcomes) ? v.outcomes.filter((o: any) => o && typeof o.label === "string" && o.label.trim()).slice(0, 30).map((o: any): Outcome => ({
@@ -75,6 +127,8 @@ export function sanitizeSettings(v: any): DialerSettings {
         appUrl: typeof v?.appUrl === "string" && /^https:\/\/\S+$/.test(v.appUrl.trim()) ? v.appUrl.trim().slice(0, 500) : "",
         workStart: hhmm(v?.workStart, d.workStart), workEnd: hhmm(v?.workEnd, d.workEnd),
         outcomes: outs && outs.length ? outs : d.outcomes,
+        scripts: blocks(v?.scripts, d.scripts), waTemplates: blocks(v?.waTemplates, d.waTemplates),
+        autoDialGapSec: num(v?.autoDialGapSec, d.autoDialGapSec, 2, 60),
     }
 }
 

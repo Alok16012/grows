@@ -28,11 +28,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ status: r.status, call })
 }
 
-// DELETE ?id= — cancel a request that has not been dialled yet.
+// DELETE ?id= — cancel a request that has not been dialled yet. Without id: cancel all of mine still waiting (auto-dial Stop).
 export async function DELETE(req: Request) {
     const g = await guard(req, [])
     if (g instanceof NextResponse) return g
-    const id = new URL(req.url).searchParams.get("id") ?? ""
-    await prisma.dialRequest.updateMany({ where: { id, userId: g.access.userId, status: "PENDING" }, data: { status: "CANCELLED" } })
+    const id = new URL(req.url).searchParams.get("id")
+    await prisma.dialRequest.updateMany({ where: { ...(id ? { id } : {}), userId: g.access.userId, status: "PENDING" }, data: { status: "CANCELLED" } })
     return NextResponse.json({ ok: true })
 }

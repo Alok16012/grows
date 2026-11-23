@@ -6,6 +6,9 @@ A small Android app for telecallers. It shows the ERP's own **Call Dialer** scre
 - **Call sync:** every call made or received on the phone (number, time, direction, duration) is sent to the ERP after it ends, including calls dialled outside the app.
 - **Live status:** "on a call" and idle time for the manager's live view.
 - **Outcome reminder:** after a call to a known lead, candidate or employee, a notification asks what happened.
+- **Caller ID (1.1):** when a known lead, candidate or employee rings, a heads-up notification shows their name, stage and last call note. Unknown numbers show nothing.
+
+Auto-dial, call scripts and WhatsApp follow-ups are ERP screens (`components/dialer/AutoDial.tsx`, `CallButton.tsx`), so they work in the app and on a laptop alike.
 
 There are no recordings, SMS or contacts. The app is installed directly (sideloaded), **not** through the Play Store, because Google Play does not allow call-log access for apps that aren't the default phone app.
 
