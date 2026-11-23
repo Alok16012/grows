@@ -14,6 +14,7 @@ import {
 const FIELD_TYPES: { key: RegisterField["type"]; label: string }[] = [
     { key: "number", label: "Number" }, { key: "text", label: "Text" }, { key: "date", label: "Date" },
     { key: "select", label: "Dropdown" }, { key: "yesno", label: "Yes / No" },
+    { key: "longtext", label: "Long text (several lines)" }, { key: "file", label: "Photo / file upload" },
 ]
 
 export default function RegisterDesignerPage() {

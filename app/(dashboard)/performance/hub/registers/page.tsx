@@ -9,7 +9,7 @@ import { fetchAllEmployees } from "@/lib/fetch-all-employees"
 import { HubShell, useHubPerms } from "../_components/HubNav"
 import {
     api, useHub, Card, CardHead, Loading, Empty, Label, inputCls, filterCls, fullName, qs, isoDay, fmtNum,
-    FREQ_LABEL, btnPrimary, btnGhost, btnIcon, thCls, tdCls,
+    FREQ_LABEL, btnPrimary, btnGhost, btnIcon, thCls, tdCls, UploadButton, EvidenceLink,
     type Register, type RegisterEntry, type RegisterField, type EmpLite,
 } from "../_components/shared"
 
@@ -39,7 +39,9 @@ export default function MyRegistersPage() {
                     list = [...mine, ...all.filter(r => r.isActive && !ids.has(r.id))]
                 }
                 setRegisters(list)
-                setActiveId(id => id || list[0]?.id || "")
+                // ?register=<id> (from a report's "Add details") opens that register.
+                const wanted = new URLSearchParams(window.location.search).get("register")
+                setActiveId(id => id || (wanted && list.some(r => r.id === wanted) ? wanted : "") || list[0]?.id || "")
             } catch (e) { fail(e, "Could not load registers") }
             finally { setLoading(false) }
         })()
@@ -158,6 +160,8 @@ function RegisterPanel({ reg, date, setDate, employeeId, fail }: {
         if (v === null || v === undefined || v === "") return <span className="text-[var(--text3)]">—</span>
         if (f.type === "yesno") return v === true || v === 1 || v === "true" ? "Yes" : "No"
         if (f.type === "number") return <span className="font-mono">{fmtNum(Number(v))}</span>
+        if (f.type === "file") return <EvidenceLink url={String(v)} />
+        if (f.type === "longtext") return <span className="whitespace-pre-wrap">{String(v)}</span>
         return String(v)
     }
 
@@ -248,6 +252,15 @@ function FieldInput({ field, value, onChange }: { field: RegisterField; value: u
                     <button type="button" className={`z-tab ${v === "yes" ? "is-active" : ""}`} onClick={() => onChange(v === "yes" ? "" : "yes")}>Yes</button>
                     <button type="button" className={`z-tab ${v === "no" ? "is-active" : ""}`} onClick={() => onChange(v === "no" ? "" : "no")}>No</button>
                 </div></div>
+            )
+        case "longtext":
+            return <textarea className={inputCls("min-h-[72px]")} value={v} onChange={e => onChange(e.target.value)} />
+        case "file":
+            return (
+                <div className="flex items-center gap-2 flex-wrap">
+                    <UploadButton onUploaded={onChange} label={v ? "Replace file" : "Upload photo / file"} />
+                    {v && <><EvidenceLink url={v} /><button type="button" className="text-[12px] text-red-600" onClick={() => onChange("")}>Remove</button></>}
+                </div>
             )
         default:
             return <input className={inputCls()} value={v} onChange={e => onChange(e.target.value)} />

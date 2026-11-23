@@ -16,7 +16,8 @@ export const REGISTER_MODES = ["SINGLE", "RATIO"] as const
 export const AGGREGATES = ["SUM", "AVG", "COUNT", "LAST", "MAX", "MIN"] as const
 export const TEMPLATE_STATUSES = ["DRAFT", "PUBLISHED", "ARCHIVED"] as const
 export const REPORT_STATUSES = ["DRAFT", "SUBMITTED", "APPROVED", "RETURNED"] as const
-export const FIELD_TYPES = ["number", "text", "date", "select", "yesno"] as const
+// longtext = several lines (8D root cause, action plan); file = an uploaded photo / document.
+export const FIELD_TYPES = ["number", "text", "longtext", "date", "select", "yesno", "file"] as const
 
 export type Frequency = (typeof FREQUENCIES)[number]
 export type Rag = "GREEN" | "AMBER" | "RED"
@@ -122,10 +123,16 @@ export type KpiRule = {
 const round1 = (n: number) => Math.round(n * 10) / 10
 const round2 = (n: number) => Math.round(n * 100) / 100
 
-/** % of target achieved (uncapped, 1 decimal); null when there is no actual. */
+/**
+ * Achievement % (1 decimal); null when there is no actual.
+ * - Yes/No: follows the direction — "lower is better" (e.g. customer escalation) means Yes = 0%, No = 100%.
+ * - Percentage, higher is better: the % entered itself (98% entered = 98%, client rule Nov 2026).
+ * - Everything else: % of target.
+ */
 export function achievement(kpi: Pick<KpiRule, "valueType" | "direction" | "target">, actual: number | null | undefined): number | null {
     if (actual === null || actual === undefined || !Number.isFinite(actual)) return null
-    if (kpi.valueType === "YESNO") return actual >= 1 ? 100 : 0
+    if (kpi.valueType === "YESNO") return (kpi.direction === "LOWER" ? actual < 1 : actual >= 1) ? 100 : 0
+    if (kpi.valueType === "PERCENT" && kpi.direction !== "LOWER") return round1(Math.max(0, Math.min(100, actual)))
     const t = kpi.target
     let pct: number
     if (kpi.direction === "LOWER") {

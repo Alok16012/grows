@@ -418,6 +418,29 @@ export async function recomputeReport(reportId: string) {
     await prisma.perfReport.update({ where: { id: reportId }, data: { score: reportScore(scored) } })
 }
 
+/**
+ * Move a draft / returned report onto the latest published KPI set. Values carry
+ * over by KPI (same code, else same KRA + name); auto values are recalculated.
+ */
+export async function upgradeReport(reportId: string) {
+    const r = await prisma.perfReport.findUnique({ where: { id: reportId }, include: { template: { select: { familyId: true, version: true } }, values: { include: { kpi: { include: { kra: { select: { title: true } } } } } } } })
+    if (!r) throw new PerfHubError(404, "Report not found")
+    if (r.status !== "DRAFT" && r.status !== "RETURNED") throw new PerfHubError(409, "Only a draft or returned report can move to the latest KPI set")
+    const latest = (await publishedByFamily([r.template.familyId])).get(r.template.familyId)
+    if (!latest || latest.id === r.templateId) return { moved: false, version: r.template.version }
+    const newKpis = await prisma.perfTemplateKpi.findMany({ where: { templateId: latest.id, frequency: r.frequency }, include: { kra: { select: { title: true } } } })
+    const byKey = new Map(newKpis.map(k => [kpiKey(k.kra.title, k), k]))
+    const carry = r.values.map(v => ({ v, to: byKey.get(kpiKey(v.kpi.kra.title, v.kpi)) })).filter(x => x.to)
+    await prisma.$transaction([
+        prisma.perfReportValue.deleteMany({ where: { reportId } }),
+        prisma.perfReport.update({ where: { id: reportId }, data: { templateId: latest.id } }),
+        ...carry.map(({ v, to }) => prisma.perfReportValue.create({ data: { reportId, kpiId: to!.id, actual: to!.sourceType === "MANUAL" ? v.actual : null, remark: v.remark, evidenceUrl: v.evidenceUrl } })),
+    ])
+    await refreshAutoValues(reportId)
+    await recomputeReport(reportId)
+    return { moved: true, version: latest.version, from: r.template.version, kept: carry.length }
+}
+
 export async function logActivity(reportId: string, action: string, userId: string, note?: string | null) {
     await prisma.perfReportActivity.create({ data: { reportId, action, userId, note: note || null } })
 }
@@ -430,7 +453,7 @@ export async function reportDetail(reportId: string, ctx: PerfCtx) {
         where: { id: reportId },
         include: {
             employee: { select: { ...EMPLOYEE_SELECT, userId: true, perfAssignment: { select: { reviewer: { select: { id: true, name: true } } } } } },
-            template: { select: { id: true, name: true, version: true, roleLabel: true } },
+            template: { select: { id: true, name: true, version: true, roleLabel: true, familyId: true } },
             values: true,
             activity: { orderBy: { createdAt: "asc" } },
         },
@@ -460,6 +483,8 @@ export async function reportDetail(reportId: string, ctx: PerfCtx) {
         submittedAt: r.submittedAt, decidedBy: r.decidedBy, decidedAt: r.decidedAt, decisionNote: r.decisionNote,
         createdAt: r.createdAt, updatedAt: r.updatedAt,
         template: r.template,
+        // A newer published KPI set for this report's template (drafts can move to it).
+        latest: await (async () => { const p = (await publishedByFamily([r.template.familyId])).get(r.template.familyId); return p && p.id !== r.templateId ? { id: p.id, version: p.version } : null })(),
         employee: { id: e.id, employeeId: e.employeeId, firstName: e.firstName, lastName: e.lastName, designation: e.designation },
         reviewer,
         kras: kras.filter(k => k.kpis.length).map(k => ({

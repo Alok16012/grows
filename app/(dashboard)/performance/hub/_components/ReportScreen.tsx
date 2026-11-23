@@ -33,7 +33,7 @@ const isSourced = (k: RKpi) => k.sourceType !== "MANUAL"
 
 const ACTION_LABEL: Record<string, string> = {
     CREATED: "Created", SAVE: "Saved draft", SAVED: "Saved draft", SUBMIT: "Submitted", SUBMITTED: "Submitted",
-    APPROVE: "Approved", APPROVED: "Approved", RETURN: "Returned", RETURNED: "Returned", REFRESH_AUTO: "Refreshed auto values",
+    APPROVE: "Approved", APPROVED: "Approved", RETURN: "Returned", RETURNED: "Returned", REFRESH_AUTO: "Refreshed auto values", UPGRADED: "Moved to the latest KPI set",
 }
 
 export function ReportScreen({ id, back }: { id: string; back: { href: string; label: string } }) {
@@ -125,6 +125,18 @@ export function ReportScreen({ id, back }: { id: string; back: { href: string; l
         finally { setBusy(null) }
     }
 
+    async function upgrade() {
+        if (!report) return
+        if (dirty && !(await save(true))) return
+        if (!confirm(`Move this report to the latest KPI set (v${report.latest?.version})? Values for KPIs that are in both sets are kept.`)) return
+        setBusy("refresh")
+        try {
+            await api(`/reports/${report.id}`, { method: "PATCH", body: { action: "UPGRADE" } })
+            toast.success(`Moved to KPI set v${report.latest?.version}`)
+            await load()
+        } catch (e) { fail(e) } finally { setBusy(null) }
+    }
+
     async function refreshAuto() {
         if (!report) return
         if (dirty && !(await save(true))) return
@@ -182,6 +194,13 @@ export function ReportScreen({ id, back }: { id: string; back: { href: string; l
 
     return (
         <HubShell title={title} subtitle={subtitle} back={back} missing={missing}>
+            {/* Started on an older KPI set: the designer shows the latest one. */}
+            {report.latest && (
+                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] text-amber-900">
+                    <span className="flex-1 min-w-[220px]">This report uses KPI set <b>v{report.template.version}</b>. The latest published set is <b>v{report.latest.version}</b> — that is what KPI Designer shows.</span>
+                    {editable && <button className={btnPrimary} onClick={upgrade} disabled={!!busy}>Move to v{report.latest.version}</button>}
+                </div>
+            )}
             {/* Summary */}
             <Card className="mb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4">
@@ -372,6 +391,12 @@ function KpiRow({ k, draft, live, editable, busy, onChange, onRefresh, onEvidenc
                     <PtsPill pts={Number(k.weightage) || 0} />
                 </div>
                 {k.measurable && <p className="text-[11.5px] text-[var(--text3)] mt-0.5">{k.measurable}</p>}
+                {/* Counted from a register (complaints, escalations …): the details go there, one row each. */}
+                {(k as any).sourceType === "REGISTER" && (k as any).registerId && (
+                    <a href={`/performance/hub/registers?register=${(k as any).registerId}`} className="inline-flex items-center gap-1 mt-1 text-[11.5px] font-semibold text-[var(--accent)] hover:underline">
+                        + Add / view details
+                    </a>
+                )}
             </td>
             <td className={`${tdCls} font-mono text-[12.5px] text-[var(--text2)] whitespace-nowrap`}>{k.targetLabel || fmtActual(toNum(k.target))}</td>
             <td className={tdCls}>{actualCell}</td>
@@ -388,7 +413,7 @@ function KpiRow({ k, draft, live, editable, busy, onChange, onRefresh, onEvidenc
             </td>
             <td className={`${tdCls} text-center`}>
                 {(k.evidenceRequired || draft.evidenceUrl) && (
-                    <button onClick={onEvidence} title={draft.evidenceUrl ? "Evidence attached" : "Evidence link required"} aria-label="Evidence"
+                    <button onClick={onEvidence} title={draft.evidenceUrl ? "Evidence attached" : "Evidence required — upload a photo or file"} aria-label="Evidence"
                         className={`inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors ${draft.evidenceUrl ? "text-[var(--accent)] bg-[var(--accent-light)]" : k.evidenceRequired && live?.actual !== null ? "text-red-500 hover:bg-red-50" : "text-[var(--text3)] hover:bg-[var(--surface2)]"}`}>
                         <Link2 size={14} />
                     </button>
@@ -411,14 +436,16 @@ function EvidenceModal({ kpi, url, editable, onClose, onSave }: { kpi: RKpi; url
             </> : <button className={btnGhost} onClick={onClose}>Close</button>}>
             <div className="p-5 space-y-3">
                 {editable ? (<>
-                    <div>
-                        <Label hint="A link to a photo, sheet or document that backs up the value">Evidence link</Label>
-                        <input className={inputCls()} value={v} onChange={e => setV(e.target.value)} placeholder="https://…" autoFocus />
+                    {/* Upload first: a photo (camera on the phone), PDF, Excel or Word file. */}
+                    <div className="rounded-[12px] border-2 border-dashed border-[var(--border)] p-4 flex flex-col items-center gap-2 text-center">
+                        <p className="text-[13px] font-semibold text-[var(--text)]">{v ? "Evidence attached" : "Attach the evidence"}</p>
+                        <p className="text-[11.5px] text-[var(--text3)]">Photo, PDF, Excel or Word file</p>
+                        <UploadButton onUploaded={setV} label={v ? "Replace file" : "Upload photo / file"} />
                     </div>
-                    <div className="flex items-center gap-3">
-                        <span className="text-[12px] text-[var(--text3)]">or</span>
-                        <UploadButton onUploaded={setV} />
-                    </div>
+                    <details className="text-[12px]">
+                        <summary className="cursor-pointer text-[var(--text3)]">Or paste a link instead</summary>
+                        <input className={`${inputCls()} mt-2`} value={v} onChange={e => setV(e.target.value)} placeholder="https://…" />
+                    </details>
                 </>) : null}
                 {v ? <a href={v} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[13px] text-[var(--accent)] hover:underline break-all"><Link2 size={13} /> {v}</a>
                     : !editable && <p className="text-[13px] text-[var(--text3)]">No evidence attached.</p>}

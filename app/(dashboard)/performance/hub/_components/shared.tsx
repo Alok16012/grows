@@ -46,7 +46,7 @@ export type Template = {
 }
 
 export type RegisterField = {
-    key: string; label: string; type: "number" | "text" | "date" | "select" | "yesno"
+    key: string; label: string; type: "number" | "text" | "longtext" | "date" | "select" | "yesno" | "file"
     options?: string[]; required?: boolean
 }
 
@@ -77,6 +77,7 @@ export type ReportDetail = {
     id: string; frequency: Frequency; periodStart: string; periodEnd: string; status: ReportStatus
     score: number | null; decisionNote: string | null
     employee: EmpLite; template: { id: string; name: string; version: number }
+    latest?: { id: string; version: number } | null
     kras: { id: string; title: string; weight: number; kpis: (KPI & { value: KpiValue | null })[] }[]
     activity: { action: string; user: { name: string | null } | null; note: string | null; createdAt: string }[]
     canEdit: boolean; canSubmit: boolean; canReview: boolean
@@ -465,7 +466,7 @@ export function UploadButton({ onUploaded, label = "Upload file" }: { onUploaded
         <label className={`${btnGhost} cursor-pointer !py-1.5 text-[12px]`}>
             {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
             {uploading ? "Uploading…" : label}
-            <input type="file" accept="image/*,application/pdf" className="hidden" disabled={uploading}
+            <input type="file" accept="image/*,application/pdf,.xlsx,.xls,.csv,.doc,.docx" className="hidden" disabled={uploading}
                 onChange={e => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = "" }} />
         </label>
     )

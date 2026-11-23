@@ -4,7 +4,7 @@ import { notifyApprovers, notifyEmployee } from "@/lib/hr-notify"
 import { periodLabel, istDay } from "@/lib/perf-hub"
 import { getDwmSettings, dueDay } from "@/lib/dwm-settings"
 import {
-    perfCtx, perfErrorResponse, jsonError, reportDetail, refreshAutoValues, recomputeReport,
+    perfCtx, perfErrorResponse, jsonError, reportDetail, refreshAutoValues, recomputeReport, upgradeReport,
     logActivity, notifyUser, PerfHubError, type PerfCtx,
 } from "@/lib/perf-hub-db"
 
@@ -147,6 +147,14 @@ export async function PATCH(req: Request, { params }: Params) {
                 await logActivity(r.id, "SAVED", ctx.userId)
                 break
             }
+            case "UPGRADE": {
+                // Move to the latest published KPI set (values carry over by KPI).
+                assertEditable(ctx, r.status, isOwner)
+                await assertNotLocked(ctx, r)
+                const u = await upgradeReport(r.id)
+                if (u.moved) await logActivity(r.id, "UPGRADED", ctx.userId, `KPI set v${u.from} → v${u.version}`)
+                break
+            }
             case "REFRESH_AUTO": {
                 assertEditable(ctx, r.status, isOwner)
                 await assertNotLocked(ctx, r)
@@ -199,7 +207,7 @@ export async function PATCH(req: Request, { params }: Params) {
                 break
             }
             default:
-                return jsonError(400, "action must be SAVE, REFRESH_AUTO, SUBMIT, APPROVE or RETURN")
+                return jsonError(400, "action must be SAVE, REFRESH_AUTO, UPGRADE, SUBMIT, APPROVE or RETURN")
         }
         return NextResponse.json({ report: await reportDetail(r.id, ctx) })
     } catch (e) {
