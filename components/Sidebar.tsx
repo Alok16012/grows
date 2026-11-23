@@ -1,5 +1,6 @@
 "use client"
 
+import { SidebarProfile } from "@/components/SidebarProfile"
 import { useState, useEffect, useLayoutEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 import Link from "next/link"
@@ -564,6 +565,9 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 )}
             </div>
 
+            {/* ── Who is signed in: photo, name, designation, Check-in / Check-out ── */}
+            {session?.user && <SidebarProfile roleLabel={roleLabel} onNavigate={onMobileClose} />}
+
             {/* ── Find a module ── */}
             <div className="px-2 shrink-0">
                 <div className="relative">
@@ -675,23 +679,8 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                 })}
             </nav>
 
-            {/* ── Footer: who is signed in, then version and terms ── */}
+            {/* ── Footer: version and terms (who is signed in is at the top) ── */}
             <div className="px-2 pt-2 pb-3 mt-auto shrink-0 border-t border-[var(--border)]">
-                {session?.user && (
-                    <Link
-                        href="/profile"
-                        onClick={onMobileClose}
-                        className="flex items-center gap-2.5 rounded-[10px] px-2 py-2 hover:bg-[var(--surface2)] transition-colors"
-                    >
-                        <span aria-hidden="true" className="h-8 w-8 shrink-0 rounded-full bg-[#e3c98f] text-[#2a1f05] text-[12px] font-bold flex items-center justify-center">
-                            {initials(session.user.name)}
-                        </span>
-                        <span className="min-w-0 flex-1 leading-tight">
-                            <span className="block truncate text-[13px] font-semibold text-[var(--text)]">{session.user.name || "Signed in"}</span>
-                            <span className="block truncate text-[11px] text-[var(--text3)]">{roleLabel}</span>
-                        </span>
-                    </Link>
-                )}
                 <div className="flex items-center justify-between gap-2 px-2 pt-1.5">
                     <p className="text-[10.5px] text-[var(--text3)]">{`v${COMPANY.version}`}</p>
                     <Link href="/terms" className="text-[10.5px] text-[var(--text3)] hover:text-[var(--text)]">Terms & Privacy</Link>

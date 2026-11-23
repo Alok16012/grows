@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { COMPANY } from "@/lib/company"
 import { formatDistanceToNow } from "date-fns"
 import { NewJoinersAlert } from "@/components/new-joiners/NewJoinersAlert"
+import { TopGreeting } from "@/components/TopGreeting"
 
 interface SearchResults {
     sites: any[]
@@ -152,7 +153,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
     }
 
     return (
-        <div className="sticky top-0 z-30 flex h-[60px] md:h-[78px] items-center justify-between bg-[rgba(238,241,251,0.9)] backdrop-blur-md px-4 md:px-8 shrink-0 gap-2" role="banner">
+        <div className="sticky top-0 z-30 flex h-[60px] md:h-[78px] items-center justify-between bg-white/90 backdrop-blur-md border-b border-[var(--border)] px-4 md:px-8 shrink-0 gap-2" role="banner">
             {/* Left — phones get Zavto's brand mark where the hamburger was;
                 the full menu lives behind "More" in the bottom bar now. */}
             <div className="flex items-center gap-2 shrink-0">
@@ -167,12 +168,13 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                 <button onClick={onMenuClick} aria-label="Open menu" className={cn("items-center justify-center rounded-[10px] w-9 h-9 text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors", noBottomBar ? "inline-flex md:hidden" : "hidden")}>
                     <Menu size={20} />
                 </button>
+                <TopGreeting />
             </div>
 
             {/* Center: Search — inline from md up; a full-width row over the
                 header on phones, opened from the search icon or the home page. */}
             <div className={cn(
-                "relative md:flex-1 md:max-w-[820px] md:block",
+                "relative md:flex-1 md:max-w-[420px] md:ml-auto md:block",
                 mobileSearch ? "absolute inset-x-3 top-[10px] z-40 flex items-center gap-2" : "hidden",
             )} ref={dropdownRef}>
                 <div className="relative group flex-1">

@@ -36,7 +36,7 @@ export async function GET(req: Request) {
     const aud = await safe(audienceWhere(session), null)
 
     const monthEnd = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth() + 1, 1) - 330 * 60_000)
-    const [today, presentDays, leaveDays, absentDays, payslip, leave, myOpen, myOverdue, awaitingMine, holiday, announcements, celebrations, monthHolidays] = await Promise.all([
+    const [today, presentDays, leaveDays, absentDays, payslip, leave, myOpen, myOverdue, awaitingMine, holiday, announcements, celebrations, monthHolidays, newJoiners, tasksDoneMonth] = await Promise.all([
         emp ? safe(prisma.attendance.findFirst({ where: { employeeId: emp.id, date: { gte: dayStart, lt: dayEnd } }, select: { checkIn: true, checkOut: true, status: true, workingHrs: true } }), null) : null,
         emp ? safe(prisma.attendance.count({ where: { employeeId: emp.id, date: { gte: monthStart, lt: dayEnd }, ...PRESENT_WHERE } }), 0) : 0,
         emp ? safe(prisma.attendance.count({ where: { employeeId: emp.id, date: { gte: monthStart, lt: dayEnd }, status: { in: ["ON_LEAVE", "LEAVE"] } } }), 0) : 0,
@@ -71,13 +71,17 @@ export async function GET(req: Request) {
             LIMIT 30`, ist.getUTCMonth() + 1, ist.getUTCDate(), ist.getUTCFullYear()), []),
         // This month's holidays, for the calendar on the desktop home.
         safe(prisma.holiday.findMany({ where: { ...(aud ?? {}), date: { gte: monthStart, lt: monthEnd } }, orderBy: { date: "asc" }, take: 15, select: { name: true, date: true, type: true } }), []),
+        // Who joined in the last 30 days (name, designation, site) for the desktop home.
+        safe(prisma.employee.findMany({ where: { status: { in: ["ACTIVE", "ONBOARDING"] as any }, dateOfJoining: { gte: new Date(now.getTime() - 30 * 86_400_000), lte: now } }, orderBy: { dateOfJoining: "desc" }, take: 6, select: { firstName: true, lastName: true, designation: true, dateOfJoining: true, deployments: { where: { isActive: true }, select: { site: { select: { name: true } } }, take: 1 } } }), []),
+        safe(prisma.workTask.count({ where: { assigneeId: userId, status: "DONE", updatedAt: { gte: monthStart } } }), 0),
     ])
 
     return NextResponse.json({
         employee: emp ? { firstName: emp.firstName, name: [emp.firstName, emp.lastName].filter(Boolean).join(" "), photo, code: emp.employeeId, designation: emp.designation, site: emp.deployments[0]?.site?.name ?? null } : null,
         today, month: { present: presentDays, leave: leaveDays, absent: absentDays },
         leave, payslip,
-        tasks: { myOpen, myOverdue, awaitingMine },
+        tasks: { myOpen, myOverdue, awaitingMine, doneThisMonth: tasksDoneMonth },
+        newJoiners: newJoiners.map(j => ({ name: [j.firstName, j.lastName].filter(Boolean).join(" "), designation: j.designation, site: j.deployments[0]?.site?.name ?? null, date: j.dateOfJoining })),
         holiday, announcements, monthHolidays,
         celebrations: celebrations.map(c => ({ name: [c.firstName, c.lastName].filter(Boolean).join(" "), kind: c.kind, years: c.years })),
     })

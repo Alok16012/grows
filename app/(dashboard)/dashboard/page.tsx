@@ -334,19 +334,7 @@ function DesktopDashboard() {
 
     return (
         <div className="p-4 lg:p-0 space-y-4">
-            {/* Page Header — Desktop */}
-            <div className="hidden md:flex items-end justify-between">
-                <div>
-                    <h1 className="text-[22px] font-semibold text-[var(--text)] tracking-tight">
-                        {greeting}, {firstName} <span className="align-middle">👋</span>
-                    </h1>
-                    <p className="text-[13px] text-[var(--text2)] mt-1">
-                        {format(new Date(), "EEEE, d MMMM yyyy")}
-                        {roleName && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] text-[11px] font-semibold">{roleName}</span>}
-                    </p>
-                </div>
-            </div>
-
+            {/* The greeting, time and date are in the top bar (components/TopGreeting). */}
             <NeedsSiteBanner />
             {/* Issued assets waiting for Received / Not received (blinks). */}
             <AssetReceiptCard />
