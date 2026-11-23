@@ -157,7 +157,12 @@ export function IssuedTab({ refreshKey, canIssue, canRequest, onChanged, onRepla
                                             <td className={tdCls}>
                                                 {s.acknowledgedAt
                                                     ? <span className="inline-flex items-center gap-1 text-[12px] text-green-700"><CheckCircle2 size={12} />{fmtDate(s.acknowledgedAt, "dd MMM")}</span>
-                                                    : (
+                                                    : s.notReceived ? (
+                                                        <span className="inline-flex flex-col text-[12px] text-red-700" title={s.notReceived.note ?? undefined}>
+                                                            <span className="font-semibold">Employee says not received</span>
+                                                            <span className="text-[10.5px] text-red-600">{fmtDate(s.notReceived.at, "dd MMM")}{s.notReceived.note ? ` · ${s.notReceived.note}` : ""}</span>
+                                                        </span>
+                                                    ) : (
                                                         <span className="inline-flex items-center gap-1.5 text-[12px] text-amber-600">
                                                             <Clock size={12} />Pending
                                                             {canIssue && s.status === "ACTIVE" && (

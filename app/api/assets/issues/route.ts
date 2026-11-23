@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { loadNotReceived } from "@/lib/asset-not-received"
 import { Prisma } from "@prisma/client"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
@@ -51,11 +52,13 @@ export async function GET(req: Request) {
         }
         if (and.length) where.AND = and
 
-        const [issues, total] = await Promise.all([
+        const [issues, total, claims] = await Promise.all([
             loadIssues(prisma, { where, orderBy: { issuedAt: "desc" }, skip, take }),
             prisma.assetIssue.count({ where }),
+            loadNotReceived(),
         ])
-        return NextResponse.json({ issues, total })
+        // Employee said "Not received" on their Dashboard.
+        return NextResponse.json({ issues: (issues as any[]).map(i => claims[i.id] ? { ...i, notReceived: claims[i.id] } : i), total })
     } catch (e) {
         return workflowErrorResponse(e, "[ASSET_ISSUES_GET]")
     }

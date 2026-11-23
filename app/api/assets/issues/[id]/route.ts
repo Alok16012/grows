@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { clearNotReceived, markNotReceived } from "@/lib/asset-not-received"
 import { createRecovery } from "@/lib/asset-recovery"
 import { getAssetSettings } from "@/lib/asset-settings"
 import prisma from "@/lib/prisma"
@@ -64,7 +65,30 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     }
                 })
             }
+            await clearNotReceived([issue.id], actorId).catch(() => {})
             return NextResponse.json({ issue: await loadIssue(prisma, issue.id) })
+        }
+
+        // The employee says the item never reached them (Dashboard "Not received").
+        // Recorded for the asset team; the issuer is told. Confirming receipt later clears it.
+        if (action === "NOT_RECEIVED") {
+            if (issue.employeeId !== await sessionEmployeeId(actorId)) return jsonError(403, "Only the employee can report this")
+            if (issue.acknowledgedAt) return jsonError(400, "Receipt was already confirmed")
+            const note = typeof body?.note === "string" ? body.note.trim().slice(0, 300) : null
+            await markNotReceived(issue.id, actorId, note || null)
+            await prisma.$transaction(tx => audit(tx, { entity: "AssetIssue", entityId: issue.id, action: "NOT_RECEIVED", userId: actorId, after: { note } })).catch(() => {})
+            const [asset, emp] = await Promise.all([
+                prisma.asset.findUnique({ where: { id: issue.assetId }, select: { name: true } }),
+                prisma.employee.findUnique({ where: { id: issue.employeeId }, select: { firstName: true, lastName: true, employeeId: true } }),
+            ])
+            if (issue.issuedBy && issue.issuedBy !== actorId) {
+                await prisma.notification.create({ data: {
+                    userId: issue.issuedBy, type: "asset_not_received", link: "/assets?tab=issued",
+                    title: "Asset not received",
+                    message: `${[emp?.firstName, emp?.lastName].filter(Boolean).join(" ")} (${emp?.employeeId ?? ""}) says ${asset?.name ?? "an item"} (${issue.issueNo}) has not reached them${note ? `: ${note}` : ""}.`,
+                } }).catch(() => {})
+            }
+            return NextResponse.json({ ok: true })
         }
 
         if (action === "RETURN") {
@@ -117,7 +141,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             })
         }
 
-        return jsonError(400, "action must be ACKNOWLEDGE, RETURN, LOST, DAMAGED, WRITTEN_OFF or REPLACE")
+        return jsonError(400, "action must be ACKNOWLEDGE, NOT_RECEIVED, RETURN, LOST, DAMAGED, WRITTEN_OFF or REPLACE")
     } catch (e) {
         return workflowErrorResponse(e, "[ASSET_ISSUE_PATCH]")
     }

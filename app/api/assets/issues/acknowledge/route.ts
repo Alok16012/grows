@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { clearNotReceived } from "@/lib/asset-not-received"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { canIssueAssets } from "@/lib/permissions"
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
             await tx.assetIssue.updateMany({ where: { id: { in: pending.map(p => p.id) }, acknowledgedAt: null }, data: { acknowledgedAt: now, acknowledgedBy: session.user.id } })
             for (const p of pending) await audit(tx, { entity: "AssetIssue", entityId: p.id, action: "ACKNOWLEDGE", userId: session.user.id, after: { onBehalf: true, bulk: true } })
         })
+        await clearNotReceived(pending.map(p => p.id), session.user.id).catch(() => {})
         return NextResponse.json({ acknowledged: pending.length })
     } catch (e) {
         return workflowErrorResponse(e, "[ASSET_BULK_ACK]")

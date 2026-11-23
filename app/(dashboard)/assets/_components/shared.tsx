@@ -61,6 +61,8 @@ export type AssetIssue = {
     returnedQty: number
     issuedAt: string
     acknowledgedAt?: string | null
+    /** The employee said "Not received" on their Dashboard. */
+    notReceived?: { at: string; note: string | null } | null
     remarks?: string | null
     employee: { id: string; employeeId: string; firstName: string; lastName: string }
     asset: { id: string; assetCode: string; name: string; category: string }

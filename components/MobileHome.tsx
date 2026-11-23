@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
+import { AssetReceiptCard } from "@/components/assets/AssetReceiptCard"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { format } from "date-fns"
@@ -166,6 +167,9 @@ export function MobileHome() {
                 <p style={{ margin: "1px 0 0", fontSize: 22, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>{firstName} 👋</p>
                 {emp && (emp.designation || emp.site || emp.code) && <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--text3)" }}>{[emp.designation, emp.site, emp.code].filter(Boolean).join(" · ")}</p>}
             </div>
+
+            {/* Issued assets waiting for Received / Not received (blinks). */}
+            <AssetReceiptCard />
 
             {/* My day — attendance today, the first thing an employee checks. */}
             {emp ? <MyDayCard me={me!} /> : (

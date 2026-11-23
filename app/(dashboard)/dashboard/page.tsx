@@ -5,6 +5,7 @@
 // their permissions allow — styled to match the admin dashboard.
 
 import { useSession } from "next-auth/react"
+import { AssetReceiptCard } from "@/components/assets/AssetReceiptCard"
 import { COMPANY } from "@/lib/company"
 import { ResponsiveHome } from "@/components/ResponsiveHome"
 import { useCachedFetch } from "@/lib/useCachedFetch"
@@ -348,6 +349,8 @@ function DesktopDashboard() {
 
             <NeedsSiteBanner />
             <MyTasksBanner />
+            {/* Issued assets waiting for Received / Not received (blinks). */}
+            <AssetReceiptCard />
             {/* The profile's own work first: recruiter, payroll, inspector, HR, approver … */}
             <WorkPanels />
             {hasAnyWidget && <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text3)] pt-2">Company overview</p>}
