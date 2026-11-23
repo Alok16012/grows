@@ -18,6 +18,7 @@ const parseYm = (v: string | null) => {
 export async function GET(req: Request) {
     const g = await guard(req, "payroll.view")
     if (g instanceof NextResponse) return g
+    const seePersonal = g.access.isAdmin || g.access.permissions.includes("employees.viewPersonal")
     const { searchParams } = new URL(req.url)
     const from = parseYm(searchParams.get("from")), to = parseYm(searchParams.get("to"))
     if (!from || !to) return NextResponse.json({ error: "Pick a from and to month." }, { status: 400 })
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
             employeeDbId: r.employee.id,
             empCode: r.employee.employeeId,
             name: `${r.employee.firstName} ${r.employee.lastName ?? ""}`.trim(),
-            fatherName: r.employee.fathersName ?? "",
+            fatherName: seePersonal ? r.employee.fathersName ?? "" : "",
             designation: r.employee.designation ?? "",
             site: r.siteId ? siteName.get(r.siteId) ?? "" : "",
             month: r.month, year: r.year,

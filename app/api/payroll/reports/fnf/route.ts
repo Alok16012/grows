@@ -64,6 +64,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     const g = await guard(req, PERMS)
     if (g instanceof NextResponse) return g
+    // Sensitive fields follow the role's switches (Roles → Sensitive fields).
+    const seeKyc = g.access.isAdmin || g.access.permissions.includes("employees.viewKyc")
+    const seePersonal = g.access.isAdmin || g.access.permissions.includes("employees.viewPersonal")
     const body = await req.json().catch(() => ({}))
     const ids: string[] = Array.from(new Set((Array.isArray(body?.employeeIds) ? body.employeeIds : []).filter((x: unknown): x is string => typeof x === "string")))
     if (!ids.length) return NextResponse.json({ error: "Select at least one employee." }, { status: 400 })
@@ -95,8 +98,8 @@ export async function POST(req: Request) {
                 return {
                     employee: {
                         id: e.id, employeeId: e.employeeId, name: `${e.firstName} ${e.lastName ?? ""}`.trim(),
-                        designation: e.designation ?? "", department: e.department?.name ?? "", fatherName: e.fathersName ?? "",
-                        site: e.deployments[0]?.site?.name ?? "", uan: e.uan ?? "", esicNo: e.esiNumber ?? "",
+                        designation: e.designation ?? "", department: e.department?.name ?? "", fatherName: seePersonal ? e.fathersName ?? "" : "",
+                        site: e.deployments[0]?.site?.name ?? "", uan: seeKyc ? e.uan ?? "" : "", esicNo: seeKyc ? e.esiNumber ?? "" : "",
                         doj: e.dateOfJoining?.toISOString() ?? null, dol: e.dateOfLeaving?.toISOString() ?? null,
                     },
                     exitType: e.exitRequest?.exitType ?? "RESIGNATION",

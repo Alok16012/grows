@@ -41,9 +41,10 @@ export async function GET(req: Request) {
         })
 
         // Format to match UI
+        const seeBank = checkAccess(session, [], "employees.viewBank")
         const data = payrolls.map(p => ({
             id: p.id,
-            account: p.employee.bankAccountNumber || "N/A",
+            account: !p.employee.bankAccountNumber ? "N/A" : seeBank ? p.employee.bankAccountNumber : `XXXX ${p.employee.bankAccountNumber.slice(-4)}`,
             name: `${p.employee.firstName} ${p.employee.lastName}`,
             txn: 1,
             amount: p.netSalary,

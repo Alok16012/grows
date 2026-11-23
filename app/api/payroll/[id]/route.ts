@@ -5,6 +5,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { accessFrom, maskDeep } from "@/lib/access"
 import { computePt, esicEligibilityBase, esicChargeAmount, rulesForPeriod, roundAmt, esicWagesOf } from "@/lib/payroll-rules"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { revisionsForMonth } from "@/lib/salary-revision"
@@ -40,7 +41,7 @@ export async function GET(
         })
 
         if (!payroll) return new NextResponse("Not found", { status: 404 })
-        return NextResponse.json(payroll)
+        return NextResponse.json(maskDeep(payroll, accessFrom(session)))
     } catch (error) {
         console.error("[PAYROLL_GET_ID]", error)
         return new NextResponse("Internal Error", { status: 500 })

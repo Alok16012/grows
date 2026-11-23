@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { accessFrom, hiddenFields } from "@/lib/access"
 import prisma from "@/lib/prisma"
 import * as XLSX from "xlsx"
 import { buildEmployeeWhere, employeeFiltersFromParams } from "@/lib/employee-filter"
@@ -76,6 +77,7 @@ export async function GET(req: Request) {
     const presetName = (searchParams.get("preset") ?? "statutory") as BulkPreset
     const preset = BULK_PRESETS[presetName] ?? BULK_PRESETS.statutory
     const fields = preset.keys.map(k => BULK_FIELD_BY_KEY.get(k)!)
+    const hidden = hiddenFields(accessFrom(session!))
 
     const employees = await prisma.employee.findMany({
         where: buildEmployeeWhere(employeeFiltersFromParams(searchParams)),
@@ -92,6 +94,7 @@ export async function GET(req: Request) {
         `${e.firstName ?? ""} ${e.middleName ?? ""} ${e.lastName ?? ""}`.replace(/\s+/g, " ").trim(),
         e.deployments[0]?.site.name ?? "",
         ...fields.map(f => {
+            if (hidden.has(f.key)) return ""
             const v = e[f.key]
             if (v === null || v === undefined) return ""
             return v instanceof Date ? toIsoDate(v) : String(v)

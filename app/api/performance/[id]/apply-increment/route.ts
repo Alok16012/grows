@@ -67,6 +67,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     if (!guard(session)) return NextResponse.json({ error: "You need Payroll (edit) to apply increments." }, { status: 403 })
+    if (!checkAccess(session, [], "employees.viewSalary")) return NextResponse.json({ error: "Seeing the increment amounts needs the View salary switch." }, { status: 403 })
     const sp = new URL(req.url).searchParams
     const my = monthYear({ month: sp.get("month"), year: sp.get("year") })
     if (!my) return NextResponse.json({ error: "Pick the month the increment starts." }, { status: 400 })

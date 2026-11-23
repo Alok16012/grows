@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { authOptions } from "@/lib/auth"
 import { checkAccess } from "@/lib/permissions"
+import { accessFrom, maskDeep } from "@/lib/access"
 import { calcFullMonthCosts } from "@/lib/payroll-calc"
 import { getPayrollRules } from "@/lib/payroll-rules-server"
 import { rulesForPeriod } from "@/lib/payroll-rules"
@@ -62,7 +63,9 @@ export async function GET(req: Request) {
         },
     })
 
-    if (!asOf) return NextResponse.json(employees)
+    // Basic, structure and CTC follow the "View salary" switch.
+    const access = accessFrom(session)
+    if (!asOf) return NextResponse.json(maskDeep(employees, access))
 
     // Overlay the revision in force for that month. Employees without one keep
     // their live row, which is the same fallback payroll applies — so what you
@@ -77,7 +80,7 @@ export async function GET(req: Request) {
         return { ...e, employeeSalary: { ...e.employeeSalary, ...rev } }
     })
 
-    return NextResponse.json(asOfEmployees)
+    return NextResponse.json(maskDeep(asOfEmployees, access))
 }
 
 // POST /api/payroll/salary-structure
