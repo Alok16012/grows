@@ -1755,9 +1755,6 @@ export default function ReportsPage() {
                                         <h3 className="text-[14px] font-[600] text-[var(--text)]">Pareto Analysis — Defect Frequency</h3>
                                         <p className="text-[11px] font-[500] text-[var(--text3)] mt-[2px]">Defect frequency vs cumulative impact</p>
                                     </div>
-                                    <Badge variant="outline" className="bg-[#fef3c7] text-[#d97706] border-transparent font-[600] px-[10px] py-[2px] text-[11px]">
-                                        Major Defects Only
-                                    </Badge>
                                 </div>
                                 {paretoData.length > 0 ? (
                                     <div ref={paretoBoxRef} className="w-full" style={{ height: 26 + 300 + paretoAxis.layout.height + X_TITLE_H + 4 + 34 }}>
