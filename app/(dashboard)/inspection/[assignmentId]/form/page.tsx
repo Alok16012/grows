@@ -26,7 +26,8 @@ import {
     ClipboardList,
     ArrowRight,
     AlertCircle,
-    X
+    X,
+    Clock
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { canAccessInspection } from "@/lib/permissions"
@@ -559,7 +560,11 @@ export default function InspectionFormPage() {
 
             if (res.ok) {
                 const updated = await res.json()
-                setInspection(updated)
+                // Keep the parts summary (the save response has none); this part takes its new status.
+                setInspection((prev: any) => ({
+                    ...updated, isMultiPart: prev?.isMultiPart, partNo: prev?.partNo,
+                    parts: (prev?.parts ?? []).map((x: any) => x.partNo === prev?.partNo ? { ...x, status: updated?.status, submittedAt: updated?.submittedAt ?? x.submittedAt } : x),
+                }))
                 setIsDirty(false)
                 setLastSaved(new Date())
                 if (effectiveStatus === "pending") {
@@ -1003,14 +1008,37 @@ export default function InspectionFormPage() {
                         </div>
                     </div>
                 )}
-                {isSubmitted && !isAdmin && inspection?.status !== "rejected" && (
-                    <div className="bg-[#f0fdf4] border border-[rgba(26,158,110,0.25)] rounded-[12px] p-[14px_18px] flex items-center gap-[12px] mb-[24px]">
-                        <CheckCircle2 className="h-[20px] w-[20px] text-[var(--success-strong)] shrink-0" />
-                        <span className="text-[13px] font-[500] text-[var(--success)] flex-1">
-                            This form has been submitted and is {inspection?.status === "approved" ? "approved" : "pending approval"}.
-                        </span>
-                    </div>
-                )}
+                {isSubmitted && !isAdmin && inspection?.status !== "rejected" && (() => {
+                    const approved = inspection?.status === "approved"
+                    const parts: any[] = Array.isArray(inspection?.parts) ? inspection.parts : []
+                    const multi = !!inspection?.isMultiPart && parts.length > 0
+                    const when = (d: any) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : ""
+                    const nApproved = parts.filter(x => x.status === "approved").length
+                    const nPending = parts.filter(x => x.status === "pending").length
+                    const nBack = parts.filter(x => x.status === "rejected" || x.status === "draft").length
+                    return (
+                        <div className={`${approved ? "bg-[#f0fdf4] border-[rgba(26,158,110,0.25)]" : "bg-[#fffbeb] border-[#fde68a]"} border rounded-[12px] p-[14px_18px] flex flex-col sm:flex-row sm:items-center gap-[12px] mb-[24px]`}>
+                            <div className="flex items-start gap-[12px] flex-1">
+                                {approved ? <CheckCircle2 className="h-[20px] w-[20px] text-[var(--success-strong)] shrink-0 mt-[1px]" /> : <Clock className="h-[20px] w-[20px] text-[#b45309] shrink-0 mt-[1px]" />}
+                                <div className="text-[13px]">
+                                    <p className={`font-[600] ${approved ? "text-[var(--success)]" : "text-[#92400e]"}`}>
+                                        {multi ? `Part ${inspection.partNo} ` : "This report "}
+                                        {approved ? `was approved${inspection?.approvedAt ? ` on ${when(inspection.approvedAt)}` : ""}.` : `was submitted${inspection?.submittedAt ? ` on ${when(inspection.submittedAt)}` : ""} and is pending approval.`}
+                                    </p>
+                                    {multi && parts.length > 1 && (
+                                        <p className="text-[12px] text-[var(--text2)] mt-[2px]">All parts: {nApproved} approved · {nPending} pending approval{nBack ? ` · ${nBack} sent back / draft` : ""}</p>
+                                    )}
+                                </div>
+                            </div>
+                            {multi && (
+                                <button type="button" onClick={() => router.push(`/inspection/${assignmentId}/form?newPart=1`)}
+                                    className="shrink-0 h-[34px] px-[14px] rounded-[8px] bg-[var(--accent)] text-white text-[12.5px] font-[600]">
+                                    Start part {parts.length + 1}
+                                </button>
+                            )}
+                        </div>
+                    )
+                })()}
                 {isAdmin && isSubmitted && (
                     <div className="bg-[#eff6ff] border border-[rgba(59,130,246,0.25)] rounded-[12px] p-[14px_18px] flex items-center gap-[12px] mb-[24px]">
                         <CheckCircle2 className="h-[20px] w-[20px] text-[#3b82f6] shrink-0" />

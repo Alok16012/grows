@@ -80,7 +80,21 @@ export async function GET(req: Request) {
             }
         })
 
-        return NextResponse.json(inspection || null)
+        if (!inspection) return NextResponse.json(null)
+        // Every part of the assignment (oldest first) so the form can say which
+        // part is open and how the others stand — on a multi-part assignment an
+        // approved part and a pending one look alike otherwise.
+        const parts = await prisma.inspection.findMany({
+            where: { assignmentId },
+            orderBy: { createdAt: "asc" },
+            select: { id: true, status: true, submittedAt: true, approvedAt: true },
+        })
+        return NextResponse.json({
+            ...inspection,
+            isMultiPart: !!(assignment as any).isMultiPart,
+            partNo: parts.findIndex(x => x.id === inspection.id) + 1,
+            parts: parts.map((x, i) => ({ partNo: i + 1, status: x.status, submittedAt: x.submittedAt, approvedAt: x.approvedAt })),
+        })
     } catch (error) {
         console.error("GET_INSPECTION_ERROR", error)
         return NextResponse.json({ error: "Internal Error" }, { status: 500 })
