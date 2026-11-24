@@ -18,7 +18,7 @@ type Emp = { employeeId: string; code: string; name: string; designation: string
 const when = (s: string) => new Date(s).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`
 
-export function SendPayslipsPanel({ month, year, focusSiteId }: { month: number; year: number; focusSiteId?: string }) {
+export function SendPayslipsPanel({ month, year, focusSiteId, onSent }: { month: number; year: number; focusSiteId?: string; onSent?: () => void }) {
     const [d, setD] = useState<Data | null>(null)
     const [sel, setSel] = useState<Set<string>>(new Set())
     const [busy, setBusy] = useState(false)
@@ -65,7 +65,7 @@ export function SendPayslipsPanel({ month, year, focusSiteId }: { month: number;
             const j = await r.json().catch(() => ({}))
             if (!r.ok) throw new Error(j?.error || "Could not send")
             toast.success(ok.replace("{n}", String(j.employees ?? "")) + (j.skippedDraft ? ` · ${j.skippedDraft} still draft, not sent` : ""))
-            setSel(new Set()); setESel(new Set()); load(); if (site || q.trim()) loadEmps(site, q)
+            setSel(new Set()); setESel(new Set()); load(); if (site || q.trim()) loadEmps(site, q); onSent?.()
         } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
     }
     const warnText = d.warnings?.length ? "\n\nCheck first:\n• " + d.warnings.join("\n• ") : ""

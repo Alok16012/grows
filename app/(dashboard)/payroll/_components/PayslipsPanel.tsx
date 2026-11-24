@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { can } from "@/lib/can"
-import { Loader2, Search, Printer, Eye, CheckCircle2, RefreshCw, MapPin, Building2, Clock, FileText, IndianRupee, X } from "lucide-react"
+import { Loader2, Search, Printer, Eye, CheckCircle2, RefreshCw, MapPin, Building2, Clock, FileText, IndianRupee, X, Send, CheckCheck } from "lucide-react"
 import { printHTML } from "@/lib/print-html"
 import PayslipViewerModal from "./PayslipViewerModal"
 import { SendPayslipsPanel } from "@/components/payroll/SendPayslipsPanel"
@@ -72,6 +72,12 @@ export default function PayslipsPanel({ onClose, initialMonth, initialYear, late
     // drives the summary card beside the list.
     const [viewing,  setViewing]  = useState<PayrollRecord|null>(null)
     const [ldSites,  setLdSites]  = useState(true)
+    // Payslips to employees: who can already see their payslip, and a Send per payslip.
+    const canSend = can(session, ["payroll.edit", "payroll.markPaid", "payroll.lock"])
+    const [sendInfo, setSendInfo] = useState<Map<string, { visible: boolean; sentBy: string | null }>>(new Map())
+    const [sending,  setSending]  = useState<string | null>(null)
+    const [sendTick, setSendTick] = useState(0)
+    const [barKey,   setBarKey]   = useState(0)   // reload the send bar after a send from a row
     const [loading,  setLoading]  = useState(false)
     const [actLoad,  setActLoad]  = useState<string|null>(null)
 
@@ -98,6 +104,32 @@ export default function PayslipsPanel({ onClose, initialMonth, initialYear, late
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(()=>{ fetchSlips(selSiteId) },[month,year])
+    useEffect(() => {
+        fetch(`/api/payroll/payslips/send?month=${month}&year=${year}&employees=1`).then(r => r.ok ? r.json() : null)
+            .then(j => setSendInfo(new Map((j?.employees ?? []).map((e: any) => [e.employeeId, { visible: e.visible, sentBy: e.sentBy }])))).catch(() => {})
+    }, [month, year, sendTick])
+    async function sendOne(r: PayrollRecord) {
+        if (r.status === "DRAFT") { toast.error("This payslip is still a draft — lock payroll first, then send it."); return }
+        if (!confirm(`Send the ${MONTHS_LONG[r.month - 1]} ${r.year} payslip to ${r.employee.firstName} ${r.employee.lastName}? It appears in their My Profile → Payslips and in the app.`)) return
+        setSending(r.id)
+        try {
+            const res = await fetch("/api/payroll/payslips/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "sendEmployees", month: r.month, year: r.year, employeeIds: [r.employee.id] }) })
+            const j = await res.json().catch(() => ({}))
+            if (!res.ok) throw new Error(j?.error || "Could not send")
+            toast.success(`Payslip sent to ${r.employee.firstName}`); setSendTick(t => t + 1); setBarKey(k => k + 1)
+        } catch (e: any) { toast.error(e.message) } finally { setSending(null) }
+    }
+    const SendBtn = ({ r, big }: { r: PayrollRecord; big?: boolean }) => {
+        const info = sendInfo.get(r.employee.id)
+        if (info?.visible) return big
+            ? <span style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#15803d", background: "#dcfce7" }}><CheckCheck size={13} /> Sent</span>
+            : <span title={info.sentBy === "auto" ? "Employee can see it (automatic)" : "Sent — employee can see it"} style={{ width: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", color: "#15803d", background: "#dcfce7" }}><CheckCheck size={13} /></span>
+        if (!canSend) return null
+        const draft = r.status === "DRAFT"
+        return big
+            ? <button onClick={() => sendOne(r)} disabled={sending === r.id} title={draft ? "Draft — lock payroll first" : "Send this payslip to the employee"} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", background: draft ? "#94a3b8" : "var(--accent)" }}>{sending === r.id ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />} Send</button>
+            : <button onClick={e => { e.stopPropagation(); sendOne(r) }} disabled={sending === r.id} title={draft ? "Draft — lock payroll first" : "Send this payslip to the employee"} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid var(--border)", background: draft ? "var(--surface2)" : "var(--accent-light)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: draft ? "var(--text3)" : "var(--accent)", opacity: draft ? 0.6 : 1 }}>{sending === r.id ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}</button>
+    }
 
     const handleMarkPaid = async (id: string)=>{
         setActLoad(id)
@@ -239,7 +271,7 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
             </div>
 
             {/* Send payslips to employees — whole site or chosen employees; ⚙ manual / automatic. */}
-            <SendPayslipsPanel month={month} year={year} focusSiteId={selSiteId || undefined} />
+            <SendPayslipsPanel key={`send-${barKey}`} month={month} year={year} focusSiteId={selSiteId || undefined} onSent={() => setSendTick(t => t + 1)} />
 
             {/* Two-panel — the site rail stacks above the list on mobile */}
             <div className="flex flex-col md:flex-row items-stretch md:items-start" style={{ gap:12 }}>
@@ -296,7 +328,7 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                         </div>
                         {/* Narrower fixed columns on phones so the employee
                             name still gets usable width. */}
-                        <div className="grid grid-cols-[1fr_72px_76px_76px] sm:grid-cols-[1fr_90px_100px_96px]" style={{ padding:"8px 16px", background:"var(--surface2)", borderBottom:"1px solid var(--border)" }}>
+                        <div className="grid grid-cols-[1fr_72px_70px_104px] sm:grid-cols-[1fr_90px_100px_110px]" style={{ padding:"8px 16px", background:"var(--surface2)", borderBottom:"1px solid var(--border)" }}>
                             {["Employee","Net Salary","Status","Actions"].map(h=>(
                                 <span key={h} style={{ fontSize:10, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.5px" }}>{h}</span>
                             ))}
@@ -317,7 +349,7 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                                 const statusBg=r.status==="PAID"?"#dcfce7":r.status==="PROCESSED"?"#dbeafe":"#f3f4f6"
                                 return (
                                     <div key={r.id} onClick={()=>setSelected(r)}
-                                        className="grid grid-cols-[1fr_72px_76px_76px] sm:grid-cols-[1fr_90px_100px_96px]"
+                                        className="grid grid-cols-[1fr_72px_70px_104px] sm:grid-cols-[1fr_90px_100px_110px]"
                                         style={{ alignItems:"center", padding:"10px 16px", cursor:"pointer",
                                             background:selected?.id===r.id?"#f0fdf4":idx%2===0?"var(--surface)":"var(--surface2)", borderBottom:"1px solid var(--border)" }}>
                                         <div>
@@ -335,6 +367,7 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                                                 style={{ width:28, height:28, borderRadius:6, border:"1px solid var(--border)", background:"var(--surface2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"var(--text3)" }}>
                                                 <Printer size={12} />
                                             </button>
+                                            <SendBtn r={r} />
                                         </div>
                                     </div>
                                 )
@@ -395,7 +428,7 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                                     ))}
                                 </div>
                             </div>
-                            <div style={{ padding:"0 16px 14px", display:"flex", gap:8 }}>
+                            <div style={{ padding:"0 16px 14px", display:"flex", gap:8, flexWrap:"wrap" }}>
                                 <button onClick={()=>setViewing(selected)}
                                     style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"8px", border:"1px solid var(--border)", borderRadius:8, fontSize:12, fontWeight:600, color:"var(--text2)", cursor:"pointer", background:"none" }}>
                                     <Eye size={13} /> View
@@ -404,6 +437,7 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                                     style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"8px", border:"1px solid var(--border)", borderRadius:8, fontSize:12, fontWeight:600, color:"var(--text2)", cursor:"pointer", background:"none" }}>
                                     <Printer size={13} /> Print
                                 </button>
+                                <SendBtn r={selected} big />
                                 {selected.status!=="PAID" && (
                                     <button onClick={()=>handleMarkPaid(selected.id)} disabled={!!actLoad || !canManage} title={canManage ? undefined : "Requires payroll manage permission"}
                                         style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"8px", border:"none", borderRadius:8, fontSize:12, fontWeight:600, color:"#fff", cursor:"pointer", background:"#16a34a", opacity:actLoad?0.6:1 }}>
