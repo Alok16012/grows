@@ -135,6 +135,11 @@ export default function OnboardingPortal() {
     const [submitting, setSubmitting] = useState(false)
     const [employee, setEmployee] = useState<any>(null)
     const [step, setStep] = useState(1)
+    // "Send sign link" from Onboarding opens with ?step=policies — straight to
+    // the policies the applicant left unsigned on the join form.
+    useEffect(() => {
+        if (new URLSearchParams(window.location.search).get("step") === "policies") setStep(POLICY_STEP)
+    }, [])
     const [form, setForm] = useState<FormData>(EMPTY)
     const [docs, setDocs] = useState<Doc[]>([])
     const [uploadingDocs, setUploadingDocs] = useState<Record<string, boolean>>({})

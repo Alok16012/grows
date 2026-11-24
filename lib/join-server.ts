@@ -2,6 +2,7 @@
 import prisma from "@/lib/prisma"
 import { findEmployeeDuplicates } from "@/lib/employee-dedupe"
 import { notifyApprovers } from "@/lib/hr-notify"
+import { signoffReady, statusFor } from "@/lib/policy-signoff"
 import { sanitizeJoinSettings, JOIN_DUP_FIELDS, type JoinSettings } from "@/lib/join-settings"
 
 const KEY = "joinSettings"
@@ -113,6 +114,34 @@ export async function alertNewJoiner(e: { name: string; designation?: string | n
     const note = { title: "New joiner — waiting for approval", message: `${e.name}${e.designation ? `, ${e.designation}` : ""}${site ? ` at ${site}` : ""} filled the join form. Check the documents and approve in Onboarding.`, type: "onboarding", link: "/onboarding" }
     if (s.alerts.recruiter) await notifyUsers([e.hrId], note)
     if (s.alerts.approvers) await notifyApprovers(ONBOARDING_APPROVERS, note, e.hrId ?? undefined)
+}
+
+/**
+ * How many joining (Onboarding-category) policies this person still has to sign.
+ * A join form only counts as received once this is 0 — the record is saved on
+ * the Documents step, before the Policies step, so an applicant who closes the
+ * page there would otherwise reach HR unsigned.
+ */
+export async function joinPoliciesPending(employeeId: string, designation: string | null | undefined): Promise<number> {
+    if (!(await signoffReady())) return 0
+    const list = await statusFor(employeeId, designation, "onboarding")
+    return list.filter(p => p.status !== "SIGNED").length
+}
+
+/** Last joining policy signed on the join/onboarding link → now tell HR the form is in. */
+export async function alertJoinerCompleted(employeeId: string) {
+    const emp = await prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { firstName: true, middleName: true, lastName: true, designation: true, managerId: true, status: true, employeeId: true,
+            deployments: { where: { isActive: true }, select: { siteId: true }, take: 1 } },
+    })
+    // Only self-registered joiners still waiting for approval (PENDING-xxxx code).
+    if (!emp || emp.status !== "ONBOARDING" || !emp.employeeId.startsWith("PENDING-")) return
+    if (await joinPoliciesPending(employeeId, emp.designation)) return
+    await alertNewJoiner({
+        name: [emp.firstName, emp.middleName, emp.lastName].filter(Boolean).join(" "),
+        designation: emp.designation, siteId: emp.deployments[0]?.siteId ?? null, hrId: emp.managerId,
+    }, await getJoinSettings())
 }
 
 /** Daily: forms waiting for approval longer than the setting → one reminder to approvers. */

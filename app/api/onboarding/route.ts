@@ -73,6 +73,7 @@ export async function GET(req: Request) {
                         status: true,
                         isKycVerified: true,
                         kycRejectionNote: true,
+                        onboardingToken: true,
                         department: { select: { name: true } },
                         deployments: {
                             where: { isActive: true },
@@ -94,7 +95,10 @@ export async function GET(req: Request) {
         const checks = open.length ? await evaluateChecklists(open).catch(() => new Map()) : new Map()
         return NextResponse.json(records.map(r => {
             const c = checks.get(r.employeeId)
-            return c ? { ...r, checklist: { done: c.done, total: c.total, blocking: c.blocking.map((b: { title: string }) => b.title) } } : r
+            return c ? { ...r, checklist: {
+                done: c.done, total: c.total, blocking: c.blocking.map((b: { title: string }) => b.title),
+                policiesPending: c.tasks.some((t: { auto: string | null; done: boolean }) => t.auto === "POLICIES" && !t.done),
+            } } : r
         }))
     } catch (error) {
         console.error("[ONBOARDING_GET]", error)

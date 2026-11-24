@@ -7,7 +7,7 @@ import {
     Search, Loader2, CheckCircle2, XCircle, Clock, AlertCircle,
     User, Phone, MapPin, X, ChevronRight, ChevronLeft, MoreVertical,
     Building2, Calendar, RefreshCw, FileText, Eye, Link2, Copy, Check,
-    Users, ClipboardList, SlidersHorizontal, ChevronsUpDown,
+    Users, ClipboardList, SlidersHorizontal, ChevronsUpDown, Send,
 } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
 import { DocumentViewer } from "@/components/DocumentViewer"
@@ -83,6 +83,7 @@ type OnboardingRecord = {
         bankBranch?: string | null
         isKycVerified?: boolean
         kycRejectionNote?: string | null
+        onboardingToken?: string | null
         safetyGoggles?: boolean
         safetyGloves?: boolean
         safetyHelmet?: boolean
@@ -99,7 +100,7 @@ type OnboardingRecord = {
     }
     tasks?: { id: string; status: string; category: string; isRequired: boolean }[]
     /** Joining checklist (only for records still in onboarding). */
-    checklist?: { done: number; total: number; blocking: string[] }
+    checklist?: { done: number; total: number; blocking: string[]; policiesPending?: boolean }
 }
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -598,6 +599,21 @@ function DetailModal({ record: listRecord, onClose, onAction, canApprove }: {
 }
 
 // ─── Pagination arrow ──────────────────────────────────────────────────────────
+/**
+ * Opens WhatsApp (on HR's own phone / WhatsApp Web) with the link the applicant
+ * uses to read and sign the joining policies they skipped. Signing the last one
+ * sends HR the usual new-joiner alert.
+ */
+function sendSignLink(name: string, phone: string | null | undefined, token: string) {
+    const url = `${window.location.origin}/onboarding/${token}?step=policies`
+    const text = `Hi ${name}, your joining form is saved but the joining policies are not signed yet. Please open this link, read each policy and sign it to complete your joining: ${url}`
+    const digits = String(phone ?? "").replace(/D/g, "")
+    const to = digits.length === 10 ? "91" + digits : digits
+    if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {})
+    window.open(`https://wa.me/${to}?text=${encodeURIComponent(text)}`, "_blank", "noopener")
+    toast.success("Sign link copied — WhatsApp opened")
+}
+
 function PageArrow({ disabled, onClick, children }: { disabled: boolean; onClick: () => void; children: React.ReactNode }) {
     return (
         <button onClick={onClick} disabled={disabled}
@@ -656,6 +672,10 @@ function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, o
                                 <span style={{ fontFamily: "monospace", fontSize: 11.5, fontWeight: 700, color: "var(--accent)" }}>{displayEmpId(e.employeeId)}</span>
                                 {isPending && (
                                     <span style={{ fontSize: 9.5, fontWeight: 700, color: "#15803d", background: "#dcfce7", padding: "1px 7px", borderRadius: 20, letterSpacing: "0.3px" }}>New</span>
+                                )}
+                                {record.checklist?.policiesPending && (
+                                    <span title="The applicant left before signing the joining policies. Send them the sign link."
+                                        style={{ fontSize: 9.5, fontWeight: 700, color: "#b45309", background: "#fef3c7", padding: "1px 7px", borderRadius: 20, letterSpacing: "0.3px", whiteSpace: "nowrap" }}>Policies not signed</span>
                                 )}
                             </div>
                         </div>
@@ -737,6 +757,7 @@ function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, o
                                 { icon: Eye,           title: "Review",         sub: "Review employee details", color: "#3b82f6", onClick: onOpen },
                                 { icon: CheckCircle2,  title: "Approve",        sub: "Approve onboarding",      color: "#15803d", onClick: onApprove },
                                 { icon: XCircle,       title: "Reject",         sub: "Reject onboarding",       color: "#dc2626", onClick: onOpen },
+                                ...(record.checklist?.policiesPending && e.onboardingToken ? [{ icon: Send, title: "Send sign link", sub: "WhatsApp the policy sign link", color: "#b45309", onClick: () => sendSignLink(fullName, e.phone, e.onboardingToken!) }] : []),
                                 { icon: ClipboardList, title: "View Checklist", sub: record.checklist?.blocking.length ? `Waiting: ${record.checklist.blocking.slice(0, 2).join(", ")}${record.checklist.blocking.length > 2 ? "…" : ""}` : "See joining tasks", color: "#6b7280", onClick: () => { window.location.href = `/onboarding/checklist?id=${record.employee.id}` } },
                             ].filter(a => canApprove || (a.title !== "Approve" && a.title !== "Reject")).map(a => (
                                 <button key={a.title} onClick={a.onClick}

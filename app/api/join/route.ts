@@ -11,7 +11,7 @@ import {
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 import crypto from "crypto"
-import { getJoinSettings, findJoinMatch, alertBlockedJoin, alertNewJoiner, DUPLICATE_MESSAGE } from "@/lib/join-server"
+import { getJoinSettings, findJoinMatch, alertBlockedJoin, alertNewJoiner, joinPoliciesPending, DUPLICATE_MESSAGE } from "@/lib/join-server"
 import { findLink, linkState, bumpLink } from "@/lib/join-links"
 import { JOIN_OPTIONAL_FIELDS, JOIN_DOCS, type JoinDoc } from "@/lib/join-settings"
 import { isPhotoDoc } from "@/lib/employee-photo"
@@ -368,7 +368,11 @@ export async function POST(req: Request) {
         })
 
         if (link) await bumpLink(link.id, "submits")
-        await alertNewJoiner({ name: [firstName.trim(), middleName?.trim(), lastName.trim()].filter(Boolean).join(" "), designation, siteId, hrId }, joinSettings).catch(e => console.error("[JOIN_ALERT_NEW]", e))
+        // The joining policies are signed on the next screen. Tell HR only once
+        // they are (the token sign route sends the alert then) — otherwise an
+        // applicant who closes the page at the Policies step looks complete.
+        const policiesLeft = await joinPoliciesPending(employee.id, employee.designation).catch(() => 0)
+        if (!policiesLeft) await alertNewJoiner({ name: [firstName.trim(), middleName?.trim(), lastName.trim()].filter(Boolean).join(" "), designation, siteId, hrId }, joinSettings).catch(e => console.error("[JOIN_ALERT_NEW]", e))
 
         return NextResponse.json({
             success: true,
