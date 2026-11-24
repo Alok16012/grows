@@ -6,6 +6,7 @@ import { TopNav } from "@/components/TopNav"
 import { InspectionStepper } from "@/components/InspectionStepper"
 import { MobileBottomNav } from "@/components/MobileBottomNav"
 import { CallHost } from "@/components/dialer/CallButton"
+import { AlarmRinger } from "@/components/todo/AlarmRinger"
 import { cn } from "@/lib/utils"
 import { COMPANY } from "@/lib/company"
 
@@ -84,6 +85,8 @@ export default function DashboardLayout({
             <MobileBottomNav onMore={() => setIsSidebarOpen(true)} />
             {/* Click-to-call panel (startCall) */}
             <CallHost />
+            {/* To-do and note alarms ring on any page while the app is open. */}
+            <AlarmRinger />
         </div>
     )
 }

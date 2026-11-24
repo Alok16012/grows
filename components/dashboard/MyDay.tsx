@@ -16,6 +16,7 @@ import {
     LifeBuoy, ListChecks, Loader2, Plus, Receipt, Umbrella,
 } from "lucide-react"
 import { useMeHome, type MeHome } from "@/lib/useMeHome"
+import { TodoWidget } from "@/components/todo/TodoWidget"
 
 type Task = { id: string; taskNo: string; title: string; status: string; dueAt: string | null }
 
@@ -29,7 +30,7 @@ export function MyDay() {
     if (!d) return null
     if (!d.employee) return (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] items-stretch">
-            <div className="min-w-0 flex flex-col gap-4"><QuickTiles /><MyTasks grow /></div>
+            <div className="min-w-0 flex flex-col gap-4"><QuickTiles /><TodoWidget /><MyTasks grow /></div>
             <div className="min-w-0 flex flex-col"><EventsCard d={d} grow /></div>
         </div>
     )
@@ -38,6 +39,7 @@ export function MyDay() {
             <div className="min-w-0 flex flex-col gap-4">
                 <TimerCard today={d.today} />
                 <QuickTiles />
+                <TodoWidget />
                 <MyTasks grow />
             </div>
             <div className="min-w-0 flex flex-col"><EventsCard d={d} grow /></div>

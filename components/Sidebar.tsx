@@ -260,6 +260,8 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             icon: Megaphone,
             links: [
                 { name: "Tasks", href: "/tasks" },
+                // Personal to-do list with alarms, and notes (private to each person).
+                { name: "To-do & Notes", href: "/todo" },
                 { name: "Announcements", href: "/announcements", permission: "announcements.view" },
                 { name: "Helpdesk", href: "/helpdesk", permission: "helpdesk.view" },
                 // Requesters / approvers / store staff work here without assets.view.
