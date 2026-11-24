@@ -14,7 +14,8 @@ export type MeHome = {
     monthHolidays?: { name: string; date: string; type?: string | null }[]
     announcements: { id: string; title: string; category: string; publishedAt: string }[]
     celebrations: { name: string; kind: string; years: number | null }[]
-    newJoiners?: { name: string; designation: string | null; site: string | null; date: string }[]
+    /** null when the viewer's role can't see staff data — the section is hidden. */
+    newJoiners?: { name: string; designation: string | null; site: string | null; date: string }[] | null
 }
 
 let cache: { at: number; data: MeHome | null } | null = null

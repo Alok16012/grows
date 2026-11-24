@@ -207,7 +207,7 @@ function EventsCard({ d, grow }: { d: MeHome; grow?: boolean }) {
                 {section("events", "EVENTS", "#eef9f1", d.celebrations.length, d.celebrations.length ? d.celebrations.slice(0, 6).map((c, i) => (
                     <p key={i} className="py-1 text-[13px] text-[var(--text)] truncate">{c.kind === "birthday" ? "🎂" : "🎉"} {c.name} — {c.kind === "birthday" ? "birthday today" : `${c.years} year${c.years === 1 ? "" : "s"} with us`}</p>
                 )) : empty("No birthdays or work anniversaries today."))}
-                {section("joiners", "NEW JOINERS", "#ecf7fb", joiners.length, joiners.length ? joiners.map((j, i) => (
+                {d.newJoiners !== null && section("joiners", "NEW JOINERS", "#ecf7fb", joiners.length, joiners.length ? joiners.map((j, i) => (
                     <p key={i} className="py-1 text-[13px] text-[var(--text)] truncate">{j.name}<span className="text-[var(--text3)]"> · {[j.designation, j.site].filter(Boolean).join(" · ")}</span></p>
                 )) : empty("Nobody joined in the last 30 days."))}
                 {section("news", "NEWS FEED", "#f6f7fc", d.announcements.length, d.announcements.length ? d.announcements.map(a => (

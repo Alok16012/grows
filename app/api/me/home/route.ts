@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
+import { checkAccess } from "@/lib/permissions"
 import { getRelease, isVisible } from "@/lib/payslip-release"
 import { getLeavePolicy, getLeaveBalances } from "@/lib/leave-policy-server"
 import { audienceWhere } from "@/lib/audience"
@@ -34,6 +35,9 @@ export async function GET(req: Request) {
     const ist = new Date(now.getTime() + 330 * 60_000)
     const monthStart = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), 1) - 330 * 60_000)
     const aud = await safe(audienceWhere(session), null)
+    // New joiners (names, roles, sites) are staff data — only for people whose
+    // role can see employees or onboarding, not every employee's home.
+    const canSeeJoiners = checkAccess(session, [], ["employees.view", "onboarding.view"])
 
     const monthEnd = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth() + 1, 1) - 330 * 60_000)
     const [today, presentDays, leaveDays, absentDays, payslip, leave, myOpen, myOverdue, awaitingMine, holiday, announcements, celebrations, monthHolidays, newJoiners, tasksDoneMonth] = await Promise.all([
@@ -72,7 +76,7 @@ export async function GET(req: Request) {
         // This month's holidays, for the calendar on the desktop home.
         safe(prisma.holiday.findMany({ where: { ...(aud ?? {}), date: { gte: monthStart, lt: monthEnd } }, orderBy: { date: "asc" }, take: 15, select: { name: true, date: true, type: true } }), []),
         // Who joined in the last 30 days (name, designation, site) for the desktop home.
-        safe(prisma.employee.findMany({ where: { status: { in: ["ACTIVE", "ONBOARDING"] as any }, dateOfJoining: { gte: new Date(now.getTime() - 30 * 86_400_000), lte: now } }, orderBy: { dateOfJoining: "desc" }, take: 6, select: { firstName: true, lastName: true, designation: true, dateOfJoining: true, deployments: { where: { isActive: true }, select: { site: { select: { name: true } } }, take: 1 } } }), []),
+        !canSeeJoiners ? Promise.resolve(null) : safe(prisma.employee.findMany({ where: { status: { in: ["ACTIVE", "ONBOARDING"] as any }, dateOfJoining: { gte: new Date(now.getTime() - 30 * 86_400_000), lte: now } }, orderBy: { dateOfJoining: "desc" }, take: 6, select: { firstName: true, lastName: true, designation: true, dateOfJoining: true, deployments: { where: { isActive: true }, select: { site: { select: { name: true } } }, take: 1 } } }), []),
         safe(prisma.workTask.count({ where: { assigneeId: userId, status: "DONE", updatedAt: { gte: monthStart } } }), 0),
     ])
 
@@ -81,7 +85,7 @@ export async function GET(req: Request) {
         today, month: { present: presentDays, leave: leaveDays, absent: absentDays },
         leave, payslip,
         tasks: { myOpen, myOverdue, awaitingMine, doneThisMonth: tasksDoneMonth },
-        newJoiners: newJoiners.map(j => ({ name: [j.firstName, j.lastName].filter(Boolean).join(" "), designation: j.designation, site: j.deployments[0]?.site?.name ?? null, date: j.dateOfJoining })),
+        newJoiners: newJoiners === null ? null : newJoiners.map(j => ({ name: [j.firstName, j.lastName].filter(Boolean).join(" "), designation: j.designation, site: j.deployments[0]?.site?.name ?? null, date: j.dateOfJoining })),
         holiday, announcements, monthHolidays,
         celebrations: celebrations.map(c => ({ name: [c.firstName, c.lastName].filter(Boolean).join(" "), kind: c.kind, years: c.years })),
     })
