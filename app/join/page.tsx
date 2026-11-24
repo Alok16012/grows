@@ -138,6 +138,11 @@ export default function JoinPage() {
     const [copied, setCopied] = useState(false)
     // Progress reported by the policy step; null until it has loaded.
     const [policyProgress, setPolicyProgress] = useState<PolicyProgress | null>(null)
+    // Draft saved on this device, so a refresh or a closed tab doesn't lose the
+    // answers (per link: ?ref / ?l / ?o). Cleared once the form is submitted.
+    const draftKey = useRef("")
+    const draftReady = useRef(false)
+    const [restored, setRestored] = useState<{ at: number; docsLost: boolean } | null>(null)
     // Site + HR dropdown options, loaded from /api/join (public GET)
     const [sites, setSites] = useState<{ id: string; name: string; code?: string | null }[]>([])
     const [hrUsers, setHrUsers] = useState<{ id: string; name: string; role?: string | null; customRole?: { name: string } | null }[]>([])
@@ -169,6 +174,23 @@ export default function JoinPage() {
         const role = params.get("role") || ""
         const l = params.get("l") || ""
         const o = params.get("o") || ""
+
+        draftKey.current = `joinDraft:${l ? "l:" + l : o ? "o:" + o : ref ? "ref:" + ref : "open"}`
+        try {
+            const raw = localStorage.getItem(draftKey.current)
+            const d = raw ? JSON.parse(raw) : null
+            if (d && d.form && Date.now() - (d.at ?? 0) < 14 * 86_400_000) {
+                setForm({ ...INITIAL, ...d.form })
+                if (typeof d.tab === "string" && TABS.some(t => t.key === d.tab)) setTab(d.tab)
+                if (typeof d.photo === "string") setPhoto(d.photo)
+                if (d.designationOther) setDesignationOther(true)
+                if (d.created?.token) setCreated(d.created)
+                if (d.result?.employeeId) setResult(d.result)
+                if (d.docs && typeof d.docs === "object") setDocs(prev => prev.map(x => ({ ...x, url: typeof d.docs[x.type] === "string" ? d.docs[x.type] : x.url })))
+                setRestored({ at: d.at, docsLost: !!d.docsPicked && !d.created })
+            } else if (raw) localStorage.removeItem(draftKey.current)
+        } catch { /* private mode: no draft */ }
+        draftReady.current = true
 
         fetch(`/api/join${l ? `?l=${encodeURIComponent(l)}` : o ? `?o=${encodeURIComponent(o)}` : ref ? `?ref=${encodeURIComponent(ref)}` : ""}`)
             .then(r => r.json())
@@ -274,6 +296,26 @@ export default function JoinPage() {
             }
             return u
         })
+    useEffect(() => {
+        if (!draftReady.current || !draftKey.current) return
+        if (submitted) { try { localStorage.removeItem(draftKey.current) } catch {} ; return }
+        const t = setTimeout(() => {
+            try {
+                const docUrls = Object.fromEntries(docs.filter(d => d.url).map(d => [d.type, d.url]))
+                localStorage.setItem(draftKey.current, JSON.stringify({
+                    at: Date.now(), form, tab, photo, designationOther, created, result,
+                    docs: docUrls, docsPicked: docs.some(d => d.file && !d.url),
+                }))
+            } catch { /* storage full or blocked */ }
+        }, 400)
+        return () => clearTimeout(t)
+    }, [form, tab, photo, designationOther, created, result, docs, submitted])
+    function startOver() {
+        if (!confirm(T("Clear everything you filled in and start again?"))) return
+        try { localStorage.removeItem(draftKey.current) } catch {}
+        window.location.reload()
+    }
+
     const clrErr = (k: keyof FormData) => setErrors(p => { const n={...p}; delete n[k]; return n })
 
     const tabOrder = TABS.map(t => t.key)
@@ -655,6 +697,15 @@ export default function JoinPage() {
                         </div>
                     )}
                     {link?.closed && <p role="alert" style={{ fontSize: 13, fontWeight: 600, color: "var(--red)", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 10, padding: "10px 12px", margin: "12px 0 0" }}>{link.closed}</p>}
+                </div>
+
+                {/* Saved-on-this-device note */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", margin: "0 0 12px", padding: "9px 12px", borderRadius: 12, background: restored ? "rgba(34,197,94,0.08)" : "var(--surface)", border: `1px solid ${restored ? "rgba(34,197,94,0.3)" : "var(--border)"}`, fontSize: 12.5, color: "var(--text2)" }}>
+                    <span>
+                        {restored ? <b style={{ color: "#15803d" }}>✓ {T("Your answers were saved — continue where you left off.")}</b> : <>💾 {T("Your answers are saved on this phone as you type — a refresh won't lose them.")}</>}
+                        {restored?.docsLost && <span style={{ display: "block", color: "#b45309", marginTop: 2 }}>{T("Please choose your document files again — files can't be kept after a refresh.")}</span>}
+                    </span>
+                    {restored && <button type="button" onClick={startOver} style={{ border: "1px solid var(--border)", background: "var(--surface)", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600, color: "var(--text2)", cursor: "pointer" }}>{T("Start over")}</button>}
                 </div>
 
                 {/* Card */}

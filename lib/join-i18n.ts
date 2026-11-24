@@ -76,6 +76,12 @@ const D: Record<string, { hi: string; mr: string }> = {
     "Passport Size Photo": { hi: "पासपोर्ट साइज़ फ़ोटो", mr: "पासपोर्ट साइझ फोटो" },
     "Bank Passbook / Cancelled Cheque": { hi: "बैंक पासबुक / कैंसल चेक", mr: "बँक पासबुक / रद्द केलेला चेक" },
     "Any Other Document": { hi: "कोई अन्य दस्तावेज़", mr: "इतर कोणतेही कागदपत्र" },
+    // Draft saved on the device
+    "Your answers are saved on this phone as you type — a refresh won't lose them.": { hi: "आपकी जानकारी लिखते ही इस फ़ोन में सेव होती है — पेज रिफ़्रेश होने पर भी नहीं मिटेगी।", mr: "तुमची माहिती टाइप करताच या फोनमध्ये सेव्ह होते — पेज रिफ्रेश झाले तरी जाणार नाही." },
+    "Your answers were saved — continue where you left off.": { hi: "आपकी जानकारी सेव है — जहाँ छोड़ा था वहीं से आगे भरें।", mr: "तुमची माहिती सेव्ह आहे — जिथे थांबला होतात तिथून पुढे भरा." },
+    "Please choose your document files again — files can't be kept after a refresh.": { hi: "कृपया दस्तावेज़ की फ़ाइलें फिर से चुनें — रिफ़्रेश के बाद फ़ाइलें नहीं रहतीं।", mr: "कृपया कागदपत्रांच्या फाइल्स पुन्हा निवडा — रिफ्रेशनंतर फाइल्स राहत नाहीत." },
+    "Start over": { hi: "फिर से शुरू करें", mr: "पुन्हा सुरू करा" },
+    "Clear everything you filled in and start again?": { hi: "भरी हुई सारी जानकारी मिटाकर फिर से शुरू करें?", mr: "भरलेली सर्व माहिती पुसून पुन्हा सुरू करायचे?" },
 }
 
 export function tr(lang: JoinLang, s: string): string {
