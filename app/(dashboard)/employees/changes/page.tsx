@@ -132,7 +132,7 @@ function Movements() {
                                 <td className={td}><b>{TYPE_LABEL[m.type] ?? m.type}</b><span className="block text-[11.5px] text-[var(--text2)]">{show(m.to)}</span>{m.note && <span className="block text-[11px] text-[var(--text3)]">{m.note}</span>}</td>
                                 <td className={`${td} text-[11.5px] text-[var(--text3)]`}>{show(m.from)}</td>
                                 <td className={td}>{day(m.effectiveDate)}</td>
-                                <td className={td}><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${m.status === "SCHEDULED" ? "bg-blue-50 text-blue-700" : m.status === "APPLIED" ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-600"}`}>{m.status.toLowerCase()}</span></td>
+                                <td className={td}><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${m.status === "SCHEDULED" ? "bg-[var(--accent-light)] text-[var(--accent-text)]" : m.status === "APPLIED" ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-600"}`}>{m.status.toLowerCase()}</span></td>
                                 <td className={`${td} text-right whitespace-nowrap`}>{d.canEdit && m.status === "SCHEDULED" && (<><button className="text-[12px] font-semibold text-[var(--accent)] mr-2" onClick={() => act(m, "applyNow")}>Apply now</button><button className="text-[12px] font-semibold text-red-600" onClick={() => act(m, "cancel")}>Cancel</button></>)}</td>
                             </tr>
                         ))}

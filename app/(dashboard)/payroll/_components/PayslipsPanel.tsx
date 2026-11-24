@@ -216,12 +216,12 @@ export default function PayslipsPanel({ onClose, initialMonth, initialYear, late
 .co-header{text-align:center;padding:10px 4px 6px;border-bottom:1px solid #333;position:relative;min-height:58px;}.co-logo{position:absolute;left:6px;top:4px;height:50px;width:auto;}.co-header h1{font-size:15px;font-style:italic;font-weight:900;letter-spacing:.3px;}
 .co-header p{font-size:10px;font-style:italic;margin-top:3px;}.site-row{padding:6px 4px;font-size:11px;}
 .main{width:100%;border-collapse:collapse;border:1px solid #555;}.main td,.main th{border:1px solid #aaa;padding:3px 6px;font-size:10.5px;}
-.month-hdr{text-align:center;font-size:12px;font-weight:900;background:#f0f0f0;padding:5px;}
+.month-hdr{text-align:center;font-size:12px;font-weight:900;background:#eceef6;padding:5px;}
 .info-cell{padding:0!important;border:none!important;}.info{width:100%;border-collapse:collapse;}.info td{border:1px solid #aaa;padding:3px 6px;font-size:10px;}
 .il{color:#333;width:20%;font-weight:600;}.iv{width:30%;font-style:italic;}
 .col-hdr th{background:#e8e8e8;font-weight:700;font-size:11px;text-align:center;}.sub-hdr th{background:#f5f5f5;font-weight:700;font-size:10px;}
 .e-col{background:#e8f0fe;}.d-col{background:#fce8e8;}.num{text-align:right;}.it{font-style:italic;}.dlabel{padding-left:8px;}
-.total-row td{font-weight:700;background:#f0f0f0;border-top:2px solid #555!important;}.net-row td{font-weight:700;background:#e8f5e9;}
+.total-row td{font-weight:700;background:#eceef6;border-top:2px solid #555!important;}.net-row td{font-weight:700;background:#e8f5e9;}
 .words{font-size:10.5px;padding:5px 6px!important;border-top:1px solid #555!important;}.footer-row{padding:8px 4px 2px;font-size:10.5px;}
 .comp-gen{text-align:center;padding:8px;font-size:10px;color:#555;}
 @media print{body{margin:0;}.slip{width:100%;margin:0;padding:0 12px 20px;}@page{margin:10mm;size:A4;}}</style></head><body>
@@ -246,7 +246,7 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                     <p style={{ fontSize:16, fontWeight:800, color:"var(--text)", margin:0 }}>Payslip Generation</p>
                     <div style={{ display:"flex", alignItems:"center", gap:12, fontSize:11, marginTop:4, flexWrap:"wrap" }}>
                         <span style={{ display:"flex", alignItems:"center", gap:4, color:"#15803d" }}><CheckCircle2 size={12}/> {paid} Credited</span>
-                        <span style={{ display:"flex", alignItems:"center", gap:4, color:"#1d4ed8" }}><Clock size={12}/> {processed} Ready</span>
+                        <span style={{ display:"flex", alignItems:"center", gap:4, color:"#2f5be0" }}><Clock size={12}/> {processed} Ready</span>
                         <span style={{ display:"flex", alignItems:"center", gap:4, color:"var(--text3)" }}><FileText size={12}/> {draft} Draft</span>
                     </div>
                 </div>
@@ -321,7 +321,7 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                             <span style={{ fontSize:11, color:"var(--text3)", whiteSpace:"nowrap" }}>{filtered.length}</span>
                             {filtered.length>0 && (
                                 <button onClick={printAllSlips}
-                                    style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:6, border:"none", background:"#7c3aed", color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
+                                    style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:6, border:"none", background:"#6d4fe0", color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
                                     <Printer size={11} /> Print All ({filtered.length})
                                 </button>
                             )}
@@ -345,8 +345,8 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                                     <p style={{ fontSize:11, margin:0 }}>Process payroll first</p>
                                 </div>
                             ) : filtered.map((r,idx)=>{
-                                const statusColor=r.status==="PAID"?"#15803d":r.status==="PROCESSED"?"#1d4ed8":"#6b7280"
-                                const statusBg=r.status==="PAID"?"#dcfce7":r.status==="PROCESSED"?"#dbeafe":"#f3f4f6"
+                                const statusColor=r.status==="PAID"?"#15803d":r.status==="PROCESSED"?"#2f5be0":"#555c72"
+                                const statusBg=r.status==="PAID"?"#dcfce7":r.status==="PROCESSED"?"#e3ebff":"#f6f7fc"
                                 return (
                                     <div key={r.id} onClick={()=>setSelected(r)}
                                         className="grid grid-cols-[1fr_72px_70px_104px] sm:grid-cols-[1fr_90px_100px_110px]"
@@ -378,7 +378,7 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                     {/* Slip Preview */}
                     {selected && (
                         <div className="w-full lg:w-[310px] lg:shrink-0" style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, overflow:"hidden", alignSelf:"flex-start", position:"sticky", top:16 }}>
-                            <div style={{ background:"#0b5cff", color:"#fff", padding:"14px 16px" }}>
+                            <div style={{ background:"#3d6ff5", color:"#fff", padding:"14px 16px" }}>
                                 <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between" }}>
                                     <div>
                                         <p style={{ fontSize:14, fontWeight:700, margin:0 }}>{selected.employee.firstName} {selected.employee.lastName}</p>
@@ -402,7 +402,7 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                                         </div>
                                     ))}
                                     <div style={{ display:"flex", justifyContent:"space-between", paddingTop:6, fontWeight:700 }}>
-                                        <span>Gross</span><span style={{ color:"#0b5cff" }}>₹{Math.round(selected.grossSalary).toLocaleString("en-IN")}</span>
+                                        <span>Gross</span><span style={{ color:"#3d6ff5" }}>₹{Math.round(selected.grossSalary).toLocaleString("en-IN")}</span>
                                     </div>
                                 </div>
                                 <div>

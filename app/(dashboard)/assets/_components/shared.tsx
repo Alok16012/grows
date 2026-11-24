@@ -110,22 +110,22 @@ export const REQUEST_STATUS: Record<RequestStatus, Tone> = {
     APPROVED: { label: "Approved", bg: "#dcfce7", color: "#15803d" },
     PARTIALLY_APPROVED: { label: "Partially approved", bg: "#e0f2fe", color: "#0369a1" },
     REJECTED: { label: "Rejected", bg: "#fef2f2", color: "#dc2626" },
-    CANCELLED: { label: "Cancelled", bg: "#f3f4f6", color: "#6b7280" },
+    CANCELLED: { label: "Cancelled", bg: "#f6f7fc", color: "#555c72" },
 }
 
 export const FULFILMENT_STATUS: Record<FulfilmentStatus, Tone> = {
-    NOT_ISSUED: { label: "Not issued", bg: "#f3f4f6", color: "#6b7280" },
+    NOT_ISSUED: { label: "Not issued", bg: "#f6f7fc", color: "#555c72" },
     PARTIALLY_ISSUED: { label: "Partially issued", bg: "#fef3c7", color: "#b45309" },
     FULFILLED: { label: "Fulfilled", bg: "#dcfce7", color: "#15803d" },
 }
 
 export const ISSUE_STATUS: Record<IssueStatus, Tone> = {
     ACTIVE: { label: "Active", bg: "#dcfce7", color: "#15803d" },
-    RETURNED: { label: "Returned", bg: "#f3f4f6", color: "#6b7280" },
+    RETURNED: { label: "Returned", bg: "#f6f7fc", color: "#555c72" },
     REPLACED: { label: "Replaced", bg: "#e0f2fe", color: "#0369a1" },
     LOST: { label: "Lost", bg: "#fef2f2", color: "#dc2626" },
     DAMAGED: { label: "Damaged", bg: "#fff7ed", color: "#c2410c" },
-    WRITTEN_OFF: { label: "Written off", bg: "#f3f4f6", color: "#374151" },
+    WRITTEN_OFF: { label: "Written off", bg: "#f6f7fc", color: "#3a4157" },
 }
 
 export function Pill({ tone, children }: { tone: Tone; children?: React.ReactNode }) {
@@ -144,14 +144,14 @@ export const LOW_TONE: Tone = { label: "Low", bg: "#fef3c7", color: "#b45309" }
 export const CATEGORIES = ["All", "Uniform", "ID Card", "Tool", "Safety Equipment", "Electronics", "Vehicle", "Furniture", "Other"]
 
 export const CATEGORY_COLOR: Record<string, { bg: string; color: string }> = {
-    "Uniform": { bg: "#eff6ff", color: "#3b82f6" },
-    "ID Card": { bg: "#fdf4ff", color: "#a855f7" },
+    "Uniform": { bg: "#eaf0ff", color: "#3d6ff5" },
+    "ID Card": { bg: "#fdf4ff", color: "#8b6cf6" },
     "Tool": { bg: "#fff7ed", color: "#f97316" },
     "Safety Equipment": { bg: "#fef2f2", color: "#ef4444" },
     "Electronics": { bg: "#ecfdf5", color: "#10b981" },
     "Vehicle": { bg: "#f0f9ff", color: "#0ea5e9" },
     "Furniture": { bg: "#fefce8", color: "#ca8a04" },
-    "Other": { bg: "#f9fafb", color: "#6b7280" },
+    "Other": { bg: "#f6f7fc", color: "#555c72" },
 }
 
 export function getCategoryIcon(category: string, size = 16) {

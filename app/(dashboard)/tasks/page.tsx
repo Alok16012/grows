@@ -14,7 +14,7 @@ const box = "h-9 rounded-[9px] border border-[var(--border)] px-2.5 text-[13px] 
 const btn = "h-9 px-4 rounded-[9px] bg-[var(--accent)] text-white text-[13px] font-semibold disabled:opacity-50 inline-flex items-center gap-1.5"
 const btn2 = "h-8 px-3 rounded-[8px] border border-[var(--border)] bg-white text-[12px] font-semibold text-[var(--text2)] inline-flex items-center gap-1 disabled:opacity-50"
 const lbl = "block text-[11px] font-semibold uppercase text-[var(--text3)]"
-const PCOLOR: Record<Priority, string> = { LOW: "bg-gray-100 text-gray-600", MEDIUM: "bg-blue-50 text-blue-700", HIGH: "bg-amber-50 text-amber-800", URGENT: "bg-red-50 text-red-700" }
+const PCOLOR: Record<Priority, string> = { LOW: "bg-gray-100 text-gray-600", MEDIUM: "bg-[var(--accent-light)] text-[var(--accent-text)]", HIGH: "bg-amber-50 text-amber-800", URGENT: "bg-red-50 text-red-700" }
 const SCOLOR: Record<TaskStatus, string> = { TODO: "border-t-gray-400", IN_PROGRESS: "border-t-blue-500", AWAITING_APPROVAL: "border-t-amber-500", DONE: "border-t-green-500", CANCELLED: "border-t-gray-300" }
 const when = (s: string | null) => s ? new Date(s).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "No due date"
 const overdue = (t: Task) => !!t.dueAt && (t.status === "TODO" || t.status === "IN_PROGRESS") && new Date(t.dueAt) < new Date()

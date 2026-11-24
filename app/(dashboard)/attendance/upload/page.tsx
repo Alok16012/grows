@@ -448,7 +448,7 @@ export default function AttendanceUploadPage() {
                     {/* Stats */}
                     <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
                         {[
-                            { label: "Total Rows",  value: matched.length,   color: "#6b7280", bg: "var(--surface2)", border: "var(--border)" },
+                            { label: "Total Rows",  value: matched.length,   color: "#555c72", bg: "var(--surface2)", border: "var(--border)" },
                             { label: "Matched",     value: matchedCount,     color: "#15803d", bg: "#dcfce7",         border: "#86efac" },
                             { label: "Not Found",   value: unmatchedCount,   color: "#dc2626", bg: "#fee2e2",         border: "#fca5a5" },
                         ].map(s => (

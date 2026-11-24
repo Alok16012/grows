@@ -110,7 +110,7 @@ export function InterviewRounds({ lead, users, canEdit, onChanged }: { lead: any
         setBusy(true)
         try { await post("/api/recruitment/interviews", { leadId: lead.id, ...f, scheduledAt: f.scheduledAt ? new Date(f.scheduledAt).toISOString() : "" }); toast.success("Interview scheduled"); setAdding(false); setF({ title: "", scheduledAt: "", mode: "In-person", location: "", interviewerId: "" }); load(); onChanged() } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
     }
-    const tone: Record<string, string> = { SCHEDULED: "text-blue-700", DONE: "text-green-700", NO_SHOW: "text-red-600", CANCELLED: "text-gray-500" }
+    const tone: Record<string, string> = { SCHEDULED: "text-[var(--accent-text)]", DONE: "text-green-700", NO_SHOW: "text-red-600", CANCELLED: "text-gray-500" }
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between"><p className="text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider">Interview rounds</p>{canEdit && !adding && <button onClick={() => setAdding(true)} className={btn2}><CalendarPlus size={12} /> Schedule round {((rows?.length ?? 0) + 1)}</button>}</div>

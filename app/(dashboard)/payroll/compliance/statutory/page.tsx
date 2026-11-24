@@ -129,7 +129,7 @@ export default function StatutoryApplicabilityPage() {
                 <p className="text-[13px] text-[var(--text3)] mt-1">Who is covered by PF, PF Pension (EPS) and ESIC. Set it for many employees at once.</p>
             </div>
 
-            <div className="flex gap-2 items-start rounded-[10px] border border-[#bfdbfe] bg-[#eff6ff] px-3.5 py-2.5 text-[12.5px] text-[#1e40af]">
+            <div className="flex gap-2 items-start rounded-[10px] border border-[#d4e0ff] bg-[#eaf0ff] px-3.5 py-2.5 text-[12.5px] text-[#2f5be0]">
                 <Info size={14} className="mt-0.5 shrink-0" />
                 <span>Changes apply the next time payroll is processed; locked months aren&apos;t recalculated. <b>Pension off</b> = zero EPS: the employer&apos;s 8.33% goes to EPF instead (same total). <b>PF off</b> also turns pension off. CALL (contract) staff never get PF or ESIC, whatever is set here.</span>
             </div>
@@ -216,7 +216,7 @@ export default function StatutoryApplicabilityPage() {
                                 <td className="px-3 py-2">
                                     <p className="font-medium text-[var(--text)]">{r.name}</p>
                                     <p className="text-[11.5px] text-[var(--text3)]">{r.employeeId}{r.compliance === "CALL" ? " · CALL" : ""}</p>
-                                    {r.upcoming && <p className="text-[11px] font-medium text-[#1d4ed8]">From {["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][r.upcoming.fromMonth]} {r.upcoming.fromYear}: PF {r.upcoming.flags.pfApplicable ? "on" : "off"} · EPS {r.upcoming.flags.pensionApplicable ? "on" : "off"} · ESIC {r.upcoming.flags.esicApplicable ? "on" : "off"}</p>}
+                                    {r.upcoming && <p className="text-[11px] font-medium text-[#2f5be0]">From {["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][r.upcoming.fromMonth]} {r.upcoming.fromYear}: PF {r.upcoming.flags.pfApplicable ? "on" : "off"} · EPS {r.upcoming.flags.pensionApplicable ? "on" : "off"} · ESIC {r.upcoming.flags.esicApplicable ? "on" : "off"}</p>}
                                 </td>
                                 <td className="px-3 py-2 text-[var(--text2)]">{r.designation || "—"}</td>
                                 <td className="px-3 py-2 text-[var(--text2)]">{r.site?.name || "—"}</td>

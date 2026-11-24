@@ -15,10 +15,10 @@ type Panel = { key: string; title: string; subtitle?: string; stats: Stat[]; lis
 
 const ICON: Record<string, any> = { inspector: SearchCheck, recruiter: Target, hr: UserPlus, payroll: Wallet, approvals: CheckSquare, inspectionReview: ClipboardCheck }
 const TINT: Record<string, [string, string]> = {
-    inspector: ["#e0f2fe", "#0369a1"], recruiter: ["#f5f3ff", "#7c3aed"], hr: ["#e8effe", "#0847c7"],
+    inspector: ["#e0f2fe", "#0369a1"], recruiter: ["#f1edff", "#6d4fe0"], hr: ["#eaf0ff", "#2f5be0"],
     payroll: ["#ecfdf5", "#047857"], approvals: ["#fef3c7", "#b45309"], inspectionReview: ["#f0fdfa", "#0f766e"],
 }
-const TONE: Record<string, string> = { red: "#dc2626", amber: "#d97706", green: "#16a34a", blue: "#2563eb", grey: "var(--text)" }
+const TONE: Record<string, string> = { red: "#dc2626", amber: "#d97706", green: "#16a34a", blue: "#3d6ff5", grey: "var(--text)" }
 
 export function WorkPanels({ compact = false }: { compact?: boolean }) {
     // Cached: the last snapshot paints at once and refreshes in the background.
@@ -49,7 +49,7 @@ export function WorkPanels({ compact = false }: { compact?: boolean }) {
 
 function PanelCard({ p, compact }: { p: Panel; compact: boolean }) {
     const Icon = ICON[p.key] ?? ClipboardCheck
-    const [bg, fg] = TINT[p.key] ?? ["#f3f4f6", "#374151"]
+    const [bg, fg] = TINT[p.key] ?? ["#f6f7fc", "#3a4157"]
     return (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-4 flex flex-col">
             <div className="flex items-center gap-2.5 mb-3">

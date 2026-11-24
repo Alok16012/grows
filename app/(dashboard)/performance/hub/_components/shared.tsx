@@ -110,21 +110,21 @@ export const FREQ_SHORT: Record<Frequency, string> = { DAILY: "D", WEEKLY: "W", 
 type Tone = { label: string; bg: string; color: string }
 
 export const TEMPLATE_STATUS: Record<TemplateStatus, Tone> = {
-    DRAFT: { label: "Draft", bg: "#f3f4f6", color: "#4b5563" },
+    DRAFT: { label: "Draft", bg: "#f6f7fc", color: "#555c72" },
     PUBLISHED: { label: "Published", bg: "#dcfce7", color: "#15803d" },
-    ARCHIVED: { label: "Archived", bg: "#f3f4f6", color: "#9ca3af" },
+    ARCHIVED: { label: "Archived", bg: "#f6f7fc", color: "#98a1b5" },
 }
 
 export const REPORT_STATUS: Record<ReportStatus, Tone> = {
-    DRAFT: { label: "Draft", bg: "#f3f4f6", color: "#4b5563" },
+    DRAFT: { label: "Draft", bg: "#f6f7fc", color: "#555c72" },
     SUBMITTED: { label: "Submitted", bg: "#fef3c7", color: "#b45309" },
     APPROVED: { label: "Approved", bg: "#dcfce7", color: "#15803d" },
     RETURNED: { label: "Returned", bg: "#fef2f2", color: "#dc2626" },
 }
 
 export const SOURCE_TONE: Record<SourceType, Tone> = {
-    MANUAL: { label: "Manual", bg: "#f3f4f6", color: "#4b5563" },
-    REGISTER: { label: "Register", bg: "#e8effe", color: "#0847c7" },
+    MANUAL: { label: "Manual", bg: "#f6f7fc", color: "#555c72" },
+    REGISTER: { label: "Register", bg: "#eaf0ff", color: "#2f5be0" },
     SYSTEM: { label: "System", bg: "#f3e8ff", color: "#7e22ce" },
 }
 
@@ -137,7 +137,7 @@ export function pctColor(p: number | null | undefined, green = 90, amber = 70) {
 }
 
 /** A distinct colour per KRA (weight bar, card accents). */
-export const KRA_COLORS = ["#0b5cff", "#16a34a", "#f5a623", "#9b4dff", "#0ea5e9", "#f43f5e", "#14b8a6", "#64748b"]
+export const KRA_COLORS = ["#3d6ff5", "#16a34a", "#f5a623", "#9b4dff", "#0ea5e9", "#f43f5e", "#14b8a6", "#64748b"]
 
 // ─── Formula mirror (keep in step with the server) ──────────────────────────
 

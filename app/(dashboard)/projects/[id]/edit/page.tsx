@@ -450,8 +450,8 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                     <div className={sectionCls}>
                         <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-[9px] bg-[#eff6ff] flex items-center justify-center">
-                                    <Users size={15} className="text-[#3b82f6]" />
+                                <div className="w-8 h-8 rounded-[9px] bg-[#eaf0ff] flex items-center justify-center">
+                                    <Users size={15} className="text-[#3d6ff5]" />
                                 </div>
                                 <div>
                                     <h2 className="text-[14px] font-semibold text-[var(--text)]">Managers</h2>

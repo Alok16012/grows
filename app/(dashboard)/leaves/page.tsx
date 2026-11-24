@@ -64,7 +64,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
     PENDING:   { label: "Pending",   color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
     APPROVED:  { label: "Approved",  color: "#16a34a", bg: "#dcfce7", border: "#bbf7d0" },
     REJECTED:  { label: "Rejected",  color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
-    CANCELLED: { label: "Cancelled", color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
+    CANCELLED: { label: "Cancelled", color: "#555c72", bg: "#f6f7fc", border: "#dfe3ef" },
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -92,7 +92,7 @@ function Avatar({ firstName, lastName, photo, size = 36 }: {
 }) {
     const [imgErr, setImgErr] = useState(false)
     const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase()
-    const colors = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"]
+    const colors = ["#3d6ff5", "#0ea5a4", "#8b6cf6", "#f5a623", "#e5566b"]
     const bg = colors[((firstName?.charCodeAt(0) || 0) + (lastName?.charCodeAt(0) || 0)) % colors.length]
     if (photo && !imgErr) return <img src={photo} alt="" style={{ width: size, height: size }} className="rounded-full object-cover shrink-0" onError={() => setImgErr(true)} />
     return (
@@ -104,7 +104,7 @@ function Avatar({ firstName, lastName, photo, size = 36 }: {
 }
 
 function TypeBadge({ code, rule }: { code: string; rule?: LeaveTypeRule }) {
-    const color = rule?.color || "#6b7280"
+    const color = rule?.color || "#555c72"
     return (
         <span title={rule?.name} style={{ color, background: `${color}14`, borderColor: `${color}40` }}
             className="px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap">
@@ -675,7 +675,7 @@ function LeaveCalendar({ typeOf, onOpen }: { typeOf: (c: string) => LeaveTypeRul
                                     {hol && <p className="text-[10.5px] font-semibold text-[#b45309] truncate mb-1" title={hol.name}>🎉 {hol.name}</p>}
                                     <div className="space-y-0.5">
                                         {list.slice(0, 3).map(l => {
-                                            const c = typeOf(l.type)?.color || "#6b7280"
+                                            const c = typeOf(l.type)?.color || "#555c72"
                                             return (
                                                 <button key={l.id} onClick={() => onOpen(l)} title={`${l.employee.firstName} ${l.employee.lastName} · ${l.type} · ${STATUS_CONFIG[l.status]?.label}`}
                                                     className="w-full text-left truncate rounded-[5px] px-1.5 py-0.5 text-[10.5px] font-medium"

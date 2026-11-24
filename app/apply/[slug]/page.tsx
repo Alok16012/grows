@@ -131,16 +131,16 @@ export default function ApplyPage() {
     }
 
     if (!meta && !notFound) return (
-        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc" }}>
-            <Loader2 size={28} style={{ color: "#6366f1" }} className="animate-spin" />
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f6f7fc" }}>
+            <Loader2 size={28} style={{ color: "#8b6cf6" }} className="animate-spin" />
         </div>
     )
 
     if (notFound) return (
-        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f8fafc", gap: 12 }}>
+        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f6f7fc", gap: 12 }}>
             <AlertCircle size={40} style={{ color: "#dc2626" }} />
             <h2 style={{ fontSize: 20, fontWeight: 700, color: "#111" }}>Form not found</h2>
-            <p style={{ color: "#6b7280", fontSize: 14 }}>This application link is invalid or has been deactivated.</p>
+            <p style={{ color: "#555c72", fontSize: 14 }}>This application link is invalid or has been deactivated.</p>
         </div>
     )
 
@@ -175,15 +175,15 @@ export default function ApplyPage() {
         border: "1px solid #e2e8f0", fontSize: 13, outline: "none",
         background: "#fff", color: "#111", boxSizing: "border-box",
     }
-    const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 4, display: "block" }
-    const section: React.CSSProperties = { padding: "16px 18px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }
-    const sectionTitle: React.CSSProperties = { fontSize: 13, fontWeight: 800, color: "#1f2937", marginBottom: 12, paddingBottom: 8, borderBottom: "2px solid #6366f1", display: "inline-block" }
+    const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#3a4157", marginBottom: 4, display: "block" }
+    const section: React.CSSProperties = { padding: "16px 18px", borderRadius: 12, background: "#f6f7fc", border: "1px solid #e2e8f0" }
+    const sectionTitle: React.CSSProperties = { fontSize: 13, fontWeight: 800, color: "#1f2937", marginBottom: 12, paddingBottom: 8, borderBottom: "2px solid #8b6cf6", display: "inline-block" }
 
     return (
-        <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "32px 12px 60px" }}>
+        <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #8b6cf6 0%, #6d4fe0 100%)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "32px 12px 60px" }}>
             <div style={{ width: "100%", maxWidth: 780, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 25px 60px rgba(0,0,0,0.15)" }}>
                 {/* Header — Logo + Company Name (big) + HR Name */}
-                <div style={{ background: isOnSiteJoin ? "linear-gradient(135deg, #047857 0%, #065f46 100%)" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "32px 32px 28px" }}>
+                <div style={{ background: isOnSiteJoin ? "linear-gradient(135deg, #047857 0%, #065f46 100%)" : "linear-gradient(135deg, #8b6cf6 0%, #6d4fe0 100%)", padding: "32px 32px 28px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                         <div style={{ width: 64, height: 64, borderRadius: 14, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -213,17 +213,17 @@ export default function ApplyPage() {
                     <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1f2937", margin: 0, textAlign: "center" }}>
                         {isOnSiteJoin ? "Candidate On-site Joining" : "Candidate Personal Information Form"}
                     </h2>
-                    {meta!.description && <p style={{ fontSize: 12, color: "#6b7280", margin: "6px 0 12px", textAlign: "center" }}>{meta!.description}</p>}
+                    {meta!.description && <p style={{ fontSize: 12, color: "#555c72", margin: "6px 0 12px", textAlign: "center" }}>{meta!.description}</p>}
                     {!meta!.description && <div style={{ height: 12 }} />}
                 </div>
 
                 <form onSubmit={handleSubmit} style={{ padding: 22, display: "flex", flexDirection: "column", gap: 16 }}>
 
                     {/* Photo Upload */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: "#f6f7fc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
                         <div onClick={() => photoRef.current?.click()} style={{ cursor: "pointer", position: "relative", flexShrink: 0 }}>
                             {photo ? (
-                                <img src={photo} alt="Profile" style={{ width: 60, height: 60, borderRadius: "50%", objectFit: "cover", border: "2.5px solid #6366f1" }} />
+                                <img src={photo} alt="Profile" style={{ width: 60, height: 60, borderRadius: "50%", objectFit: "cover", border: "2.5px solid #8b6cf6" }} />
                             ) : (
                                 <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", border: "2px dashed #fca5a5" }}>
                                     <User size={24} color="#ef4444" />
@@ -236,14 +236,14 @@ export default function ApplyPage() {
                             )}
                         </div>
                         <div style={{ flex: 1 }}>
-                            <p style={{ fontSize: 12, fontWeight: 700, color: "#374151", margin: "0 0 5px" }}>
+                            <p style={{ fontSize: 12, fontWeight: 700, color: "#3a4157", margin: "0 0 5px" }}>
                                 Passport Size Photo <span style={{ color: "#dc2626" }}>*</span>
                             </p>
                             <button type="button" onClick={() => photoRef.current?.click()} disabled={photoUploading}
-                                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 7, background: photo ? "#f0fdf4" : "#ede9fe", color: photo ? "#047857" : "#6366f1", fontSize: 11, fontWeight: 600, border: `1px solid ${photo ? "#86efac" : "#c4b5fd"}`, cursor: "pointer" }}>
+                                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 7, background: photo ? "#f0fdf4" : "#ebe5ff", color: photo ? "#047857" : "#8b6cf6", fontSize: 11, fontWeight: 600, border: `1px solid ${photo ? "#86efac" : "#c4b5fd"}`, cursor: "pointer" }}>
                                 <Camera size={11} /> {photoUploading ? "Uploading…" : photo ? "Change Photo" : "Upload Photo"}
                             </button>
-                            <p style={{ fontSize: 10, color: photo ? "#9ca3af" : "#dc2626", margin: "4px 0 0" }}>
+                            <p style={{ fontSize: 10, color: photo ? "#98a1b5" : "#dc2626", margin: "4px 0 0" }}>
                                 {photo ? "JPG / PNG • max 2MB" : "Required • JPG / PNG • max 2MB"}
                             </p>
                         </div>
@@ -303,7 +303,7 @@ export default function ApplyPage() {
                                 <tbody>
                                     {education.map((row, i) => (
                                         <tr key={i} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                                            <td style={{ padding: "4px 8px", fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>{row.course}</td>
+                                            <td style={{ padding: "4px 8px", fontWeight: 600, color: "#3a4157", whiteSpace: "nowrap" }}>{row.course}</td>
                                             <td style={{ padding: "4px 4px" }}><input value={row.stream} onChange={e => updateEdu(i, "stream", e.target.value)} style={{ ...inp, padding: "5px 7px", fontSize: 12 }} /></td>
                                             <td style={{ padding: "4px 4px" }}><input value={row.institute} onChange={e => updateEdu(i, "institute", e.target.value)} style={{ ...inp, padding: "5px 7px", fontSize: 12 }} /></td>
                                             <td style={{ padding: "4px 4px" }}><input value={row.year} onChange={e => updateEdu(i, "year", e.target.value)} style={{ ...inp, padding: "5px 7px", fontSize: 12, width: 70 }} /></td>
@@ -370,7 +370,7 @@ export default function ApplyPage() {
                         <h3 style={sectionTitle}>6. Documents Submitted</h3>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                             {DOC_OPTIONS.map(d => (
-                                <label key={d} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 7, background: docs.includes(d) ? "#ede9fe" : "#fff", border: `1px solid ${docs.includes(d) ? "#c4b5fd" : "#e2e8f0"}`, fontSize: 12, fontWeight: 600, color: docs.includes(d) ? "#5b21b6" : "#374151", cursor: "pointer" }}>
+                                <label key={d} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 7, background: docs.includes(d) ? "#ebe5ff" : "#fff", border: `1px solid ${docs.includes(d) ? "#c4b5fd" : "#e2e8f0"}`, fontSize: 12, fontWeight: 600, color: docs.includes(d) ? "#6d4fe0" : "#3a4157", cursor: "pointer" }}>
                                     <input type="checkbox" checked={docs.includes(d)} onChange={() => toggleDoc(d)} />
                                     {d}
                                 </label>
@@ -384,7 +384,7 @@ export default function ApplyPage() {
                         <label style={lbl}>Do you have a bike?</label>
                         <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
                             {["Yes", "No"].map(opt => (
-                                <label key={opt} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 16px", borderRadius: 7, background: form.hasBike === opt ? "#ede9fe" : "#fff", border: `1px solid ${form.hasBike === opt ? "#c4b5fd" : "#e2e8f0"}`, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                                <label key={opt} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 16px", borderRadius: 7, background: form.hasBike === opt ? "#ebe5ff" : "#fff", border: `1px solid ${form.hasBike === opt ? "#c4b5fd" : "#e2e8f0"}`, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                                     <input type="radio" name="hasBike" value={opt} checked={form.hasBike === opt} onChange={set("hasBike")} />
                                     {opt}
                                 </label>
@@ -395,7 +395,7 @@ export default function ApplyPage() {
                     {/* 8. DECLARATION */}
                     <div style={section}>
                         <h3 style={sectionTitle}>8. Declaration</h3>
-                        <p style={{ fontSize: 12, color: "#4b5563", marginBottom: 12, lineHeight: 1.5 }}>
+                        <p style={{ fontSize: 12, color: "#555c72", marginBottom: 12, lineHeight: 1.5 }}>
                             I hereby declare that all the information provided by me is true and correct to the best of my knowledge.
                         </p>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -420,7 +420,7 @@ export default function ApplyPage() {
                     <button type="submit" disabled={submitting} style={{
                         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                         padding: "12px 24px", borderRadius: 10, border: "none",
-                        background: submitting ? "#a5b4fc" : (isOnSiteJoin ? "linear-gradient(135deg, #047857 0%, #065f46 100%)" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"),
+                        background: submitting ? "#a5b4fc" : (isOnSiteJoin ? "linear-gradient(135deg, #047857 0%, #065f46 100%)" : "linear-gradient(135deg, #8b6cf6 0%, #6d4fe0 100%)"),
                         color: "#fff", fontSize: 14, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer",
                         boxShadow: submitting ? "none" : "0 4px 15px rgba(102,126,234,0.4)",
                     }}>
@@ -428,7 +428,7 @@ export default function ApplyPage() {
                         {submitting ? "Submitting…" : isOnSiteJoin ? "Confirm On-site Joining" : "Submit Application"}
                     </button>
 
-                    <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", margin: 0 }}>
+                    <p style={{ fontSize: 11, color: "#98a1b5", textAlign: "center", margin: 0 }}>
                         By submitting you agree that we may contact you regarding this application.
                     </p>
                 </form>

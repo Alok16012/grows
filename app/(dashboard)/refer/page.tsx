@@ -55,7 +55,7 @@ export default function ReferPage() {
                         <div key={j.id} className={`${card} p-4 flex flex-col gap-2`}>
                             <div className="flex justify-between gap-2"><b className="text-[15px]">{j.title}</b>{j.priority === "HIGH" && <span className="h-fit px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-semibold">Urgent</span>}</div>
                             <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12.5px] text-[var(--text2)]">
-                                {(j.siteName || j.jobLocation) && <span className="inline-flex items-center gap-1"><MapPin size={12} />{j.siteName || j.jobLocation}</span>}
+                                {(j.siteName || j.jobLocation) && <span className="inline-flex items-center gap-1 min-w-0 max-w-full"><MapPin size={12} className="shrink-0" /><span className="truncate">{j.siteName || j.jobLocation}</span></span>}
                                 {salary(j) && <span className="inline-flex items-center gap-1"><IndianRupee size={12} />{salary(j)}</span>}
                                 <span>{j.openings} opening{j.openings === 1 ? "" : "s"}</span>
                                 {(j.workExpMin != null || j.freshersAllowed) && <span>{j.freshersAllowed && !j.workExpMin ? "Freshers OK" : `${j.workExpMin}${j.workExpMax ? `–${j.workExpMax}` : "+"} yrs`}</span>}
@@ -78,7 +78,7 @@ export default function ReferPage() {
                     <tbody>{d.mine.map((r: any) => {
                         const due = r.joinedAt ? new Date(new Date(r.joinedAt).getTime() + s.bonusAfterDays * 86_400_000) : null
                         return <tr key={r.id}><td className={`${td} font-semibold`}>{r.name}</td><td className={td}>{r.position}</td><td className={td}>{day(r.createdAt)}</td>
-                            <td className={td}><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${r.joined ? "bg-green-50 text-green-700" : r.closed ? "bg-gray-100 text-gray-600" : "bg-blue-50 text-blue-700"}`}>{r.stage}</span></td>
+                            <td className={td}><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${r.joined ? "bg-green-50 text-green-700" : r.closed ? "bg-gray-100 text-gray-600" : "bg-[var(--accent-light)] text-[var(--accent-text)]"}`}>{r.stage}</span></td>
                             {s.bonusAmount > 0 && <td className={td}>{!r.joined ? "—" : due && due <= new Date() ? <span className="text-green-700 font-semibold">Eligible</span> : `After ${day(due!.toISOString())}`}</td>}</tr>
                     })}</tbody></table></div>
             ))}

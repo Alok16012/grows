@@ -30,12 +30,12 @@ type Project = {
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string; dot: string }> = {
     ACTIVE: { label: "Active", bg: "#dcfce7", fg: "#15803d", dot: "#16a34a" },
-    PLANNING: { label: "Planning", bg: "#eff6ff", fg: "#1d4ed8", dot: "#3b82f6" },
+    PLANNING: { label: "Planning", bg: "#eaf0ff", fg: "#2f5be0", dot: "#3d6ff5" },
     ON_HOLD: { label: "On Hold", bg: "#fef2f2", fg: "#b91c1c", dot: "#ef4444" },
-    COMPLETED: { label: "Completed", bg: "#f3f4f6", fg: "#374151", dot: "#6b7280" },
+    COMPLETED: { label: "Completed", bg: "#f6f7fc", fg: "#3a4157", dot: "#555c72" },
     // Saved with Name + Site only; not assignable until it is created from the edit page.
-    DRAFT: { label: "Draft", bg: "#f3f4f6", fg: "#6b7280", dot: "#9ca3af" },
-    ARCHIVED: { label: "Archived", bg: "#f3f4f6", fg: "#9ca3af", dot: "#9ca3af" },
+    DRAFT: { label: "Draft", bg: "#f6f7fc", fg: "#555c72", dot: "#98a1b5" },
+    ARCHIVED: { label: "Archived", bg: "#f6f7fc", fg: "#98a1b5", dot: "#98a1b5" },
 }
 const STATUS_FILTERS = ["ALL", "ACTIVE", "PLANNING", "ON_HOLD", "COMPLETED", "DRAFT", "ARCHIVED"] as const
 // The headline strip: Total = these four. Draft and Archived are shown beside
@@ -51,7 +51,7 @@ function StatusBadge({ status }: { status?: string | null }) {
     )
 }
 
-const AVATAR_COLORS = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
+const AVATAR_COLORS = ["#3d6ff5", "#0ea5a4", "#8b6cf6", "#f5a623", "#e5566b", "#06b6d4"]
 
 function TeamAvatars({ team }: { team?: TeamMember[] }) {
     // One avatar per person even if a list still names them twice (manager and

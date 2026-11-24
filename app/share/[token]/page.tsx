@@ -142,7 +142,7 @@ export default function SharePage() {
                         <h2 className="text-[14px] font-semibold text-[var(--text)]">Inspection Details</h2>
                         <p className="text-[12px] text-[var(--text3)] mt-0.5">{responses.length} fields recorded</p>
                     </div>
-                    <div className="divide-y divide-[#f0f0f0]">
+                    <div className="divide-y divide-[#eceef6]">
                         {responses.map((resp: any) => (
                             <div key={resp.id} className="px-5 py-4">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text3)] mb-1">{resp.field.fieldLabel}</p>

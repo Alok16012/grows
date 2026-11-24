@@ -50,13 +50,13 @@ const paidOf   = (st?: SiteStatus) => st?.paid   ?? 0
 function StatusPills({ st }: { st?: SiteStatus }) {
     if (!st || (st.processedCount ?? 0) === 0) return null
     const pill = (n: number, label: string, bg: string, color: string) => (
-        <span key={label} style={{ padding: "1px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: n > 0 ? bg : "#f3f4f6", color: n > 0 ? color : "#9ca3af", whiteSpace: "nowrap" }}>{n} {label}</span>
+        <span key={label} style={{ padding: "1px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: n > 0 ? bg : "#f6f7fc", color: n > 0 ? color : "#98a1b5", whiteSpace: "nowrap" }}>{n} {label}</span>
     )
     return (
         <span style={{ display: "inline-flex", gap: 3, flexWrap: "wrap" }}>
             {pill(draftOf(st),  "draft",  "#fef9c3", "#854d0e")}
             {pill(lockedOf(st), "locked", "#dcfce7", "#15803d")}
-            {pill(paidOf(st),   "paid",   "#dbeafe", "#1d4ed8")}
+            {pill(paidOf(st),   "paid",   "#e3ebff", "#2f5be0")}
         </span>
     )
 }
@@ -358,7 +358,7 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
             <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <Play size={15} style={{ color: "#7c3aed" }} />
+                        <Play size={15} style={{ color: "#6d4fe0" }} />
                         <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Process Payroll — Site Wise</span>
                     </div>
 
@@ -418,7 +418,7 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                                 <MapPin size={11} style={{ color: isSel ? "var(--accent)" : "var(--text3)", flexShrink: 0 }} />
                                                 <span style={{ fontSize: 12, fontWeight: 600, color: isSel ? "var(--accent)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{site.name}</span>
                                             </div>
-                                            {isDone ? <CheckCircle2 size={12} style={{ color: "#16a34a", flexShrink: 0 }} /> : <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#d1d5db", flexShrink: 0 }} />}
+                                            {isDone ? <CheckCircle2 size={12} style={{ color: "#16a34a", flexShrink: 0 }} /> : <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#d5dae8", flexShrink: 0 }} />}
                                         </div>
                                         <div style={{ fontSize: 10, marginTop: 2, marginLeft: 16, color: isDone ? "#16a34a" : "#f59e0b", fontWeight: 600 }}>
                                             {isDone ? `${st!.processedCount} processed` : "Pending"}
@@ -497,7 +497,7 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                     {draftOf(getStatus(selectedSiteId)) > 0 && canLock && (
                                         <button onClick={() => handleSiteLock("lock")} disabled={siteLocking !== null}
                                             title="Lock this site's open rows for the month"
-                                            style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #ddd6fe", background: "#f5f3ff", fontSize: 11, color: "#7c3aed", fontWeight: 700, cursor: "pointer", opacity: siteLocking ? 0.6 : 1 }}>
+                                            style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 7, border: "1px solid #ddd6fe", background: "#f1edff", fontSize: 11, color: "#6d4fe0", fontWeight: 700, cursor: "pointer", opacity: siteLocking ? 0.6 : 1 }}>
                                             {siteLocking === "lock" ? <Loader2 size={11} className="animate-spin" /> : <Lock size={11} />} Lock site
                                         </button>
                                     )}
@@ -545,10 +545,10 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                             {fetched && (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
                                     {[
-                                        { label: "Total Staff",     value: String(employees.length),                 color: "#3b82f6" },
+                                        { label: "Total Staff",     value: String(employees.length),                 color: "#3d6ff5" },
                                         { label: "Salary Approved", value: `${approvedCount}/${employees.length}`,   color: approvedCount < employees.length ? "#f59e0b" : "#16a34a" },
-                                        { label: "Est. Gross",      value: fmt(totalGrossEst),                        color: "#0b5cff" },
-                                        { label: "Default Days",    value: String(defaultDays),                       color: "#7c3aed" },
+                                        { label: "Est. Gross",      value: fmt(totalGrossEst),                        color: "#3d6ff5" },
+                                        { label: "Default Days",    value: String(defaultDays),                       color: "#6d4fe0" },
                                     ].map(s => (
                                         <div key={s.label} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)" }}>
                                             <p style={{ fontSize: 9, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px", margin: 0 }}>{s.label}</p>
@@ -577,18 +577,18 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                             </tr>
                                             <tr style={{ background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
                                                 <th style={th}>#</th><th style={th}>Emp Code</th><th style={{ ...th, textAlign: "left" }}>Name</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>Month<br/>Days</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>LOP</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>Days</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>OT<br/>{otUnit.unit === "hours" ? "(hrs)" : "Days"}</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>OT<br/>Hrs</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>Canteen<br/>Days</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>Canteen ₹<br/><span style={{ fontWeight: 400, fontSize: 9 }}>blank = days×rate</span></th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>Other<br/>Ded</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>LWF</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>Penalty</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>Advance</th>
-                                                <th style={{ ...th, background: "#eff6ff" }}>Prod<br/>Inc</th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>Month<br/>Days</th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>LOP</th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>Days</th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>OT<br/>{otUnit.unit === "hours" ? "(hrs)" : "Days"}</th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>OT<br/>Hrs</th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>Canteen<br/>Days</th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>Canteen ₹<br/><span style={{ fontWeight: 400, fontSize: 9 }}>blank = days×rate</span></th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>Other<br/>Ded</th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>LWF</th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>Penalty</th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>Advance</th>
+                                                <th style={{ ...th, background: "#eaf0ff" }}>Prod<br/>Inc</th>
                                                 <th style={{ ...th, background: "#f0fdf4" }}>BASIC</th>
                                                 <th style={{ ...th, background: "#f0fdf4" }}>DA</th>
                                                 <th style={{ ...th, background: "#f0fdf4" }}>HRA</th>
@@ -632,31 +632,31 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                                             <div style={{ fontWeight: 600, color: "var(--text)" }}>{emp.firstName} {emp.lastName}</div>
                                                             <div style={{ fontSize: 10, color: "var(--text3)" }}>{emp.designation || "—"}</div>
                                                         </td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={1} max={31} value={att.monthDays ?? defaultDays} onChange={e => setAtt(emp.id, "monthDays", e.target.value)} style={inp} disabled={locked} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff", color: lop < 0 ? "#16a34a" : lop > 0 ? "#dc2626" : "var(--text3)", fontWeight: 700, fontSize: 10 }}>{lop}</td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} max={31} value={att.workedDays ?? 0} onChange={e => setAtt(emp.id, "workedDays", e.target.value)} style={inp} disabled={locked} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} step="0.01" value={att.otDays ?? 0} onChange={e => setAtt(emp.id, "otDays", e.target.value)} style={inp} disabled={locked} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff", color: "var(--text3)", fontSize: 10 }}>{otHrs}</td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.canteenDays ?? 0} onChange={e => setAtt(emp.id, "canteenDays", e.target.value)} style={inp} disabled={locked} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} placeholder="auto" value={att.canteenAmount ?? ""} onChange={e => setAttOptional(emp.id, "canteenAmount", e.target.value)} style={inp} disabled={locked} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.otherDeductions ?? 0} onChange={e => setAtt(emp.id, "otherDeductions", e.target.value)} style={inp} disabled={locked} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.lwf ?? 0} onChange={e => setAtt(emp.id, "lwf", e.target.value)} style={inp} disabled={locked} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.penalty ?? 0} onChange={e => setAtt(emp.id, "penalty", e.target.value)} style={inp} disabled={locked} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.advance ?? 0} onChange={e => setAtt(emp.id, "advance", e.target.value)} style={inp} disabled={locked} /></td>
-                                                        <td style={{ ...td, background: "#eff6ff" }}><input type="number" min={0} value={att.productionIncentive ?? 0} onChange={e => setAtt(emp.id, "productionIncentive", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eaf0ff" }}><input type="number" min={1} max={31} value={att.monthDays ?? defaultDays} onChange={e => setAtt(emp.id, "monthDays", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eaf0ff", color: lop < 0 ? "#16a34a" : lop > 0 ? "#dc2626" : "var(--text3)", fontWeight: 700, fontSize: 10 }}>{lop}</td>
+                                                        <td style={{ ...td, background: "#eaf0ff" }}><input type="number" min={0} max={31} value={att.workedDays ?? 0} onChange={e => setAtt(emp.id, "workedDays", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eaf0ff" }}><input type="number" min={0} step="0.01" value={att.otDays ?? 0} onChange={e => setAtt(emp.id, "otDays", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eaf0ff", color: "var(--text3)", fontSize: 10 }}>{otHrs}</td>
+                                                        <td style={{ ...td, background: "#eaf0ff" }}><input type="number" min={0} value={att.canteenDays ?? 0} onChange={e => setAtt(emp.id, "canteenDays", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eaf0ff" }}><input type="number" min={0} placeholder="auto" value={att.canteenAmount ?? ""} onChange={e => setAttOptional(emp.id, "canteenAmount", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eaf0ff" }}><input type="number" min={0} value={att.otherDeductions ?? 0} onChange={e => setAtt(emp.id, "otherDeductions", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eaf0ff" }}><input type="number" min={0} value={att.lwf ?? 0} onChange={e => setAtt(emp.id, "lwf", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eaf0ff" }}><input type="number" min={0} value={att.penalty ?? 0} onChange={e => setAtt(emp.id, "penalty", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eaf0ff" }}><input type="number" min={0} value={att.advance ?? 0} onChange={e => setAtt(emp.id, "advance", e.target.value)} style={inp} disabled={locked} /></td>
+                                                        <td style={{ ...td, background: "#eaf0ff" }}><input type="number" min={0} value={att.productionIncentive ?? 0} onChange={e => setAtt(emp.id, "productionIncentive", e.target.value)} style={inp} disabled={locked} /></td>
                                                         <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.basic) : "—"}</td>
                                                         <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.da) : "—"}</td>
-                                                        <td style={{ ...td, background: "#f0fdf4", color: "#1d4ed8" }}>{sal ? fmt(hra) : "—"}</td>
+                                                        <td style={{ ...td, background: "#f0fdf4", color: "#2f5be0" }}>{sal ? fmt(hra) : "—"}</td>
                                                         <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.washing) : "—"}</td>
                                                         <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.conveyance) : "—"}</td>
                                                         <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.leaveWithWages) : "—"}</td>
-                                                        <td style={{ ...td, background: "#f0fdf4", color: "#1d4ed8" }}>{sal ? fmt(bonus) : "—"}</td>
+                                                        <td style={{ ...td, background: "#f0fdf4", color: "#2f5be0" }}>{sal ? fmt(bonus) : "—"}</td>
                                                         <td style={{ ...td, background: "#f0fdf4" }}>{sal ? fmt(sal.otherAllowance) : "—"}</td>
                                                         <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>{fmt(fullGross)}</td>
                                                         <td style={td}>
                                                             <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
                                                                 <span style={{ padding: "2px 6px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: approved ? "#dcfce7" : "#fef9c3", color: approved ? "#15803d" : "#854d0e" }}>{approved ? "Approved" : sal ? "Pending" : "No Salary"}</span>
-                                                                <span style={{ padding: "1px 5px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: attRows[emp.id] ? "#dbeafe" : "#f3f4f6", color: attRows[emp.id] ? "#1d4ed8" : "#9ca3af" }}>{attRows[emp.id] ? "✓ Att" : "No att"}</span>
+                                                                <span style={{ padding: "1px 5px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: attRows[emp.id] ? "#e3ebff" : "#f6f7fc", color: attRows[emp.id] ? "#2f5be0" : "#98a1b5" }}>{attRows[emp.id] ? "✓ Att" : "No att"}</span>
                                                                 {locked && <span title="Locked — unlock to edit" style={{ padding: "1px 5px", borderRadius: 20, fontSize: 9, fontWeight: 700, background: "#dcfce7", color: "#15803d" }}>🔒 {rowStatus[emp.id] === "PAID" ? "Paid" : "Locked"}</span>}
                                                             </div>
                                                         </td>
@@ -668,18 +668,18 @@ export default function ProcessPanel({ onClose, onDone, initialMonth, initialYea
                                             <tfoot>
                                                 <tr style={{ background: "var(--surface2)", borderTop: "2px solid var(--border)", fontWeight: 700 }}>
                                                     <td colSpan={3} style={{ ...td, textAlign: "right", fontSize: 10, color: "var(--text3)", textTransform: "uppercase" }}>Total ({employees.length})</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.monthDays ?? defaultDays), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.monthDays ?? defaultDays) - (attRows[e.id]?.workedDays ?? 0)), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.workedDays ?? 0), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + (attRows[e.id]?.otDays ?? 0), 0) * 1000) / 1000}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{Math.round(employees.reduce((s, e) => s + (attRows[e.id]?.otDays ?? 0) * (otUnit.unit === "hours" ? 1 : otUnit.hpd), 0) * 100) / 100}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenDays ?? 0), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenAmount ?? 0), 0) || "—"}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.otherDeductions ?? 0), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.lwf ?? 0), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.penalty ?? 0), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.advance ?? 0), 0)}</td>
-                                                    <td style={{ ...td, background: "#eff6ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.productionIncentive ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.monthDays ?? defaultDays), 0)}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{employees.reduce((s, e) => s + ((attRows[e.id]?.monthDays ?? defaultDays) - (attRows[e.id]?.workedDays ?? 0)), 0)}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.workedDays ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{Math.round(employees.reduce((s, e) => s + (attRows[e.id]?.otDays ?? 0), 0) * 1000) / 1000}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{Math.round(employees.reduce((s, e) => s + (attRows[e.id]?.otDays ?? 0) * (otUnit.unit === "hours" ? 1 : otUnit.hpd), 0) * 100) / 100}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenDays ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.canteenAmount ?? 0), 0) || "—"}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.otherDeductions ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.lwf ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.penalty ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.advance ?? 0), 0)}</td>
+                                                    <td style={{ ...td, background: "#eaf0ff" }}>{employees.reduce((s, e) => s + (attRows[e.id]?.productionIncentive ?? 0), 0)}</td>
                                                     <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.basic ?? 0), 0))}</td>
                                                     <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => s + (e.employeeSalary?.da ?? 0), 0))}</td>
                                                     <td style={{ ...td, background: "#f0fdf4" }}>{fmt(employees.reduce((s, e) => { const sa = e.employeeSalary as any; if (!sa || sa.complianceType === "CALL") return s; return s + (sa.hra ?? 0) }, 0))}</td>

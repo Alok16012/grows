@@ -134,7 +134,7 @@ export default function AdvanceReportPage() {
                     </span>
                 </label>
                 <button onClick={download} disabled={loading || !filtered.length}
-                    className="flex h-10 items-center gap-2 rounded-lg bg-[#0b5cff] px-4 text-sm font-semibold text-white disabled:opacity-50">
+                    className="flex h-10 items-center gap-2 rounded-lg bg-[#3d6ff5] px-4 text-sm font-semibold text-white disabled:opacity-50">
                     <Download size={15} /> Download Excel
                 </button>
             </div>
@@ -158,7 +158,7 @@ export default function AdvanceReportPage() {
                     <div className="flex rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5">
                         {([["summary", "By employee"], ["detail", "Month-wise"]] as [View, string][]).map(([v, l]) => (
                             <button key={v} onClick={() => setView(v)}
-                                className={`rounded-md px-3 py-1 text-xs font-semibold ${view === v ? "bg-[#0b5cff] text-white" : "text-[var(--text2)]"}`}>{l}</button>
+                                className={`rounded-md px-3 py-1 text-xs font-semibold ${view === v ? "bg-[#3d6ff5] text-white" : "text-[var(--text2)]"}`}>{l}</button>
                         ))}
                     </div>
                 </div>

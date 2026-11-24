@@ -69,13 +69,13 @@ const STEPS = [
         step: 1, label: "Attendance", icon: Upload, panel: "attendance" as Panel,
         desc: "Upload the attendance sheet. Pay is calculated right away.",
         cta: "Upload sheet",
-        color: "#0b5cff", bg: "#e8effe", border: "#c7dbff", gradient: "linear-gradient(135deg, #0b5cff 0%, #0847c7 100%)",
+        color: "#3d6ff5", bg: "#eaf0ff", border: "#c7dbff", gradient: "linear-gradient(135deg, #3d6ff5 0%, #2f5be0 100%)",
     },
     {
         step: 2, label: "Wage Sheet Review", icon: FileSpreadsheet, panel: "wagesheet" as Panel,
         desc: "Go through the wage sheet, fix anything, then lock the month.",
         cta: "Open wage sheet",
-        color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", gradient: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
+        color: "#6d4fe0", bg: "#f1edff", border: "#ddd6fe", gradient: "linear-gradient(135deg, #6d4fe0 0%, #6d4fe0 100%)",
     },
     {
         step: 3, label: "PF / ESIC / PT", icon: ShieldCheck, panel: "compliance" as Panel,
@@ -373,7 +373,7 @@ export default function PayrollPage() {
                             {counts.draft > 0 && canLock && (
                                 <button onClick={lockMonth} disabled={lockingMonth !== null}
                                     title={`Lock ${periodLabel} — every open row, all sites`}
-                                    style={{ ...quietBtn, border: "none", background: "#7c3aed", color: "#fff" }}>
+                                    style={{ ...quietBtn, border: "none", background: "#6d4fe0", color: "#fff" }}>
                                     {lockingMonth === "lock" ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />}
                                     {counts.locked + counts.paid > 0 ? `Lock remaining (${counts.draft})` : "Lock month"}
                                 </button>
@@ -442,7 +442,7 @@ export default function PayrollPage() {
                         canCreatePeriod(nextMonth, calendarMonth) ? (
                             <button onClick={createNextMonth} disabled={creating}
                                 title={`Create ${labelOf(nextMonth)} with the employees on its rolls`}
-                                style={{ ...quietBtn, border: "1px solid #c7dbff", background: "#e8effe", color: "#0b5cff" }}>
+                                style={{ ...quietBtn, border: "1px solid #c7dbff", background: "#eaf0ff", color: "#3d6ff5" }}>
                                 {creating ? <Loader2 size={15} className="animate-spin" /> : <CalendarPlus size={15} />} Create next month
                             </button>
                         ) : (
@@ -570,8 +570,8 @@ export default function PayrollPage() {
                     })}
                 </div>
 
-                <div style={{ padding: "10px 20px 12px", borderTop: "1px solid var(--border)", background: "var(--surface2)", display: "flex", alignItems: "center", gap: 8 }}>
-                    <Lock size={11} style={{ color: "var(--text3)", flexShrink: 0 }} />
+                <div style={{ padding: "10px 20px 12px", borderTop: "1px solid var(--border)", background: "var(--surface2)", display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <Lock size={11} style={{ color: "var(--text3)", flexShrink: 0, marginTop: 3 }} />
                     <p style={{ fontSize: 11.5, color: "var(--text3)", margin: 0 }}>
                         Reports and payslips are open as soon as attendance is uploaded — they show <b>draft</b> figures (files marked DRAFT) until you use <b>Lock month</b> at the top. A locked month can&apos;t be edited or re-processed — <b>Unlock month</b> reopens it to fix a mistake, even after salaries are marked paid (they become unpaid until marked paid again).
                     </p>
@@ -666,11 +666,11 @@ export default function PayrollPage() {
                                     const statusMap: Record<string, { bg: string; color: string; label: string }> = {
                                         DRAFT:     { bg: "#fef9c3", color: "#854d0e", label: "In progress" },
                                         PROCESSED: { bg: "#dcfce7", color: "#15803d", label: "Locked" },
-                                        PAID:      { bg: "#dbeafe", color: "#1d4ed8", label: "Paid" },
+                                        PAID:      { bg: "#e3ebff", color: "#2f5be0", label: "Paid" },
                                     }
                                     const empty = run._count.payrolls === 0
-                                    const ss = empty ? { bg: "#e8effe", color: "#0b5cff", label: "Created" }
-                                        : statusMap[run.status] ?? { bg: "#f3f4f6", color: "#6b7280", label: run.status }
+                                    const ss = empty ? { bg: "#eaf0ff", color: "#3d6ff5", label: "Created" }
+                                        : statusMap[run.status] ?? { bg: "#f6f7fc", color: "#555c72", label: run.status }
                                     const isCurrent = run.month === period.month && run.year === period.year
                                     // An empty month can only be removed while it is the newest,
                                     // so the created months stay one after another.
@@ -687,7 +687,7 @@ export default function PayrollPage() {
                                             <td style={{ padding: "12px 16px", textAlign: "right", color: "var(--text2)", fontWeight: 600 }}>
                                                 {empty && run.onRolls != null ? <span style={{ fontWeight: 500, color: "var(--text3)" }}>{run.onRolls} on rolls</span> : run._count.payrolls}
                                             </td>
-                                            <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 700, color: "#0b5cff" }}>{fmt(run.totalGross)}</td>
+                                            <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 700, color: "#3d6ff5" }}>{fmt(run.totalGross)}</td>
                                             <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 700, color: "#16a34a" }}>{fmt(run.totalNet)}</td>
                                             <td style={{ padding: "12px 16px", textAlign: "right", color: "var(--text2)" }}>{fmt(run.totalPfEmployer)}</td>
                                             <td style={{ padding: "12px 16px", textAlign: "right", color: "var(--text2)" }}>{fmt(run.totalEsiEmployer)}</td>
@@ -729,7 +729,7 @@ function LockChip({ counts, lockedAt }: { counts: { rows: number; draft: number;
         return <span title="Days and amounts can still be edited and re-processed" style={{ ...base, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a" }}><Unlock size={11} /> Open · not locked</span>
     }
     if (counts.draft > 0) {
-        return <span title={`${counts.draft} row(s) can still be edited; ${counts.locked + counts.paid} are locked`} style={{ ...base, color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe" }}><Lock size={11} /> Partly locked · {counts.locked + counts.paid} of {counts.rows}</span>
+        return <span title={`${counts.draft} row(s) can still be edited; ${counts.locked + counts.paid} are locked`} style={{ ...base, color: "#6d4fe0", background: "#f1edff", border: "1px solid #ddd6fe" }}><Lock size={11} /> Partly locked · {counts.locked + counts.paid} of {counts.rows}</span>
     }
     if (counts.paid === counts.rows) {
         return <span title="Every salary is locked and marked paid" style={{ ...base, color: "#15803d", background: "#dcfce7", border: "1px solid #bbf7d0" }}><CheckCircle2 size={11} /> Locked · paid</span>

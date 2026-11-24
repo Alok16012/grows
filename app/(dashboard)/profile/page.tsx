@@ -162,7 +162,7 @@ function MyDetailsTab() {
                 </p>
             </div>
             {waiting.length > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 text-[12.5px] text-blue-800">
+                <div className="bg-[var(--accent-light)] border border-[#d4e0ff] rounded-2xl px-4 py-3 text-[12.5px] text-[var(--accent-text)]">
                     <b>Waiting for HR approval:</b> {waiting.join(", ")}. These show what you entered; your record changes once HR approves.
                 </div>
             )}
@@ -249,14 +249,14 @@ const DOC_LABELS: Record<string, string> = {
 function statusBadge(s: string) {
     if (s === "VERIFIED")  return <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-700">Verified ✓</span>
     if (s === "REJECTED")  return <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-600">Rejected</span>
-    if (s === "AWAITING_APPROVAL") return <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">Waiting for HR approval</span>
+    if (s === "AWAITING_APPROVAL") return <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#e3ebff] text-[var(--accent-text)]">Waiting for HR approval</span>
     return <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">Pending Review</span>
 }
 
 function taskStatusIcon(s: string) {
     if (s === "COMPLETED") return <CheckCircle2 size={16} className="text-green-500 shrink-0" />
     if (s === "SKIPPED")   return <XCircle size={16} className="text-gray-400 shrink-0" />
-    if (s === "IN_PROGRESS") return <Clock size={16} className="text-blue-500 shrink-0 animate-pulse" />
+    if (s === "IN_PROGRESS") return <Clock size={16} className="text-[var(--accent)] shrink-0 animate-pulse" />
     return <div className="w-4 h-4 rounded-full border-2 border-[var(--border)] shrink-0" />
 }
 
@@ -375,7 +375,7 @@ function OnboardingTab() {
 
     const statusColors: Record<string, string> = {
         NOT_STARTED: "bg-gray-100 text-gray-600",
-        IN_PROGRESS: "bg-blue-100 text-blue-700",
+        IN_PROGRESS: "bg-[#e3ebff] text-[var(--accent-text)]",
         COMPLETED: "bg-green-100 text-green-700",
         ON_HOLD: "bg-amber-100 text-amber-700",
     }
@@ -601,7 +601,7 @@ function LettersTab() {
     )
 
     const typeColors: Record<string, string> = {
-        "Offer Letter": "#7c3aed", "Appointment Letter": "#1d4ed8",
+        "Offer Letter": "#6d4fe0", "Appointment Letter": "#2f5be0",
         "Confirmation Letter": "#0f766e", "Experience Letter": "#b45309",
         "Salary Certificate": "#15803d", "Relieving Letter": "#dc2626",
     }
@@ -613,8 +613,8 @@ function LettersTab() {
                 <div key={letter.id} className="bg-white border border-[var(--border)] rounded-xl p-4 flex flex-wrap items-start justify-between gap-4">
                     <div className="flex items-start gap-3 min-w-0">
                         <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                            style={{ background: `${typeColors[letter.type?.name] ?? "#6366f1"}18` }}>
-                            <FileText size={16} style={{ color: typeColors[letter.type?.name] ?? "#6366f1" }} />
+                            style={{ background: `${typeColors[letter.type?.name] ?? "#8b6cf6"}18` }}>
+                            <FileText size={16} style={{ color: typeColors[letter.type?.name] ?? "#8b6cf6" }} />
                         </div>
                         <div>
                             <p className="text-[13.5px] font-semibold text-[var(--text)]">{letter.type?.name ?? "Document"}</p>
@@ -626,7 +626,7 @@ function LettersTab() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">Issued</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#e3ebff] text-[var(--accent-text)]">Issued</span>
                         <a
                             href={`/api/hr-documents/${letter.id}/pdf`}
                             target="_blank"
@@ -1073,8 +1073,8 @@ export default function ProfilePage() {
     if (loading) return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="animate-spin text-[var(--accent)]" /></div>
 
     const roleBadge: Record<string, { bg: string; color: string }> = {
-        ADMIN:          { bg: "#e8effe", color: "#0847c7" },
-        MANAGER:        { bg: "#eff6ff", color: "#1d4ed8" },
+        ADMIN:          { bg: "#eaf0ff", color: "#2f5be0" },
+        MANAGER:        { bg: "#eaf0ff", color: "#2f5be0" },
         INSPECTION_BOY: { bg: "#fef3c7", color: "#92400e" },
     }
     const badge = roleBadge[formData.role] ?? { bg: "#f5f7fd", color: "#5b6478" }
@@ -1130,9 +1130,9 @@ export default function ProfilePage() {
                         <span
                             className="inline-block mt-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide border"
                             style={{
-                                color: (session?.user as any)?.customRoleColor || "#6366f1",
-                                background: `${(session?.user as any)?.customRoleColor || "#6366f1"}15`,
-                                borderColor: `${(session?.user as any)?.customRoleColor || "#6366f1"}40`,
+                                color: (session?.user as any)?.customRoleColor || "#8b6cf6",
+                                background: `${(session?.user as any)?.customRoleColor || "#8b6cf6"}15`,
+                                borderColor: `${(session?.user as any)?.customRoleColor || "#8b6cf6"}40`,
                             }}
                         >
                             {(session?.user as any).customRoleName}

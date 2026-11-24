@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react"
 
 const LEVELS = ["Not trained", "Theory done", "Under supervision", "Independent", "Can train others"]
-const TONE = ["bg-[var(--surface2)] text-[var(--text3)]", "bg-[#fef3c7] text-[#92400e]", "bg-[#dbeafe] text-[#1e40af]", "bg-[#dcfce7] text-[#166534]", "bg-[#166534] text-white"]
+const TONE = ["bg-[var(--surface2)] text-[var(--text3)]", "bg-[#fef3c7] text-[#92400e]", "bg-[#e3ebff] text-[#2f5be0]", "bg-[#dcfce7] text-[#166534]", "bg-[#166534] text-white"]
 
 export default function MySkills() {
     const [rows, setRows] = useState<{ level: number; skill: { code: string; name: string } }[]>([])

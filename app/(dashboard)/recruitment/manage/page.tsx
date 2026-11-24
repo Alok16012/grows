@@ -142,7 +142,7 @@ function Requests() {
         if (ask) { note = prompt(ask); if (note === null) return }
         try { await api(`/api/recruitment/requests/${id}`, { action, note }); toast.success("Saved"); load() } catch (e: any) { toast.error(e.message) }
     }
-    const tone: Record<string, string> = { PENDING: "bg-amber-50 text-amber-800", APPROVED: "bg-blue-50 text-blue-700", FILLED: "bg-green-50 text-green-700", REJECTED: "bg-red-50 text-red-700", CANCELLED: "bg-gray-100 text-gray-600" }
+    const tone: Record<string, string> = { PENDING: "bg-amber-50 text-amber-800", APPROVED: "bg-[var(--accent-light)] text-[var(--accent-text)]", FILLED: "bg-green-50 text-green-700", REJECTED: "bg-red-50 text-red-700", CANCELLED: "bg-gray-100 text-gray-600" }
     return (
         <div className="space-y-3">
             <div className="flex flex-wrap gap-2 items-center">
@@ -216,7 +216,7 @@ function Interviews() {
     useEffect(() => { load() }, [load])
     const byDay = new Map<string, any[]>()
     for (const i of d?.interviews ?? []) { const k = new Date(i.scheduledAt).toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" }); byDay.set(k, [...(byDay.get(k) ?? []), i]) }
-    const tone: Record<string, string> = { SCHEDULED: "text-blue-700", DONE: "text-green-700", NO_SHOW: "text-red-600", CANCELLED: "text-gray-500" }
+    const tone: Record<string, string> = { SCHEDULED: "text-[var(--accent-text)]", DONE: "text-green-700", NO_SHOW: "text-red-600", CANCELLED: "text-gray-500" }
     return (
         <div className="space-y-3">
             <div className="flex flex-wrap gap-2 items-center text-[13px]">From<input type="date" value={from} onChange={e => setFrom(e.target.value)} className={box} />to<input type="date" value={to} onChange={e => setTo(e.target.value)} className={box} /><label className="flex items-center gap-1.5 ml-2"><input type="checkbox" checked={mine} onChange={e => setMine(e.target.checked)} /> Only mine</label></div>

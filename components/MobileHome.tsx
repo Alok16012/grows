@@ -58,24 +58,24 @@ type Tile = { label: string; href: string; icon: LucideIcon; color: string; tint
 const MY_TILES: Tile[] = [
     { label: "Attendance", href: "/attendance",          icon: Clock,       color: "#0d9488", tint: "#e6fffa" },
     { label: "Leave",      href: "/leaves",              icon: CalendarOff, color: "#dd8f0d", tint: "#fff6e4" },
-    { label: "Payslip",    href: "/profile?tab=payslip", icon: IndianRupee, color: "#7c3aed", tint: "#f5f3ff" },
-    { label: "Tasks",      href: "/tasks",               icon: ListChecks,  color: "#0b5cff", tint: "#e8effe" },
+    { label: "Payslip",    href: "/profile?tab=payslip", icon: IndianRupee, color: "#6d4fe0", tint: "#f1edff" },
+    { label: "Tasks",      href: "/tasks",               icon: ListChecks,  color: "#3d6ff5", tint: "#eaf0ff" },
 ]
 // Office staff, in priority order.
 const STAFF_TILES: Tile[] = [
     { label: "Approvals",  href: "/approvals",   icon: ClipboardCheck, color: "#dd8f0d", tint: "#fff6e4", perms: ["approvals.view"] },
-    { label: "Tasks",      href: "/tasks",       icon: ListChecks,     color: "#0b5cff", tint: "#e8effe" },
-    { label: "Employees",  href: "/employees",   icon: UserCheck,      color: "#0b5cff", tint: "#e8effe", perms: ["employees.view"] },
-    { label: "Payroll",    href: "/payroll",     icon: Wallet,         color: "#7c3aed", tint: "#f5f3ff", perms: ["payroll.view"] },
+    { label: "Tasks",      href: "/tasks",       icon: ListChecks,     color: "#3d6ff5", tint: "#eaf0ff" },
+    { label: "Employees",  href: "/employees",   icon: UserCheck,      color: "#3d6ff5", tint: "#eaf0ff", perms: ["employees.view"] },
+    { label: "Payroll",    href: "/payroll",     icon: Wallet,         color: "#6d4fe0", tint: "#f1edff", perms: ["payroll.view"] },
     { label: "Attendance", href: "/attendance", icon: Clock,      color: "#0d9488", tint: "#e6fffa", perms: ["attendance.view"] },
-    { label: "Recruitment",href: "/recruitment", icon: Target,         color: "#7c3aed", tint: "#f5f3ff", perms: ["recruitment.view"] },
+    { label: "Recruitment",href: "/recruitment", icon: Target,         color: "#6d4fe0", tint: "#f1edff", perms: ["recruitment.view"] },
     { label: "Reports",    href: "/reports",     icon: BarChart2,      color: "#0d9488", tint: "#e6fffa", perms: ["reports.view"] },
-    { label: "Expenses",   href: "/expenses",    icon: CreditCard,     color: "#0b5cff", tint: "#e8effe", perms: ["expenses.view", "expenses.approve"] },
+    { label: "Expenses",   href: "/expenses",    icon: CreditCard,     color: "#3d6ff5", tint: "#eaf0ff", perms: ["expenses.view", "expenses.approve"] },
     { label: "Helpdesk",   href: "/helpdesk",    icon: Headphones,     color: "#5b6478", tint: "#f0f2f8", perms: ["helpdesk.view"] },
 ]
-const INSPECTOR_TILE: Tile = { label: "Inspections", href: "/inspection", icon: HardHat, color: "#0b5cff", tint: "#e8effe" }
+const INSPECTOR_TILE: Tile = { label: "Inspections", href: "/inspection", icon: HardHat, color: "#3d6ff5", tint: "#eaf0ff" }
 const HELP_TILE: Tile = { label: "Help", href: "/helpdesk", icon: Headphones, color: "#5b6478", tint: "#f0f2f8" }
-const PROFILE_TILE: Tile = { label: "My profile", href: "/profile", icon: User, color: "#0b5cff", tint: "#e8effe" }
+const PROFILE_TILE: Tile = { label: "My profile", href: "/profile", icon: User, color: "#3d6ff5", tint: "#eaf0ff" }
 
 type Slide = { pill: string; title: string; highlight: string; sub: string; cta: string; href: string; icon: LucideIcon }
 
@@ -135,10 +135,10 @@ export function MobileHome() {
 
     // ── Company "today" strip ──
     const today: { label: string; value: string; sub?: string; href: string; icon: LucideIcon; color: string; tint: string }[] = []
-    if (s.employees) today.push({ label: "Active employees", value: fmt(s.employees.active ?? 0), sub: s.employees.new30d > 0 ? `+${s.employees.new30d} in 30 days` : undefined, href: "/employees", icon: UserCheck, color: "#0b5cff", tint: "#e8effe" })
+    if (s.employees) today.push({ label: "Active employees", value: fmt(s.employees.active ?? 0), sub: s.employees.new30d > 0 ? `+${s.employees.new30d} in 30 days` : undefined, href: "/employees", icon: UserCheck, color: "#3d6ff5", tint: "#eaf0ff" })
     if (s.attendanceToday) today.push({ label: "Present today", value: fmt(s.attendanceToday.present), sub: s.attendanceToday.expected ? `of ${fmt(s.attendanceToday.expected)} expected` : `${s.attendanceToday.pct}% attendance`, href: "/attendance", icon: CalendarCheck, color: "#15803d", tint: "#dcfce7" })
     if (s.approvals) today.push({ label: "Pending approvals", value: fmt(s.approvals.total), href: "/approvals", icon: ClipboardCheck, color: "#dd8f0d", tint: "#fff6e4" })
-    if (s.recruitment) today.push({ label: "Active candidates", value: fmt(s.recruitment.activeLeads), sub: `${s.recruitment.joined30d} joined in 30 days`, href: "/recruitment", icon: Target, color: "#7c3aed", tint: "#f5f3ff" })
+    if (s.recruitment) today.push({ label: "Active candidates", value: fmt(s.recruitment.activeLeads), sub: `${s.recruitment.joined30d} joined in 30 days`, href: "/recruitment", icon: Target, color: "#6d4fe0", tint: "#f1edff" })
     if (s.activeAssignments !== undefined) today.push({ label: "Active assignments", value: fmt(s.activeAssignments), href: isInspector ? "/inspection" : "/assignments", icon: ClipboardList, color: "#0d9488", tint: "#e6fffa" })
     if (s.activeSites !== undefined) today.push({ label: "Active sites", value: fmt(s.activeSites), href: "/sites", icon: MapPin, color: "#0891b2", tint: "#ecfeff" })
     if (s.openTickets !== undefined) today.push({ label: "Open tickets", value: fmt(s.openTickets), href: "/helpdesk", icon: Headphones, color: "#5b6478", tint: "#f0f2f8" })
@@ -148,13 +148,13 @@ export function MobileHome() {
     const attention: { title: string; sub: string; value: string; status: string; tone: Tone; href: string; cta: string; icon: LucideIcon; color: string; tint: string }[] = []
     const t = me?.tasks
     if (t && t.myOverdue > 0) attention.push({ title: "Overdue tasks", sub: `${t.myOpen} open in total`, value: `${fmt(t.myOverdue)} overdue`, status: "Overdue", tone: "danger", href: "/tasks", cta: "Open", icon: AlertTriangle, color: "#dc2626", tint: "#fef2f2" })
-    else if (t && t.myOpen > 0) attention.push({ title: "My tasks", sub: "Given to you", value: `${fmt(t.myOpen)} open`, status: "Open", tone: "info", href: "/tasks", cta: "Open", icon: ListChecks, color: "#0b5cff", tint: "#e8effe" })
+    else if (t && t.myOpen > 0) attention.push({ title: "My tasks", sub: "Given to you", value: `${fmt(t.myOpen)} open`, status: "Open", tone: "info", href: "/tasks", cta: "Open", icon: ListChecks, color: "#3d6ff5", tint: "#eaf0ff" })
     if (t && t.awaitingMine > 0) attention.push({ title: "Tasks to approve", sub: "Marked done, waiting for you", value: `${fmt(t.awaitingMine)} waiting`, status: "Approve", tone: "warn", href: "/tasks?view=byme", cta: "Review", icon: CheckCircle2, color: "#dd8f0d", tint: "#fff6e4" })
     if (s.approvals && s.approvals.total > 0) attention.push({ title: "Approvals", sub: "Leaves, expenses and inspections", value: `${fmt(s.approvals.total)} waiting`, status: "Pending", tone: "warn", href: "/approvals", cta: "Review", icon: ClipboardCheck, color: "#dd8f0d", tint: "#fff6e4" })
-    if (s.onboarding && s.onboarding.inProgress > 0) attention.push({ title: "Onboarding", sub: `${s.onboarding.notStarted} yet to start · ${s.onboarding.onHold} on hold`, value: `${fmt(s.onboarding.inProgress)} in progress`, status: "In Progress", tone: "info", href: "/onboarding", cta: "View", icon: UserPlus, color: "#0b5cff", tint: "#e8effe" })
-    if (s.payroll && s.payroll.pending > 0) attention.push({ title: `Payroll · ${format(new Date(), "MMM yyyy")}`, sub: `${fmt(s.payroll.processed)} processed`, value: `${fmt(s.payroll.pending)} pending`, status: "Pending", tone: "warn", href: "/payroll", cta: "Continue", icon: Wallet, color: "#7c3aed", tint: "#f5f3ff" })
+    if (s.onboarding && s.onboarding.inProgress > 0) attention.push({ title: "Onboarding", sub: `${s.onboarding.notStarted} yet to start · ${s.onboarding.onHold} on hold`, value: `${fmt(s.onboarding.inProgress)} in progress`, status: "In Progress", tone: "info", href: "/onboarding", cta: "View", icon: UserPlus, color: "#3d6ff5", tint: "#eaf0ff" })
+    if (s.payroll && s.payroll.pending > 0) attention.push({ title: `Payroll · ${format(new Date(), "MMM yyyy")}`, sub: `${fmt(s.payroll.processed)} processed`, value: `${fmt(s.payroll.pending)} pending`, status: "Pending", tone: "warn", href: "/payroll", cta: "Continue", icon: Wallet, color: "#6d4fe0", tint: "#f1edff" })
     if (s.exits && s.exits.pending > 0) attention.push({ title: "Exits", sub: `${s.exits.clearancePending} clearances pending`, value: `${fmt(s.exits.pending)} open`, status: "Open", tone: "danger", href: "/exit", cta: "View", icon: LogOut, color: "#dc2626", tint: "#fef2f2" })
-    if (s.logins && s.logins.withoutLogin > 0) attention.push({ title: "Employee logins", sub: `${fmt(s.logins.withLogin)} of ${fmt(s.logins.totalEmployees)} set up`, value: `${fmt(s.logins.withoutLogin)} without login`, status: "Action", tone: "info", href: "/admin/employee-logins", cta: "Manage", icon: KeyRound, color: "#0b5cff", tint: "#e8effe" })
+    if (s.logins && s.logins.withoutLogin > 0) attention.push({ title: "Employee logins", sub: `${fmt(s.logins.withLogin)} of ${fmt(s.logins.totalEmployees)} set up`, value: `${fmt(s.logins.withoutLogin)} without login`, status: "Action", tone: "info", href: "/admin/employee-logins", cta: "Manage", icon: KeyRound, color: "#3d6ff5", tint: "#eaf0ff" })
 
     const onRailScroll = () => { const el = railRef.current; if (el) setSlide(Math.round(el.scrollLeft / el.clientWidth)) }
     const hasCompany = today.length > 0
@@ -220,7 +220,7 @@ export function MobileHome() {
                         </Link>
                         <div style={{ ...card, padding: 14 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                                <Mini icon={IndianRupee} color="#7c3aed" tint="#f5f3ff" label="Last salary" />
+                                <Mini icon={IndianRupee} color="#6d4fe0" tint="#f1edff" label="Last salary" />
                                 {me.payslip && <button type="button" onClick={() => setShowPay(v => !v)} aria-label={showPay ? "Hide salary" : "Show salary"} style={{ border: "none", background: "none", padding: 2, cursor: "pointer", color: "var(--text3)" }}>{showPay ? <EyeOff size={16} /> : <Eye size={16} />}</button>}
                             </div>
                             <Link href="/profile?tab=payslip" style={{ textDecoration: "none" }}>
@@ -234,7 +234,7 @@ export function MobileHome() {
                             <p style={small}>{me.month.leave} leave · {me.month.absent} absent</p>
                         </Link>
                         <Link href="/tasks" style={{ ...card, padding: 14, display: "block" }}>
-                            <Mini icon={ListChecks} color={me.tasks.myOverdue ? "#dc2626" : "#0b5cff"} tint={me.tasks.myOverdue ? "#fef2f2" : "#e8effe"} label="My tasks" />
+                            <Mini icon={ListChecks} color={me.tasks.myOverdue ? "#dc2626" : "#3d6ff5"} tint={me.tasks.myOverdue ? "#fef2f2" : "#eaf0ff"} label="My tasks" />
                             <p style={big}>{fmt(me.tasks.myOpen)} open</p>
                             <p style={{ ...small, color: me.tasks.myOverdue ? "#dc2626" : small.color, fontWeight: me.tasks.myOverdue ? 600 : 400 }}>{me.tasks.myOverdue ? `${me.tasks.myOverdue} overdue` : "Nothing overdue"}</p>
                         </Link>
@@ -303,7 +303,7 @@ export function MobileHome() {
                                 sub={me.celebrations.slice(0, 4).map(c => c.kind === "birthday" ? `🎂 ${c.name}` : `🎉 ${c.name} (${c.years} yr)`).join(" · ") + (me.celebrations.length > 4 ? ` +${me.celebrations.length - 4} more` : "")} />
                         )}
                         {me.announcements.slice(0, 2).map(a => (
-                            <Row key={a.id} href="/announcements" icon={Megaphone} color={a.category === "URGENT" ? "#dc2626" : "#0b5cff"} tint={a.category === "URGENT" ? "#fef2f2" : "#e8effe"}
+                            <Row key={a.id} href="/announcements" icon={Megaphone} color={a.category === "URGENT" ? "#dc2626" : "#3d6ff5"} tint={a.category === "URGENT" ? "#fef2f2" : "#eaf0ff"}
                                 title={a.title} sub={`${a.category.charAt(0) + a.category.slice(1).toLowerCase()} · ${format(new Date(a.publishedAt), "d MMM")}`} />
                         ))}
                     </div>
@@ -401,7 +401,7 @@ function HeroCard({ pill, title, highlight, sub, cta, href, icon: Icon }: Slide)
                     display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 24px rgba(2,11,36,0.25)",
                     transform: "rotate(-6deg)",
                 }}>
-                    <Icon size={40} color="#0b5cff" strokeWidth={2} />
+                    <Icon size={40} color="#3d6ff5" strokeWidth={2} />
                 </span>
             </div>
         </div>
@@ -419,7 +419,7 @@ function SectionHead({ kicker, title }: { kicker: string; title: string }) {
 
 const TONES = {
     warn:   { bg: "#fef3c7", fg: "#d97706", bd: "#fde68a" },
-    info:   { bg: "#eff6ff", fg: "#1e40af", bd: "#dbeafe" },
+    info:   { bg: "#eaf0ff", fg: "#2f5be0", bd: "#e3ebff" },
     danger: { bg: "#fee2e2", fg: "#dc2626", bd: "#fecaca" },
 }
 

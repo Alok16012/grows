@@ -34,7 +34,7 @@ async function api<T = any>(url: string, init?: { method?: string; body?: unknow
 
 function statusText(r: Rec) {
     if (r.status === "PENDING") return { t: "To decide", c: "bg-amber-50 text-amber-700" }
-    if (r.status === "SCHEDULED" && r.via === "PAYROLL") return { t: `From ${ym({ month: r.payrollMonth!, year: r.payrollYear! })} salary`, c: "bg-blue-50 text-blue-700" }
+    if (r.status === "SCHEDULED" && r.via === "PAYROLL") return { t: `From ${ym({ month: r.payrollMonth!, year: r.payrollYear! })} salary`, c: "bg-[var(--accent-light)] text-[var(--accent-text)]" }
     if (r.status === "SCHEDULED" && r.via === "FNF") return { t: "In F&F", c: "bg-violet-50 text-violet-700" }
     if (r.status === "RECOVERED") return { t: r.via === "CASH" ? "Paid in cash" : "Recovered", c: "bg-green-50 text-green-700" }
     if (r.status === "WAIVED") return { t: "Waived", c: "bg-gray-100 text-gray-600" }

@@ -77,36 +77,36 @@ function priorityBadge(priority: TicketPriority) {
         URGENT: { bg: "#fef2f2", color: "#ef4444", label: "Urgent" },
         HIGH: { bg: "#fff7ed", color: "#f97316", label: "High" },
         MEDIUM: { bg: "#fffbeb", color: "#f59e0b", label: "Medium" },
-        LOW: { bg: "#f9fafb", color: "#6b7280", label: "Low" },
+        LOW: { bg: "#f6f7fc", color: "#555c72", label: "Low" },
     }
     return map[priority]
 }
 
 function statusBadge(status: TicketStatus) {
     const map: Record<TicketStatus, { bg: string; color: string; label: string }> = {
-        OPEN: { bg: "#eff6ff", color: "#3b82f6", label: "Open" },
+        OPEN: { bg: "#eaf0ff", color: "#3d6ff5", label: "Open" },
         IN_PROGRESS: { bg: "#fffbeb", color: "#f59e0b", label: "In Progress" },
         RESOLVED: { bg: "#dcfce7", color: "#16a34a", label: "Resolved" },
-        CLOSED: { bg: "#f9fafb", color: "#6b7280", label: "Closed" },
+        CLOSED: { bg: "#f6f7fc", color: "#555c72", label: "Closed" },
     }
     return map[status]
 }
 
 function categoryColor(cat: string): { bg: string; color: string } {
     const map: Record<string, { bg: string; color: string }> = {
-        IT: { bg: "#eff6ff", color: "#3b82f6" },
-        HR: { bg: "#fdf4ff", color: "#a855f7" },
+        IT: { bg: "#eaf0ff", color: "#3d6ff5" },
+        HR: { bg: "#fdf4ff", color: "#8b6cf6" },
         Payroll: { bg: "#f0fdf4", color: "#22c55e" },
         Attendance: { bg: "#fff7ed", color: "#f97316" },
         General: { bg: "#f0f9ff", color: "#0ea5e9" },
         Compliance: { bg: "#fef2f2", color: "#ef4444" },
-        Other: { bg: "#f9fafb", color: "#6b7280" },
+        Other: { bg: "#f6f7fc", color: "#555c72" },
     }
-    return map[cat] || { bg: "#f9fafb", color: "#6b7280" }
+    return map[cat] || { bg: "#f6f7fc", color: "#555c72" }
 }
 
 function avatarColors(name: string) {
-    const colors = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#0ea5e9"]
+    const colors = ["#3d6ff5", "#0ea5a4", "#8b6cf6", "#f5a623", "#e5566b", "#0ea5e9"]
     const idx = name ? name.charCodeAt(0) % colors.length : 0
     return colors[idx]
 }

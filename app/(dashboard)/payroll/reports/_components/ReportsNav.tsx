@@ -32,7 +32,7 @@ export default function ReportsNav({ title, subtitle }: { title: string; subtitl
                     const on = path?.startsWith(t.href)
                     return (
                         <Link key={t.href} href={t.href}
-                            className={`whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-semibold ${on ? "border-[#0b5cff] text-[#0b5cff]" : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"}`}>
+                            className={`whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-semibold ${on ? "border-[#3d6ff5] text-[#3d6ff5]" : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"}`}>
                             {t.label}
                         </Link>
                     )

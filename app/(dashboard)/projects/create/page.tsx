@@ -23,12 +23,12 @@ type Person = { id: string; name: string | null; email: string | null; phone?: s
 
 const PROJECT_TYPES = ["Mechanical", "Electrical", "Civil", "Safety", "Facility", "Quality", "Other"]
 const PRIORITIES = [
-    { value: "Low", dot: "#6b7280" },
+    { value: "Low", dot: "#555c72" },
     { value: "Medium", dot: "#f59e0b" },
     { value: "High", dot: "#ef4444" },
 ]
 const STATUS_OPTIONS = [
-    { value: "PLANNING", label: "Planning", dot: "#3b82f6" },
+    { value: "PLANNING", label: "Planning", dot: "#3d6ff5" },
     { value: "ACTIVE", label: "Active", dot: "#16a34a" },
     { value: "ON_HOLD", label: "On Hold", dot: "#ef4444" },
 ]
@@ -383,8 +383,8 @@ function CreateProjectForm() {
                     <div className={sectionCls}>
                         <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-[9px] bg-[#eff6ff] flex items-center justify-center">
-                                    <Users size={15} className="text-[#3b82f6]" />
+                                <div className="w-8 h-8 rounded-[9px] bg-[#eaf0ff] flex items-center justify-center">
+                                    <Users size={15} className="text-[#3d6ff5]" />
                                 </div>
                                 <div>
                                     <h2 className="text-[14px] font-semibold text-[var(--text)]">Managers</h2>

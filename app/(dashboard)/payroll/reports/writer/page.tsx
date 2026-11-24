@@ -146,7 +146,7 @@ export default function ReportWriterPage() {
                         {busy === "preview" ? <Loader2 size={15} className="animate-spin" /> : <Eye size={15} />} Preview
                     </button>
                     <button onClick={doDownload} disabled={busy !== null}
-                        className="flex h-10 items-center gap-2 rounded-lg bg-[#0b5cff] px-4 text-sm font-semibold text-white disabled:opacity-60">
+                        className="flex h-10 items-center gap-2 rounded-lg bg-[#3d6ff5] px-4 text-sm font-semibold text-white disabled:opacity-60">
                         {busy === "download" ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Download Excel
                     </button>
                 </div>
@@ -162,7 +162,7 @@ export default function ReportWriterPage() {
                     <div className="flex flex-wrap gap-1.5">
                         {PRESETS.map(p => (
                             <button key={p.label} onClick={() => setCols(p.keys())}
-                                className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-xs font-semibold text-[var(--text2)] hover:border-[#0b5cff] hover:text-[#0b5cff]">
+                                className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-xs font-semibold text-[var(--text2)] hover:border-[#3d6ff5] hover:text-[#3d6ff5]">
                                 {p.label}
                             </button>
                         ))}
@@ -179,7 +179,7 @@ export default function ReportWriterPage() {
                                 <button onClick={() => toggleGroup(g.id, !all)} className="mb-2 flex w-full items-center justify-between text-left">
                                     <span className="text-[13px] font-bold text-[var(--text)]">{g.label}</span>
                                     <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text3)]">
-                                        {all ? <CheckSquare size={13} className="text-[#0b5cff]" /> : <Square size={13} />} {on}/{items.length}
+                                        {all ? <CheckSquare size={13} className="text-[#3d6ff5]" /> : <Square size={13} />} {on}/{items.length}
                                     </span>
                                 </button>
                                 <div className="flex flex-wrap gap-1.5">
@@ -187,8 +187,8 @@ export default function ReportWriterPage() {
                                         const ticked = cols.includes(c.key)
                                         return (
                                             <label key={c.key}
-                                                className={`flex cursor-pointer select-none items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${ticked ? "border-[#c7dbff] bg-[#e8effe] text-[#0b5cff]" : "border-[var(--border)] text-[var(--text2)]"}`}>
-                                                <input type="checkbox" className="h-3.5 w-3.5 accent-[#0b5cff]" checked={ticked} onChange={() => toggle(c.key)} />
+                                                className={`flex cursor-pointer select-none items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${ticked ? "border-[#c7dbff] bg-[#eaf0ff] text-[#3d6ff5]" : "border-[var(--border)] text-[var(--text2)]"}`}>
+                                                <input type="checkbox" className="h-3.5 w-3.5 accent-[#3d6ff5]" checked={ticked} onChange={() => toggle(c.key)} />
                                                 {c.label}
                                             </label>
                                         )

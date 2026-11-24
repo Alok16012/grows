@@ -39,7 +39,7 @@ type Detail = {
 type DesignationOpt = { designation: string; employees: number }
 
 const STATUS_TONE: Record<Status, { label: string; bg: string; color: string }> = {
-    DRAFT: { label: "Draft", bg: "#f3f4f6", color: "#4b5563" },
+    DRAFT: { label: "Draft", bg: "#f6f7fc", color: "#555c72" },
     ACTIVE: { label: "Active", bg: "#dcfce7", color: "#15803d" },
     ARCHIVED: { label: "Archived", bg: "#fef3c7", color: "#92400e" },
 }
@@ -61,8 +61,8 @@ function CategoryTag({ category }: { category: string | null }) {
     const onboarding = isOnboardingCategory(category)
     return (
         <span className="inline-flex items-center gap-1.5 flex-wrap">
-            <span className={`px-1.5 py-0.5 rounded-md text-[11px] font-medium border ${onboarding ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-[var(--surface2)] border-[var(--border)] text-[var(--text2)]"}`}>{category}</span>
-            {onboarding && <span className="inline-flex items-center gap-1 text-[11px] text-blue-700" title={categorySignedOn(category)}><UserPlus size={11} /> Onboarding form</span>}
+            <span className={`px-1.5 py-0.5 rounded-md text-[11px] font-medium border ${onboarding ? "bg-[var(--accent-light)] border-[#d4e0ff] text-[var(--accent-text)]" : "bg-[var(--surface2)] border-[var(--border)] text-[var(--text2)]"}`}>{category}</span>
+            {onboarding && <span className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-text)]" title={categorySignedOn(category)}><UserPlus size={11} /> Onboarding form</span>}
         </span>
     )
 }
@@ -472,7 +472,7 @@ function PolicyEditor({ id, canManage, canPublish, designationOpts, fail, onClos
                                 {/* A category typed before the list existed stays selectable. */}
                                 {f.category && !POLICY_CATEGORIES.some(c => c.toLowerCase() === f.category.toLowerCase()) && <option value={f.category}>{f.category}</option>}
                             </select>
-                            <p className={`text-[11.5px] mt-1 flex items-center gap-1 ${isOnboardingCategory(f.category) ? "text-blue-700" : "text-[var(--text3)]"}`}>
+                            <p className={`text-[11.5px] mt-1 flex items-center gap-1 ${isOnboardingCategory(f.category) ? "text-[var(--accent-text)]" : "text-[var(--text3)]"}`}>
                                 {isOnboardingCategory(f.category) && <UserPlus size={12} />} {categorySignedOn(f.category)}
                             </p>
                         </div>

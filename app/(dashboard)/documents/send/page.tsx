@@ -547,7 +547,7 @@ export default function SendDocumentsPage() {
                 <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-[11px] bg-[#eef2ff] flex items-center justify-center">
-                            <FileText size={20} className="text-[#6366f1]" />
+                            <FileText size={20} className="text-[#8b6cf6]" />
                         </div>
                         <h2 className="text-[17px] font-bold text-[var(--text)]">Issued Documents</h2>
                     </div>
@@ -590,13 +590,13 @@ export default function SendDocumentsPage() {
                                         const st = d.status === "RECALLED"
                                             ? { label: "RECALLED", color: "#dc2626", bg: "#fef2f2" }
                                             : d.status === "SCHEDULED"
-                                                ? { label: "SCHEDULED", color: "#2563eb", bg: "#eff6ff" }
+                                                ? { label: "SCHEDULED", color: "#3d6ff5", bg: "#eaf0ff" }
                                                 : { label: d.status, color: "#15803d", bg: "#dcfce7" }
                                         return (
                                             <tr key={d.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface2)]">
                                                 <td className="px-3 py-3">
                                                     <div className="flex items-center gap-2.5">
-                                                        <div className="w-8 h-8 rounded-full bg-[var(--accent-light,#e8effe)] text-[var(--accent)] flex items-center justify-center text-[11px] font-bold shrink-0">
+                                                        <div className="w-8 h-8 rounded-full bg-[var(--accent-light,#eaf0ff)] text-[var(--accent)] flex items-center justify-center text-[11px] font-bold shrink-0">
                                                             {d.employee.firstName[0]}{(d.employee.lastName || "")[0]}
                                                         </div>
                                                         <div>

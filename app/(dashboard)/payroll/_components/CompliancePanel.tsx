@@ -76,9 +76,9 @@ async function buildHierarchicalSheet(data: Record<string,string|number>[], repo
 
 const COLS = [
     { key:"wage", title:"Wage Sheet",       color:"#0f766e", items:WAGE_ITEMS },
-    { key:"pf",   title:"Provident Fund",   color:"#1d4ed8", items:PF_ITEMS   },
+    { key:"pf",   title:"Provident Fund",   color:"#2f5be0", items:PF_ITEMS   },
     { key:"esic", title:"ESIC",             color:"#0369a1", items:ESIC_ITEMS },
-    { key:"pt",   title:"Professional Tax", color:"#7c3aed", items:PT_ITEMS   },
+    { key:"pt",   title:"Professional Tax", color:"#6d4fe0", items:PT_ITEMS   },
 ]
 
 function PillCell({ items, run, color, dlLoading, onDownload }: {
@@ -250,9 +250,9 @@ export default function CompliancePanel({ onClose, initialMonth, initialYear }: 
                                 <span style={{ fontSize:10, color:(run.status==="PROCESSED"||run.status==="PAID")?"#16a34a":"#d97706", fontWeight:600, marginTop:2 }}>{run._count.payrolls} emp</span>
                             </div>
                             <PillCell items={WAGE_ITEMS} run={run} color="#0f766e" dlLoading={dlLoading} onDownload={handleDownload} />
-                            <PillCell items={PF_ITEMS}   run={run} color="#1d4ed8" dlLoading={dlLoading} onDownload={handleDownload} />
+                            <PillCell items={PF_ITEMS}   run={run} color="#2f5be0" dlLoading={dlLoading} onDownload={handleDownload} />
                             <PillCell items={ESIC_ITEMS} run={run} color="#0369a1" dlLoading={dlLoading} onDownload={handleDownload} />
-                            <PillCell items={PT_ITEMS}   run={run} color="#7c3aed" dlLoading={dlLoading} onDownload={handleDownload} />
+                            <PillCell items={PT_ITEMS}   run={run} color="#6d4fe0" dlLoading={dlLoading} onDownload={handleDownload} />
                         </div>
                         )
                     })

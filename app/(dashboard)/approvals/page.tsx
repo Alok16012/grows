@@ -291,7 +291,7 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                             onClick={() => setActiveTab("all")}
                             className={`shrink-0 whitespace-nowrap px-[18px] py-1.5 rounded-[7px] text-[13px] font-medium transition-all duration-150 ${
                                 activeTab === "all"
-                                    ? "bg-[#e3ecff] text-[#1f5fff]"
+                                    ? "bg-[#e3ecff] text-[#3d6ff5]"
                                     : "text-[var(--text2)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
                             }`}
                         >
@@ -312,10 +312,10 @@ export default function ApprovalsPage({ searchParams }: { searchParams?: { date?
                         </button>
                     )}
                     {todayOnly && (
-                        <span className="inline-flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-full bg-[#e3ecff] text-[#1f5fff] text-[12.5px] font-medium">
+                        <span className="inline-flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-full bg-[#e3ecff] text-[#3d6ff5] text-[12.5px] font-medium">
                             Submitted today
                             <button onClick={clearToday} aria-label="Clear Submitted today filter" title="Clear filter"
-                                className="h-5 w-5 rounded-full flex items-center justify-center hover:bg-[#1f5fff] hover:text-white transition-colors">
+                                className="h-5 w-5 rounded-full flex items-center justify-center hover:bg-[#3d6ff5] hover:text-white transition-colors">
                                 <X className="h-3 w-3" />
                             </button>
                         </span>

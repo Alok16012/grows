@@ -86,7 +86,7 @@ export default function PayslipViewerModal({
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                         <button onClick={onPrint}
-                            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#7c3aed", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#6d4fe0", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                             <Printer size={13} /> Print
                         </button>
                         <button onClick={onClose} aria-label="Close preview"

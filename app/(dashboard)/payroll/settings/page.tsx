@@ -271,7 +271,7 @@ export default function PayrollSettingsPage() {
             <ChangeControlPanel versions={versions} window={window_} viewing={viewing} onView={viewVersion} onChanged={() => loadRules(viewing)} isAdmin={isAdmin} />
 
             {/* Scope note */}
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "10px 14px", borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1e40af", lineHeight: 1.55 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "10px 14px", borderRadius: 10, background: "#eaf0ff", border: "1px solid #d4e0ff", fontSize: 12, color: "#2f5be0", lineHeight: 1.55 }}>
                 <Info size={14} style={{ marginTop: 2, flexShrink: 0 }} />
                 <span>
                     Saved settings apply <b>from the month you pick next to Save</b> (the open payroll month or the next). Months before it keep
@@ -280,7 +280,7 @@ export default function PayrollSettingsPage() {
             </div>
 
             {/* ── Dated statutory revision (govt. rule from 1 Oct 2026) ── */}
-            <div style={{ ...cardStyle, borderColor: "#bfdbfe" }}>
+            <div style={{ ...cardStyle, borderColor: "#d4e0ff" }}>
                 <div>
                     <h2 style={cardTitle}>
                         New PF &amp; ESIC rule — from {MONTHS[rules.revision.effectiveMonth - 1]} {rules.revision.effectiveYear}
@@ -678,7 +678,7 @@ export default function PayrollSettingsPage() {
                                             ].map((v, i) => (
                                                 <td key={i} style={{
                                                     padding: "9px 10px", textAlign: "right", fontWeight: i === 7 || i === 10 ? 800 : 600,
-                                                    color: i === 7 ? "#15803d" : i === 10 ? "#7c3aed" : i === 1 ? "#d97706" : "var(--text)",
+                                                    color: i === 7 ? "#15803d" : i === 10 ? "#6d4fe0" : i === 1 ? "#d97706" : "var(--text)",
                                                     borderBottom: "1px solid var(--border)",
                                                 }}>{fmt(v)}</td>
                                             ))}

@@ -142,39 +142,39 @@ const ENROLLMENT_STATUSES = ["All", "ENROLLED", "IN_PROGRESS", "COMPLETED", "FAI
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
     Safety:       { bg: "#fef3c7", text: "#b45309", border: "#fde68a" },
-    Security:     { bg: "#ede9fe", text: "#6d28d9", border: "#ddd6fe" },
-    Compliance:   { bg: "#dbeafe", text: "#1d4ed8", border: "#bfdbfe" },
+    Security:     { bg: "#ebe5ff", text: "#6d4fe0", border: "#ddd6fe" },
+    Compliance:   { bg: "#e3ebff", text: "#2f5be0", border: "#d4e0ff" },
     "Soft Skills":{ bg: "#fce7f3", text: "#be185d", border: "#fbcfe8" },
     Technical:    { bg: "#d1fae5", text: "#065f46", border: "#a7f3d0" },
     Induction:    { bg: "#e0f2fe", text: "#0369a1", border: "#bae6fd" },
-    Other:        { bg: "#f3f4f6", text: "#374151", border: "#e5e7eb" },
+    Other:        { bg: "#f6f7fc", text: "#3a4157", border: "#dfe3ef" },
 }
 
 const CATEGORY_STRIP: Record<string, string> = {
     Safety:       "#f59e0b",
-    Security:     "#8b5cf6",
-    Compliance:   "#3b82f6",
+    Security:     "#8b6cf6",
+    Compliance:   "#3d6ff5",
     "Soft Skills":"#ec4899",
     Technical:    "#10b981",
     Induction:    "#0ea5e9",
-    Other:        "#6b7280",
+    Other:        "#555c72",
 }
 
 const ENROLLMENT_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-    ENROLLED:    { label: "Enrolled",     color: "#1d4ed8", bg: "#dbeafe", border: "#bfdbfe" },
+    ENROLLED:    { label: "Enrolled",     color: "#2f5be0", bg: "#e3ebff", border: "#d4e0ff" },
     IN_PROGRESS: { label: "In Progress",  color: "#b45309", bg: "#fef3c7", border: "#fde68a" },
     COMPLETED:   { label: "Completed",    color: "#065f46", bg: "#d1fae5", border: "#bbf7d0" },
     FAILED:      { label: "Failed",       color: "#dc2626", bg: "#fee2e2", border: "#fecaca" },
-    DROPPED:     { label: "Dropped",      color: "#6b7280", bg: "#f3f4f6", border: "#e5e7eb" },
+    DROPPED:     { label: "Dropped",      color: "#555c72", bg: "#f6f7fc", border: "#dfe3ef" },
 }
 
 const COURSE_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-    DRAFT:     { label: "Draft",     color: "#6b7280", bg: "#f3f4f6" },
+    DRAFT:     { label: "Draft",     color: "#555c72", bg: "#f6f7fc" },
     PUBLISHED: { label: "Published", color: "#065f46", bg: "#d1fae5" },
     ARCHIVED:  { label: "Archived",  color: "#b45309", bg: "#fef3c7" },
 }
 
-const AVATAR_COLORS = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
+const AVATAR_COLORS = ["#3d6ff5", "#0ea5a4", "#8b6cf6", "#f5a623", "#e5566b", "#06b6d4", "#f97316"]
 
 function getAvatarColor(name: string) {
     return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length]
@@ -1043,7 +1043,7 @@ function CourseModal({ open, onClose, onSaved, course }: {
                                             {rules.map(rule => (
                                                 <div key={rule.id} className="flex items-center justify-between p-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface2)]">
                                                     <div className="flex items-center gap-3">
-                                                        {rule.assignTo === "ALL" && <LayoutGrid size={16} className="text-blue-500" />}
+                                                        {rule.assignTo === "ALL" && <LayoutGrid size={16} className="text-[var(--accent)]" />}
                                                         {rule.assignTo === "ROLE" && <Users2 size={16} className="text-purple-500" />}
                                                         {rule.assignTo === "DESIGNATION" && <User size={16} className="text-orange-500" />}
                                                         {rule.assignTo === "SITE" && <MapPin size={16} className="text-green-500" />}
@@ -1461,8 +1461,8 @@ function CourseDrawer({ courseId, onClose, onEdit, onEnroll, onRefresh }: {
                                         <span
                                             className="px-2 py-0.5 rounded-full text-[10.5px] font-medium"
                                             style={{
-                                                background: COURSE_STATUS_CONFIG[course.status]?.bg ?? "#f3f4f6",
-                                                color: COURSE_STATUS_CONFIG[course.status]?.color ?? "#6b7280"
+                                                background: COURSE_STATUS_CONFIG[course.status]?.bg ?? "#f6f7fc",
+                                                color: COURSE_STATUS_CONFIG[course.status]?.color ?? "#555c72"
                                             }}
                                         >
                                             {COURSE_STATUS_CONFIG[course.status]?.label ?? course.status}
@@ -1881,7 +1881,7 @@ export default function LMSPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                 {courses.map(course => {
                                     const catCfg = CATEGORY_COLORS[course.category] ?? CATEGORY_COLORS["Other"]
-                                    const strip = CATEGORY_STRIP[course.category] ?? "#6b7280"
+                                    const strip = CATEGORY_STRIP[course.category] ?? "#555c72"
                                     const statusCfg = COURSE_STATUS_CONFIG[course.status]
                                     const isMenuOpen = openMenuId === course.id
 
@@ -2269,7 +2269,7 @@ function DashboardTab() {
                 </div>
                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4">
                     <p className="text-[11px] text-[var(--text3)]">In Progress</p>
-                    <p className="text-[28px] font-bold text-blue-600 mt-1">{data.overview.inProgress}</p>
+                    <p className="text-[28px] font-bold text-[var(--accent)] mt-1">{data.overview.inProgress}</p>
                 </div>
                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-4">
                     <p className="text-[11px] text-[var(--text3)]">Pass Rate</p>
@@ -2416,7 +2416,7 @@ function ComplianceTab() {
         EXPIRING_SOON: { bg: "#fef3c7", text: "#92400e", border: "#fde68a" },
         EXPIRED: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
         NOT_ENROLLED: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
-        ENROLLED: { bg: "#dbeafe", text: "#1e40af", border: "#93c5fd" },
+        ENROLLED: { bg: "#e3ebff", text: "#2f5be0", border: "#b9ccfb" },
         IN_PROGRESS: { bg: "#e0e7ff", text: "#3730a3", border: "#a5b4fc" },
         COMPLETED: { bg: "#dcfce7", text: "#166534", border: "#86efac" },
         FAILED: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
@@ -2569,14 +2569,14 @@ type ILTAttendeeRecord = {
 }
 
 const ILT_STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
-    SCHEDULED:   { label: "Scheduled",  bg: "#dbeafe", text: "#1d4ed8", border: "#bfdbfe" },
+    SCHEDULED:   { label: "Scheduled",  bg: "#e3ebff", text: "#2f5be0", border: "#d4e0ff" },
     IN_PROGRESS: { label: "In Progress",bg: "#fef3c7", text: "#b45309", border: "#fde68a" },
     COMPLETED:   { label: "Completed",  bg: "#d1fae5", text: "#065f46", border: "#bbf7d0" },
-    CANCELLED:   { label: "Cancelled",  bg: "#f3f4f6", text: "#6b7280", border: "#e5e7eb" },
+    CANCELLED:   { label: "Cancelled",  bg: "#f6f7fc", text: "#555c72", border: "#dfe3ef" },
 }
 
 const ATTENDANCE_STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-    PENDING: { label: "Pending", bg: "#f3f4f6", text: "#6b7280" },
+    PENDING: { label: "Pending", bg: "#f6f7fc", text: "#555c72" },
     PRESENT: { label: "Present", bg: "#d1fae5", text: "#065f46" },
     ABSENT:  { label: "Absent",  bg: "#fee2e2", text: "#991b1b" },
     LATE:    { label: "Late",    bg: "#fef3c7", text: "#92400e" },
@@ -2887,8 +2887,8 @@ type PolicyType = {
 }
 
 const POLICY_CAT_COLORS: Record<string, string> = {
-    Safety: "#f59e0b", HR: "#8b5cf6", Compliance: "#3b82f6",
-    Operations: "#10b981", IT: "#06b6d4", Finance: "#ec4899", Other: "#6b7280"
+    Safety: "#f59e0b", HR: "#8b6cf6", Compliance: "#3d6ff5",
+    Operations: "#10b981", IT: "#06b6d4", Finance: "#ec4899", Other: "#555c72"
 }
 
 const POLICY_CATEGORIES = ["All", "Safety", "HR", "Compliance", "Operations", "IT", "Finance", "Other"]
@@ -2980,7 +2980,7 @@ function PoliciesTab() {
             ) : (
                 <div className="space-y-3">
                     {filteredPolicies.map(policy => {
-                        const catColor = POLICY_CAT_COLORS[policy.category] ?? "#6b7280"
+                        const catColor = POLICY_CAT_COLORS[policy.category] ?? "#555c72"
                         return (
                             <div key={policy.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
                                 <div className="h-1 w-full" style={{ background: catColor }} />

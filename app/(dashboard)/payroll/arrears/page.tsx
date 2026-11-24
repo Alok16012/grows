@@ -100,7 +100,7 @@ export default function ArrearsPage() {
 
             <div className="grid gap-3 sm:grid-cols-4">
                 {tabs.map(([s, l]) => (
-                    <button key={s} onClick={() => setStatus(s)} className={`${card} p-3 text-left ${status === s ? "ring-2 ring-[#0b5cff]" : ""}`}>
+                    <button key={s} onClick={() => setStatus(s)} className={`${card} p-3 text-left ${status === s ? "ring-2 ring-[#3d6ff5]" : ""}`}>
                         <div className="text-[12px] font-semibold text-[var(--text3)]">{l}</div>
                         <div className="mt-1 text-lg font-bold text-[var(--text)]">{data?.counts?.[s]?.n ?? 0}</div>
                         <div className="text-[11.5px] text-[var(--text3)]">{inr(data?.counts?.[s]?.amount ?? 0)}</div>
@@ -125,14 +125,14 @@ export default function ArrearsPage() {
                         <div className="overflow-x-auto">
                             <table className="w-full border-collapse text-[12.5px]">
                                 <thead className="bg-[var(--surface2)] text-left text-[var(--text2)]"><tr>
-                                    {canManage && status === "PENDING" && <th className="w-10 px-3 py-2"><input type="checkbox" className="accent-[#0b5cff]" checked={allPicked} onChange={() => setPicked(allPicked ? new Set() : new Set(rows.map(r => r.id)))} aria-label="Tick all" /></th>}
+                                    {canManage && status === "PENDING" && <th className="w-10 px-3 py-2"><input type="checkbox" className="accent-[#3d6ff5]" checked={allPicked} onChange={() => setPicked(allPicked ? new Set() : new Set(rows.map(r => r.id)))} aria-label="Tick all" /></th>}
                                     {["Employee", "For month", "Net then", "Net now", "PF / ESIC / PT change", "Arrear", status === "PAID" ? "Paid in" : status === "PENDING" ? "" : "Reviewed", ""].map((h, i) => <th key={i} className="whitespace-nowrap px-3 py-2 font-bold">{h}</th>)}
                                 </tr></thead>
                                 <tbody>
                                     {rows.map(r => (
                                         <Fragment key={r.id}>
                                             <tr className="border-t border-[var(--border)] align-top">
-                                                {canManage && status === "PENDING" && <td className="px-3 py-2"><input type="checkbox" className="accent-[#0b5cff]" checked={picked.has(r.id)} onChange={() => setPicked(p => { const n = new Set(p); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n })} aria-label="Tick" /></td>}
+                                                {canManage && status === "PENDING" && <td className="px-3 py-2"><input type="checkbox" className="accent-[#3d6ff5]" checked={picked.has(r.id)} onChange={() => setPicked(p => { const n = new Set(p); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n })} aria-label="Tick" /></td>}
                                                 <td className="px-3 py-2"><span className="font-semibold text-[var(--text)]">{r.employee?.name ?? "—"}</span><span className="block text-[11px] text-[var(--text3)]">{r.employee?.code}{r.employee?.site ? ` · ${r.employee.site}` : ""}</span></td>
                                                 <td className="whitespace-nowrap px-3 py-2 text-[var(--text2)]">{MONTHS[r.forMonth - 1]} {r.forYear}</td>
                                                 <td className="whitespace-nowrap px-3 py-2 tabular-nums text-[var(--text2)]">{inr(r.oldNet)}</td>
@@ -144,7 +144,7 @@ export default function ArrearsPage() {
                                                 </td>
                                                 <td className="whitespace-nowrap px-3 py-2 text-[11.5px] text-[var(--text3)]">{status === "PAID" ? (r.paidMonth ? `${MONTHS[r.paidMonth - 1]} ${r.paidYear}` : "") : status !== "PENDING" ? `${r.reviewedByName}${r.reviewedAt ? ` · ${new Date(r.reviewedAt).toLocaleDateString("en-IN")}` : ""}` : ""}</td>
                                                 <td className="whitespace-nowrap px-3 py-2 text-right">
-                                                    <button onClick={() => setOpen(open === r.id ? null : r.id)} className="text-[11.5px] font-semibold text-[#0b5cff]">{open === r.id ? "Hide" : "Details"}</button>
+                                                    <button onClick={() => setOpen(open === r.id ? null : r.id)} className="text-[11.5px] font-semibold text-[#3d6ff5]">{open === r.id ? "Hide" : "Details"}</button>
                                                     {canManage && (status === "PENDING" || status === "APPROVED") && <button onClick={() => setAmount(r)} className="ml-3 text-[11.5px] font-semibold text-[var(--text2)]">Edit amount</button>}
                                                     {canManage && status === "PENDING" && <button onClick={() => decide("approve", [r.id])} className="ml-3 text-[11.5px] font-semibold text-[#16a34a]">Approve</button>}
                                                 </td>
@@ -179,7 +179,7 @@ export default function ArrearsPage() {
                         <div className="flex flex-wrap items-center gap-2">
                             <select className={input} value={check.month} onChange={e => setCheck(c => ({ ...c, month: Number(e.target.value) }))}>{MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select>
                             <input className={`${input} w-24`} type="number" value={check.year} onChange={e => setCheck(c => ({ ...c, year: Number(e.target.value) }))} />
-                            <button onClick={recheck} disabled={busy === "recheck"} className="flex h-9 items-center gap-1.5 rounded-lg bg-[#0b5cff] px-3 text-[13px] font-semibold text-white disabled:opacity-50">{busy === "recheck" ? <Loader2 size={14} className="animate-spin" /> : <Scale size={14} />} Check from this month</button>
+                            <button onClick={recheck} disabled={busy === "recheck"} className="flex h-9 items-center gap-1.5 rounded-lg bg-[#3d6ff5] px-3 text-[13px] font-semibold text-white disabled:opacity-50">{busy === "recheck" ? <Loader2 size={14} className="animate-spin" /> : <Scale size={14} />} Check from this month</button>
                         </div>
                     </div>
                 )}

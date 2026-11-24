@@ -168,8 +168,8 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
         const caption=`Salary ${MONTHS[m-1].slice(0,3)} ${String(y).slice(-2)}`
         const today=new Date(); const genOn=today.toLocaleString("en-IN"); const valueDate=today.toLocaleDateString("en-IN")
         const totalAmt=exportRows.reduce((s,p)=>s+Math.round(p.netSalary),0)
-        const rows=exportRows.map((p,i)=>`<tr style="background:${i%2===0?"#fff":"#f8fafc"}"><td>${i+1}</td><td>${hdfcAccNo||"XXXXXXXXXXXXXXXXX"}</td><td style="text-align:left;font-weight:600">${`${p.employee.firstName} ${p.employee.lastName}`.toUpperCase()}</td><td>${p.employee.bankAccountNumber||"<span style='color:#dc2626'>Missing</span>"}</td><td>${p.employee.bankIFSC||"<span style='color:#dc2626'>Missing</span>"}</td><td>${caption}</td><td>${valueDate}</td><td>NEFT</td><td style="text-align:right;font-weight:700">₹${Math.round(p.netSalary).toLocaleString("en-IN")}</td><td style="color:#16a34a;font-weight:600">Processed</td></tr>`).join("")
-        const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>HDFC Bank Statement</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px;color:#1a1a1a;padding:20px}.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #004C8F;padding-bottom:12px;margin-bottom:16px}.logo-text{font-size:26px;font-weight:900;color:#004C8F}.logo-sub{font-size:9px;color:#004C8F;letter-spacing:1px}.logo-tag{font-size:8px;color:#e4002b;font-style:italic}.bank-info{text-align:right;font-size:10px;color:#555}.title-bar{background:#004C8F;color:#fff;padding:8px 14px;border-radius:4px;margin-bottom:14px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;background:#f0f4f8;border:1px solid #dce5ef;border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:10px}.meta span{color:#555}.meta b{color:#004C8F}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#004C8F;color:#fff;padding:7px 8px;text-align:center;white-space:nowrap;font-weight:700}td{padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap}.footer{margin-top:14px;display:flex;justify-content:space-between;align-items:center;border-top:2px solid #004C8F;padding-top:10px}.footer-total{background:#004C8F;color:#fff;padding:6px 16px;border-radius:4px;font-weight:700;font-size:12px}.footer-note{font-size:9px;color:#888}@media print{body{padding:10px}}</style></head><body><div class="header"><div><div class="logo-text">HDFC BANK</div><div class="logo-sub">WE UNDERSTAND YOUR WORLD</div><div class="logo-tag">India's Most Trusted Private Bank</div></div><div class="bank-info"><div><b>Statement Type:</b> File Transactions</div><div><b>Site:</b> ${site?.name??"—"}</div><div><b>Period:</b> ${MONTHS[m-1]} ${y}</div></div></div><div class="title-bar"><h2>File Transactions — Salary Payment Statement</h2></div><div class="meta"><span><b>User ID</b>: ${hdfcGenBy||"ADMIN"}</span><span><b>Generated On</b>: ${genOn}</span><span><b>Company Account</b>: ${hdfcAccNo||"XXXXXXXXXXXXXXXXX"}</span><span><b>Transfer Type</b>: NEFT</span><span><b>Value Date</b>: ${valueDate}</span><span><b>Reference</b>: ${caption}</span></div><table><thead><tr><th>#</th><th>Account Number</th><th>Beneficiary</th><th>Beneficiary A/C No.</th><th>IFSC Code</th><th>User Reference</th><th>Value Date</th><th>Transfer Type</th><th>Amount (₹)</th><th>Status</th></tr></thead><tbody>${rows}</tbody><tfoot><tr style="background:#eff6ff;font-weight:700"><td colspan="8" style="text-align:right;color:#004C8F">Total (${exportRows.length} records)</td><td style="text-align:right;color:#004C8F">₹${totalAmt.toLocaleString("en-IN")}</td><td></td></tr></tfoot></table><div class="footer"><div class="footer-note">Computer generated statement. No signature required.</div><div class="footer-total">Total Payable: ₹${totalAmt.toLocaleString("en-IN")}</div></div></body></html>`
+        const rows=exportRows.map((p,i)=>`<tr style="background:${i%2===0?"#fff":"#f6f7fc"}"><td>${i+1}</td><td>${hdfcAccNo||"XXXXXXXXXXXXXXXXX"}</td><td style="text-align:left;font-weight:600">${`${p.employee.firstName} ${p.employee.lastName}`.toUpperCase()}</td><td>${p.employee.bankAccountNumber||"<span style='color:#dc2626'>Missing</span>"}</td><td>${p.employee.bankIFSC||"<span style='color:#dc2626'>Missing</span>"}</td><td>${caption}</td><td>${valueDate}</td><td>NEFT</td><td style="text-align:right;font-weight:700">₹${Math.round(p.netSalary).toLocaleString("en-IN")}</td><td style="color:#16a34a;font-weight:600">Processed</td></tr>`).join("")
+        const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>HDFC Bank Statement</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px;color:#1a1a1a;padding:20px}.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #004C8F;padding-bottom:12px;margin-bottom:16px}.logo-text{font-size:26px;font-weight:900;color:#004C8F}.logo-sub{font-size:9px;color:#004C8F;letter-spacing:1px}.logo-tag{font-size:8px;color:#e4002b;font-style:italic}.bank-info{text-align:right;font-size:10px;color:#555}.title-bar{background:#004C8F;color:#fff;padding:8px 14px;border-radius:4px;margin-bottom:14px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;background:#f0f4f8;border:1px solid #dce5ef;border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:10px}.meta span{color:#555}.meta b{color:#004C8F}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#004C8F;color:#fff;padding:7px 8px;text-align:center;white-space:nowrap;font-weight:700}td{padding:5px 8px;border-bottom:1px solid #dfe3ef;text-align:center;white-space:nowrap}.footer{margin-top:14px;display:flex;justify-content:space-between;align-items:center;border-top:2px solid #004C8F;padding-top:10px}.footer-total{background:#004C8F;color:#fff;padding:6px 16px;border-radius:4px;font-weight:700;font-size:12px}.footer-note{font-size:9px;color:#888}@media print{body{padding:10px}}</style></head><body><div class="header"><div><div class="logo-text">HDFC BANK</div><div class="logo-sub">WE UNDERSTAND YOUR WORLD</div><div class="logo-tag">India's Most Trusted Private Bank</div></div><div class="bank-info"><div><b>Statement Type:</b> File Transactions</div><div><b>Site:</b> ${site?.name??"—"}</div><div><b>Period:</b> ${MONTHS[m-1]} ${y}</div></div></div><div class="title-bar"><h2>File Transactions — Salary Payment Statement</h2></div><div class="meta"><span><b>User ID</b>: ${hdfcGenBy||"ADMIN"}</span><span><b>Generated On</b>: ${genOn}</span><span><b>Company Account</b>: ${hdfcAccNo||"XXXXXXXXXXXXXXXXX"}</span><span><b>Transfer Type</b>: NEFT</span><span><b>Value Date</b>: ${valueDate}</span><span><b>Reference</b>: ${caption}</span></div><table><thead><tr><th>#</th><th>Account Number</th><th>Beneficiary</th><th>Beneficiary A/C No.</th><th>IFSC Code</th><th>User Reference</th><th>Value Date</th><th>Transfer Type</th><th>Amount (₹)</th><th>Status</th></tr></thead><tbody>${rows}</tbody><tfoot><tr style="background:#eaf0ff;font-weight:700"><td colspan="8" style="text-align:right;color:#004C8F">Total (${exportRows.length} records)</td><td style="text-align:right;color:#004C8F">₹${totalAmt.toLocaleString("en-IN")}</td><td></td></tr></tfoot></table><div class="footer"><div class="footer-note">Computer generated statement. No signature required.</div><div class="footer-total">Total Payable: ₹${totalAmt.toLocaleString("en-IN")}</div></div></body></html>`
         printHTML(html)
     }
 
@@ -261,11 +261,11 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                                     const isSel=selId===site.id; const isSiteChecked=selectedSiteIds.has(site.id)
                                     return (
                                         <div key={site.id} onClick={()=>selectSite(site.id)}
-                                            style={{ padding:"10px 14px", cursor:"pointer", borderBottom:"1px solid var(--border)", background:isSiteChecked?"#f5f3ff":isSel?"var(--accent-light)":"transparent", borderLeft:isSiteChecked?"3px solid #7c3aed":isSel?"3px solid var(--accent)":"3px solid transparent" }}>
+                                            style={{ padding:"10px 14px", cursor:"pointer", borderBottom:"1px solid var(--border)", background:isSiteChecked?"#f1edff":isSel?"var(--accent-light)":"transparent", borderLeft:isSiteChecked?"3px solid #6d4fe0":isSel?"3px solid var(--accent)":"3px solid transparent" }}>
                                             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:6 }}>
                                                 <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:0 }}>
-                                                    <input type="checkbox" checked={isSiteChecked} onClick={e=>toggleSiteSelect(site.id,e)} onChange={()=>{}} style={{ cursor:"pointer", accentColor:"#7c3aed", flexShrink:0 }} />
-                                                    <span style={{ fontSize:12, fontWeight:600, color:isSiteChecked?"#7c3aed":isSel?"var(--accent)":"var(--text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{site.name}</span>
+                                                    <input type="checkbox" checked={isSiteChecked} onClick={e=>toggleSiteSelect(site.id,e)} onChange={()=>{}} style={{ cursor:"pointer", accentColor:"#6d4fe0", flexShrink:0 }} />
+                                                    <span style={{ fontSize:12, fontWeight:600, color:isSiteChecked?"#6d4fe0":isSel?"var(--accent)":"var(--text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{site.name}</span>
                                                 </div>
                                                 <span style={{ padding:"1px 6px", borderRadius:20, fontSize:9, fontWeight:700, whiteSpace:"nowrap", background:isDone?"#dcfce7":"#fef9c3", color:isDone?"#15803d":"#854d0e" }}>{isDone?`${st!.processedCount}`:"—"}</span>
                                             </div>
@@ -277,10 +277,10 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                         )}
                     </div>
                     {selectedSiteIds.size>0 && (
-                        <div style={{ padding:"10px 14px", borderTop:"2px solid #7c3aed", background:"#f5f3ff" }}>
-                            <div style={{ fontSize:11, color:"#7c3aed", fontWeight:700, marginBottom:8 }}>{selectedSiteIds.size} site{selectedSiteIds.size>1?"s":""} selected</div>
+                        <div style={{ padding:"10px 14px", borderTop:"2px solid #6d4fe0", background:"#f1edff" }}>
+                            <div style={{ fontSize:11, color:"#6d4fe0", fontWeight:700, marginBottom:8 }}>{selectedSiteIds.size} site{selectedSiteIds.size>1?"s":""} selected</div>
                             <button onClick={handleExportCombined} disabled={dlCombined}
-                                style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"7px 12px", borderRadius:8, border:"1px solid #7c3aed", background:"#fff", color:"#7c3aed", fontSize:12, fontWeight:700, cursor:dlCombined?"not-allowed":"pointer", marginBottom:6 }}>
+                                style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"7px 12px", borderRadius:8, border:"1px solid #6d4fe0", background:"#fff", color:"#6d4fe0", fontSize:12, fontWeight:700, cursor:dlCombined?"not-allowed":"pointer", marginBottom:6 }}>
                                 {dlCombined?<Loader2 size={13} className="animate-spin"/>:<FileSpreadsheet size={13}/>}
                                 {dlCombined?"Downloading…":"Download Form II (Combined)"}
                             </button>
@@ -351,7 +351,7 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                                         </button>
                                     )}
                                     {activeView==="neft" && (
-                                        <button onClick={handleNEFT} disabled={!data.length} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"none", background:"#0b5cff", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", opacity:!data.length?0.5:1 }}>
+                                        <button onClick={handleNEFT} disabled={!data.length} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:8, border:"none", background:"#3d6ff5", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", opacity:!data.length?0.5:1 }}>
                                             <FileDown size={13} />{selectedCount>0?`Download NEFT (${selectedCount})`:"Download NEFT"}
                                         </button>
                                     )}
@@ -394,18 +394,18 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
 
                             {/* NEFT email input */}
                             {activeView==="neft" && (
-                                <div style={{ background:"#eff6ff", border:"1px solid #bfdbfe", borderRadius:10, padding:"12px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-                                    <span style={{ fontSize:12, fontWeight:700, color:"#1d4ed8", whiteSpace:"nowrap" }}>Authorized Email (col 26)</span>
+                                <div style={{ background:"#eaf0ff", border:"1px solid #d4e0ff", borderRadius:10, padding:"12px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                                    <span style={{ fontSize:12, fontWeight:700, color:"#2f5be0", whiteSpace:"nowrap" }}>Authorized Email (col 26)</span>
                                     <input value={neftEmail} onChange={e=>setNeftEmail(e.target.value)} placeholder="accounts@yourcompany.com"
-                                        style={{ flex:1, minWidth:220, padding:"6px 10px", borderRadius:7, border:"1px solid #93c5fd", fontSize:12, outline:"none", background:"#fff", color:"var(--text)" }} />
-                                    <span style={{ fontSize:11, color:"#3b82f6" }}>Site short: <b>{(selSite?.code||selSite?.name||"").toUpperCase().replace(/\s+/g,"").slice(0,8)}</b></span>
+                                        style={{ flex:1, minWidth:220, padding:"6px 10px", borderRadius:7, border:"1px solid #b9ccfb", fontSize:12, outline:"none", background:"#fff", color:"var(--text)" }} />
+                                    <span style={{ fontSize:11, color:"#3d6ff5" }}>Site short: <b>{(selSite?.code||selSite?.name||"").toUpperCase().replace(/\s+/g,"").slice(0,8)}</b></span>
                                 </div>
                             )}
 
                             {/* Stat cards */}
                             {data.length>0 && (
                                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(150px, 1fr))", gap:8 }}>
-                                    {[{label:"Employees",value:String(data.length),color:"#3b82f6"},{label:"Total Gross",value:fmt(totals.gross),color:"#0b5cff"},{label:"Deductions",value:fmt(totals.ded),color:"#dc2626"},{label:"Net Payable",value:fmt(totals.net),color:"#16a34a"}].map(s=>(
+                                    {[{label:"Employees",value:String(data.length),color:"#3d6ff5"},{label:"Total Gross",value:fmt(totals.gross),color:"#3d6ff5"},{label:"Deductions",value:fmt(totals.ded),color:"#dc2626"},{label:"Net Payable",value:fmt(totals.net),color:"#16a34a"}].map(s=>(
                                         <div key={s.label} style={{ padding:"9px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--surface)" }}>
                                             <p style={{ fontSize:9, color:"var(--text3)", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.4px", margin:0 }}>{s.label}</p>
                                             <p style={{ fontSize:14, fontWeight:700, color:s.color, margin:"2px 0 0 0" }}>{s.value}</p>
@@ -416,18 +416,18 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
 
                             {/* NEFT Preview */}
                             {activeView==="neft" && (
-                                <div style={{ background:"var(--surface)", border:"1px solid #bfdbfe", borderRadius:12, overflow:"hidden" }}>
-                                    <div style={{ padding:"9px 14px", borderBottom:"1px solid #bfdbfe", background:"#eff6ff", display:"flex", alignItems:"center", gap:8 }}>
-                                        <FileDown size={13} style={{ color:"#1d4ed8" }} />
-                                        <span style={{ fontSize:12, fontWeight:700, color:"#1d4ed8" }}>NEFT File Preview — {data.length} rows</span>
-                                        <span style={{ fontSize:11, color:"#3b82f6", marginLeft:"auto" }}>26 columns as per bank format</span>
+                                <div style={{ background:"var(--surface)", border:"1px solid #d4e0ff", borderRadius:12, overflow:"hidden" }}>
+                                    <div style={{ padding:"9px 14px", borderBottom:"1px solid #d4e0ff", background:"#eaf0ff", display:"flex", alignItems:"center", gap:8 }}>
+                                        <FileDown size={13} style={{ color:"#2f5be0" }} />
+                                        <span style={{ fontSize:12, fontWeight:700, color:"#2f5be0" }}>NEFT File Preview — {data.length} rows</span>
+                                        <span style={{ fontSize:11, color:"#3d6ff5", marginLeft:"auto" }}>26 columns as per bank format</span>
                                     </div>
                                     <div style={{ overflowX:"auto" }}>
                                         <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
                                             <thead>
-                                                <tr style={{ background:"#dbeafe", borderBottom:"1px solid #bfdbfe" }}>
+                                                <tr style={{ background:"#e3ebff", borderBottom:"1px solid #d4e0ff" }}>
                                                     {["#","Type","Blank","Acct No","Net Salary","Name (CAPS)","[6-11]","Caption 1","Caption 2","Site","[15-20]","Pay Date","Blank","IFSC","[24-25]","Email"].map(h=>(
-                                                        <th key={h} style={{ padding:"6px 10px", fontWeight:700, color:"#1e40af", whiteSpace:"nowrap", textAlign:"center", fontSize:10 }}>{h}</th>
+                                                        <th key={h} style={{ padding:"6px 10px", fontWeight:700, color:"#2f5be0", whiteSpace:"nowrap", textAlign:"center", fontSize:10 }}>{h}</th>
                                                     ))}
                                                 </tr>
                                             </thead>
@@ -453,7 +453,7 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                                                             <td style={td}></td>
                                                             <td style={{...td,color:"#0369a1"}}>{p.employee.bankIFSC||<span style={{color:"#f59e0b"}}>Missing</span>}</td>
                                                             <td style={{...td,color:"var(--text3)",fontSize:9}}>——</td>
-                                                            <td style={{...td,color:"#6b7280"}}>{neftEmail||"—"}</td>
+                                                            <td style={{...td,color:"#555c72"}}>{neftEmail||"—"}</td>
                                                         </tr>
                                                     )
                                                 })}
@@ -488,7 +488,7 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                                                 <tr style={{ background:"var(--surface2)", borderBottom:"2px solid var(--border)" }}>
                                                     <th style={th}><input type="checkbox" checked={filtered.length>0&&filtered.every(p=>selectedIds.has(p.id))} onChange={()=>toggleAll(filtered)} style={{ cursor:"pointer", accentColor:"var(--accent)" }} /></th>
                                                     <th style={th}>SR</th><th style={th}>EMP CODE</th><th style={{...th,textAlign:"left"}}>NAME</th><th style={th}>DESIG.</th>
-                                                    <th style={{...th,background:"#eff6ff"}}>Month<br/>Days</th><th style={{...th,background:"#eff6ff"}}>LOP</th><th style={{...th,background:"#eff6ff"}}>DAYS</th><th style={{...th,background:"#eff6ff"}}>OT<br/>DAYS</th><th style={{...th,background:"#eff6ff"}}>OT<br/>Hrs</th>
+                                                    <th style={{...th,background:"#eaf0ff"}}>Month<br/>Days</th><th style={{...th,background:"#eaf0ff"}}>LOP</th><th style={{...th,background:"#eaf0ff"}}>DAYS</th><th style={{...th,background:"#eaf0ff"}}>OT<br/>DAYS</th><th style={{...th,background:"#eaf0ff"}}>OT<br/>Hrs</th>
                                                     <th style={{...th,background:"#f0fdf4"}}>BASIC</th><th style={{...th,background:"#f0fdf4"}}>DA</th><th style={{...th,background:"#f0fdf4"}}>HRA</th><th style={{...th,background:"#f0fdf4"}}>Washing</th><th style={{...th,background:"#f0fdf4"}}>Convence</th><th style={{...th,background:"#f0fdf4"}}>LWW</th><th style={{...th,background:"#f0fdf4"}}>BONUS</th><th style={{...th,background:"#f0fdf4"}}>Other</th><th style={{...th,background:"#dcfce7",color:"#15803d"}}>GROSS</th>
                                                     <th style={{...th,background:"#fffbeb"}}>BASIC</th><th style={{...th,background:"#fffbeb"}}>DA</th><th style={{...th,background:"#fffbeb"}}>HRA</th><th style={{...th,background:"#fffbeb"}}>Washing</th><th style={{...th,background:"#fffbeb"}}>Convence</th><th style={{...th,background:"#fffbeb"}}>LWW</th><th style={{...th,background:"#fffbeb"}}>Bonus</th><th style={{...th,background:"#fffbeb"}}>Other</th><th style={{...th,background:"#fffbeb"}}>OT</th><th style={{...th,background:"#fffbeb"}}>Prod<br/>Incentive</th><th style={{...th,background:"#fef9c3",color:"#854d0e"}}>GROSS</th>
                                                     <th style={{...th,background:"#fef2f2"}}>PF</th><th style={{...th,background:"#fef2f2"}}>ESIC</th><th style={{...th,background:"#fef2f2"}}>PT</th><th style={{...th,background:"#fef2f2"}}>LWF</th><th style={{...th,background:"#fef2f2"}}>CANTEEN</th><th style={{...th,background:"#fef2f2"}}>PENALTY</th><th style={{...th,background:"#fef2f2"}}>ADVANCE</th><th style={{...th,background:"#fef2f2"}}>Other<br/>Ded</th><th style={{...th,background:"#fee2e2",color:"#b91c1c"}}>Total<br/>Deduction</th>
@@ -509,11 +509,11 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                                                             <td style={{...td,color:"var(--accent)",fontWeight:700}}>{p.employee.employeeId}</td>
                                                             <td style={{...td,textAlign:"left",fontWeight:600}}>{p.employee.firstName} {p.employee.lastName}</td>
                                                             <td style={{...td,fontSize:10,color:"var(--text3)"}}>{p.employee.designation||"—"}</td>
-                                                            <td style={{...td,background:"#eff6ff"}}>{monthDays}</td>
-                                                            <td style={{...td,background:"#eff6ff",color:lop<0?"#16a34a":lop>0?"#dc2626":"var(--text3)",fontWeight:700}}>{lop}</td>
-                                                            <td style={{...td,background:"#eff6ff"}}>{workedDays}</td>
-                                                            <td style={{...td,background:"#eff6ff"}}>{p.otDays??0}</td>
-                                                            <td style={{...td,background:"#eff6ff"}}>{otHrs}</td>
+                                                            <td style={{...td,background:"#eaf0ff"}}>{monthDays}</td>
+                                                            <td style={{...td,background:"#eaf0ff",color:lop<0?"#16a34a":lop>0?"#dc2626":"var(--text3)",fontWeight:700}}>{lop}</td>
+                                                            <td style={{...td,background:"#eaf0ff"}}>{workedDays}</td>
+                                                            <td style={{...td,background:"#eaf0ff"}}>{p.otDays??0}</td>
+                                                            <td style={{...td,background:"#eaf0ff"}}>{otHrs}</td>
                                                             <td style={{...td,background:"#f0fdf4"}}>{fmtN(p.basicFull??p.basicSalary)}</td>
                                                             <td style={{...td,background:"#f0fdf4"}}>{fmtN(p.daFull??p.da)}</td>
                                                             <td style={{...td,background:"#f0fdf4"}}>{fmtN(p.hraFull??p.hra)}</td>
@@ -552,12 +552,12 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                                                 <tfoot>
                                                     <tr style={{ background:"var(--surface2)", borderTop:"2px solid var(--border)", fontWeight:700 }}>
                                                         <td colSpan={5} style={{...td,textAlign:"right",fontSize:10,color:"var(--text3)",textTransform:"uppercase"}}>{isFiltered?`Filtered total (${rows.length} of ${data.length})`:`Total (${selectedCount>0?`${selectedCount} selected`:data.length})`}</td>
-                                                        <td style={{...td,background:"#eff6ff"}}>{rows.reduce((s,p)=>s+(p.workingDays??26),0)}</td>
+                                                        <td style={{...td,background:"#eaf0ff"}}>{rows.reduce((s,p)=>s+(p.workingDays??26),0)}</td>
                                                         {/* Days are decimal (half days), so round the sum like the OT column does. */}
-                                                        <td style={{...td,background:"#eff6ff"}}>{Math.round(rows.reduce((s,p)=>s+((p.workingDays??26)-(p.presentDays??(p.workingDays??26))),0)*1000)/1000}</td>
-                                                        <td style={{...td,background:"#eff6ff"}}>{Math.round(rows.reduce((s,p)=>s+(p.presentDays??p.workingDays??26),0)*1000)/1000}</td>
-                                                        <td style={{...td,background:"#eff6ff"}}>{Math.round(rows.reduce((s,p)=>s+(p.otDays??0),0)*1000)/1000}</td>
-                                                        <td style={{...td,background:"#eff6ff"}}>{rows.reduce((s,p)=>s+(p.overtimeHrs??0),0)}</td>
+                                                        <td style={{...td,background:"#eaf0ff"}}>{Math.round(rows.reduce((s,p)=>s+((p.workingDays??26)-(p.presentDays??(p.workingDays??26))),0)*1000)/1000}</td>
+                                                        <td style={{...td,background:"#eaf0ff"}}>{Math.round(rows.reduce((s,p)=>s+(p.presentDays??p.workingDays??26),0)*1000)/1000}</td>
+                                                        <td style={{...td,background:"#eaf0ff"}}>{Math.round(rows.reduce((s,p)=>s+(p.otDays??0),0)*1000)/1000}</td>
+                                                        <td style={{...td,background:"#eaf0ff"}}>{rows.reduce((s,p)=>s+(p.overtimeHrs??0),0)}</td>
                                                         <td style={{...td,background:"#f0fdf4"}}>{fmt(rows.reduce((s,p)=>s+(p.basicFull??p.basicSalary),0))}</td>
                                                         <td style={{...td,background:"#f0fdf4"}}>{fmt(rows.reduce((s,p)=>s+(p.daFull??p.da),0))}</td>
                                                         <td style={{...td,background:"#f0fdf4"}}>{fmt(rows.reduce((s,p)=>s+(p.hraFull??p.hra),0))}</td>

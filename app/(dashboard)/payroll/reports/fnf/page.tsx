@@ -219,7 +219,7 @@ export default function FnfReportPage() {
                             <Printer size={14} /> Print selected{pickedIds.length ? ` (${pickedIds.length})` : ""}
                         </button>
                         <button onClick={() => print(filtered.map(r => r.id))} disabled={!!printing || !filtered.length}
-                            className="flex h-9 items-center gap-2 rounded-lg bg-[#0b5cff] px-3 text-[13px] font-semibold text-white disabled:opacity-50">
+                            className="flex h-9 items-center gap-2 rounded-lg bg-[#3d6ff5] px-3 text-[13px] font-semibold text-white disabled:opacity-50">
                             {printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
                             {printing ? `Preparing ${printing.done}/${printing.total}…` : `Print all (${filtered.length})`}
                         </button>
@@ -235,7 +235,7 @@ export default function FnfReportPage() {
                         <table className="w-full border-collapse text-[12.5px]">
                             <thead className="bg-[var(--surface2)] text-left text-[var(--text2)]">
                                 <tr>
-                                    <th className="w-10 px-3 py-2"><input type="checkbox" className="accent-[#0b5cff]" checked={allPicked} onChange={toggleAll} aria-label="Tick all" /></th>
+                                    <th className="w-10 px-3 py-2"><input type="checkbox" className="accent-[#3d6ff5]" checked={allPicked} onChange={toggleAll} aria-label="Tick all" /></th>
                                     <th className="px-2 py-2 font-bold">Emp Code</th>
                                     <th className="px-2 py-2 font-bold">Name</th>
                                     <th className="px-2 py-2 font-bold">Designation</th>
@@ -249,7 +249,7 @@ export default function FnfReportPage() {
                             <tbody>
                                 {filtered.map(r => (
                                     <tr key={r.id} className="border-t border-[var(--border)] hover:bg-[var(--surface2)]">
-                                        <td className="px-3 py-2"><input type="checkbox" className="accent-[#0b5cff]" checked={picked.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Tick ${r.name}`} /></td>
+                                        <td className="px-3 py-2"><input type="checkbox" className="accent-[#3d6ff5]" checked={picked.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Tick ${r.name}`} /></td>
                                         <td className="whitespace-nowrap px-2 py-2 font-semibold text-[var(--text)]">{r.employeeId}</td>
                                         <td className="whitespace-nowrap px-2 py-2 text-[var(--text)]">{r.name}</td>
                                         <td className="px-2 py-2 text-[var(--text2)]">{r.designation || "—"}</td>
@@ -263,7 +263,7 @@ export default function FnfReportPage() {
                                         </td>
                                         <td className="px-2 py-2 text-right">
                                             <button onClick={() => print([r.id])} disabled={!!printing}
-                                                className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-1 text-[11.5px] font-semibold text-[var(--text2)] hover:border-[#0b5cff] hover:text-[#0b5cff] disabled:opacity-50">
+                                                className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-1 text-[11.5px] font-semibold text-[var(--text2)] hover:border-[#3d6ff5] hover:text-[#3d6ff5] disabled:opacity-50">
                                                 <Printer size={12} /> Print
                                             </button>
                                         </td>

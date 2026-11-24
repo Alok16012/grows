@@ -162,7 +162,7 @@ function SalaryModal({ emp, rules, onClose, onSaved }: {
                         </label>
                         <div className="grid grid-cols-2 gap-3">
                             {([
-                                { value: "OR", label: "OR — With Compliance", desc: "PF + ESIC + PT", color: "#0b5cff", bg: "#e8effe", border: "#86efac" },
+                                { value: "OR", label: "OR — With Compliance", desc: "PF + ESIC + PT", color: "#3d6ff5", bg: "#eaf0ff", border: "#86efac" },
                                 { value: "CALL", label: "CALL — Without Compliance", desc: "PT only (No PF / ESIC)", color: "#d97706", bg: "#fffbeb", border: "#fcd34d" },
                             ] as const).map(opt => (
                                 <button key={opt.value} type="button"
@@ -528,7 +528,7 @@ export default function PayrollPage() {
                 {[
                     { label: "Gross Salary", value: fmt(totalGross), color: "text-[var(--accent)]" },
                     { label: "Net Salary", value: fmt(totalNet), color: "text-green-600" },
-                    { label: "PF (Employee)", value: fmt(totalPF), color: "text-blue-600" },
+                    { label: "PF (Employee)", value: fmt(totalPF), color: "text-[var(--accent)]" },
                     { label: "ESIC (Employee)", value: fmt(totalESIC), color: "text-orange-600" },
                     { label: "Total CTC", value: fmt(totalCTC), color: "text-purple-600" },
                 ].map(card => (
@@ -748,7 +748,7 @@ export default function PayrollPage() {
                                 className="flex items-center gap-1.5 text-[12px] font-medium border border-[var(--border)] px-3 py-1.5 rounded-lg hover:bg-[var(--surface)] transition-colors">
                                 <FileDown size={13} /> Download Template
                             </button>
-                            <label className={`flex items-center gap-1.5 text-[12px] font-medium border border-[var(--accent)] text-[var(--accent)] px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors ${bulkUploading ? "opacity-60 pointer-events-none" : ""}`}>
+                            <label className={`flex items-center gap-1.5 text-[12px] font-medium border border-[var(--accent)] text-[var(--accent)] px-3 py-1.5 rounded-lg cursor-pointer hover:bg-[var(--accent-light)] transition-colors ${bulkUploading ? "opacity-60 pointer-events-none" : ""}`}>
                                 {bulkUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
                                 {bulkUploading ? "Uploading..." : "Bulk Upload (.xlsx)"}
                                 <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handleBulkSalaryUpload} disabled={bulkUploading} />

@@ -135,25 +135,25 @@ type KPITemplate = {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = ["#16a34a", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
+const AVATAR_COLORS = ["#16a34a", "#3d6ff5", "#8b6cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
 
 const STATUS_CONFIG: Record<ReviewStatus, { label: string; color: string; bg: string }> = {
-    DRAFT:        { label: "Draft",        color: "#6b7280", bg: "#f3f4f6" },
+    DRAFT:        { label: "Draft",        color: "#555c72", bg: "#f6f7fc" },
     SUBMITTED:    { label: "Submitted",    color: "#d97706", bg: "#fef3c7" },
-    ACKNOWLEDGED: { label: "Acknowledged", color: "#2563eb", bg: "#eff6ff" },
+    ACKNOWLEDGED: { label: "Acknowledged", color: "#3d6ff5", bg: "#eaf0ff" },
     COMPLETED:    { label: "Completed",    color: "#16a34a", bg: "#dcfce7" },
 }
 
 const CYCLE_CONFIG: Record<ReviewCycle, { label: string; color: string; bg: string }> = {
-    MONTHLY:     { label: "Monthly",    color: "#7c3aed", bg: "#f5f3ff" },
-    QUARTERLY:   { label: "Quarterly",  color: "#2563eb", bg: "#eff6ff" },
+    MONTHLY:     { label: "Monthly",    color: "#6d4fe0", bg: "#f1edff" },
+    QUARTERLY:   { label: "Quarterly",  color: "#3d6ff5", bg: "#eaf0ff" },
     HALF_YEARLY: { label: "Half-Yearly", color: "#0891b2", bg: "#ecfeff" },
-    ANNUAL:      { label: "Annual",     color: "#0b5cff", bg: "#e8effe" },
+    ANNUAL:      { label: "Annual",     color: "#3d6ff5", bg: "#eaf0ff" },
 }
 
 const RANK_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-    TOP_PERFORMER:  { label: "Top Performer",  color: "#0b5cff", bg: "#e8effe" },
-    HIGH_PERFORMER: { label: "High Performer", color: "#2563eb", bg: "#eff6ff" },
+    TOP_PERFORMER:  { label: "Top Performer",  color: "#3d6ff5", bg: "#eaf0ff" },
+    HIGH_PERFORMER: { label: "High Performer", color: "#3d6ff5", bg: "#eaf0ff" },
     AVERAGE:        { label: "Average",        color: "#d97706", bg: "#fef3c7" },
     LOW_PERFORMER:  { label: "Low Performer",  color: "#ef4444", bg: "#fee2e2" },
 }
@@ -212,7 +212,7 @@ function StarRating({
                     style={{
                         cursor: readonly ? "default" : "pointer",
                         fill: (hover ?? value ?? 0) >= n ? "#f59e0b" : "transparent",
-                        color: (hover ?? value ?? 0) >= n ? "#f59e0b" : "#d1d5db",
+                        color: (hover ?? value ?? 0) >= n ? "#f59e0b" : "#d5dae8",
                     }}
                     onMouseEnter={() => !readonly && setHover(n)}
                     onMouseLeave={() => !readonly && setHover(null)}
@@ -220,7 +220,7 @@ function StarRating({
                 />
             ))}
             {(hover || value) && (
-                <span style={{ fontSize: 10, color: "#6b7280", marginLeft: 6 }}>
+                <span style={{ fontSize: 10, color: "#555c72", marginLeft: 6 }}>
                     {labels[Math.round(hover ?? value ?? 1)]}
                 </span>
             )}
@@ -541,8 +541,8 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
     ]
 
     const rankCards = [
-        { key: "TOP_PERFORMER", label: "Top Performers", color: "#0b5cff", bg: "#e8effe" },
-        { key: "HIGH_PERFORMER", label: "High Performers", color: "#2563eb", bg: "#eff6ff" },
+        { key: "TOP_PERFORMER", label: "Top Performers", color: "#3d6ff5", bg: "#eaf0ff" },
+        { key: "HIGH_PERFORMER", label: "High Performers", color: "#3d6ff5", bg: "#eaf0ff" },
         { key: "AVERAGE", label: "Average", color: "#d97706", bg: "#fef3c7" },
         { key: "LOW_PERFORMER", label: "Low Performers", color: "#ef4444", bg: "#fee2e2" },
     ]
@@ -558,8 +558,8 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
 
             {/* Ranking & Actions Ribbons */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #e8effe 100%)", borderRadius: 12, padding: 18, border: "1px solid #bbf7d0", display: "flex", alignItems: "center", gap: 14 }}>
-                    <div style={{ width: 40, height: 40, background: "#0b5cff", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}><Award color="#fff" size={20} /></div>
+                <div style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #eaf0ff 100%)", borderRadius: 12, padding: 18, border: "1px solid #bbf7d0", display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ width: 40, height: 40, background: "#3d6ff5", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}><Award color="#fff" size={20} /></div>
                     <div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#166534" }}>Performance Rewards Active</div>
                         <div style={{ fontSize: 11, color: "#15803d" }}>Top 10% eligible for quarterly performance bonus</div>
@@ -607,7 +607,7 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
                         Top 5 Performers
                     </h3>
                     {topPerformers.length === 0 && (
-                        <p style={{ color: "#9ca3af", fontSize: 13 }}>No rated reviews yet</p>
+                        <p style={{ color: "#98a1b5", fontSize: 13 }}>No rated reviews yet</p>
                     )}
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                         {topPerformers.map((p, i) => (
@@ -617,7 +617,7 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
                             }}>
                                 <div style={{
                                     width: 24, height: 24, borderRadius: "50%",
-                                    background: i === 0 ? "#f59e0b" : i === 1 ? "#9ca3af" : i === 2 ? "#b45309" : "#e5e7eb",
+                                    background: i === 0 ? "#f59e0b" : i === 1 ? "#98a1b5" : i === 2 ? "#b45309" : "#dfe3ef",
                                     display: "flex", alignItems: "center", justifyContent: "center",
                                     fontSize: 11, fontWeight: 700, color: "#fff",
                                 }}>
@@ -627,17 +627,17 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
                                     <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
                                         {p.employee.firstName} {p.employee.lastName}
                                     </div>
-                                    <div style={{ fontSize: 11, color: "#6b7280" }}>{p.employee.designation || "—"}</div>
+                                    <div style={{ fontSize: 11, color: "#555c72" }}>{p.employee.designation || "—"}</div>
                                 </div>
                                 <div style={{ textAlign: "right" }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0b5cff" }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: "#3d6ff5" }}>
                                         {p.overallRating?.toFixed(1) ?? "—"}
                                     </div>
                                     {p.performanceRank && (
                                         <Badge
                                             label={RANK_CONFIG[p.performanceRank]?.label ?? p.performanceRank}
-                                            color={RANK_CONFIG[p.performanceRank]?.color ?? "#6b7280"}
-                                            bg={RANK_CONFIG[p.performanceRank]?.bg ?? "#f3f4f6"}
+                                            color={RANK_CONFIG[p.performanceRank]?.color ?? "#555c72"}
+                                            bg={RANK_CONFIG[p.performanceRank]?.bg ?? "#f6f7fc"}
                                         />
                                     )}
                                 </div>
@@ -658,7 +658,7 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
                     </h3>
                     <ResponsiveContainer width="100%" height={180}>
                         <LineChart data={monthlyTrend}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#eceef6" />
                             <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                             <YAxis domain={[0, 5]} tick={{ fontSize: 11 }} />
                             <Tooltip />
@@ -681,7 +681,7 @@ function DashboardTab({ data, loading }: { data: DashboardData | null; loading: 
                     </h3>
                     <ResponsiveContainer width="100%" height={Math.max(120, roleAvgScores.length * 36)}>
                         <BarChart data={roleAvgScores} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#eceef6" />
                             <XAxis type="number" domain={[0, 5]} tick={{ fontSize: 11 }} />
                             <YAxis type="category" dataKey="role" width={130} tick={{ fontSize: 11 }} />
                             <Tooltip />
@@ -718,7 +718,7 @@ function ReviewsTab({
             {/* Toolbar */}
             <div className="filter-bar" style={{ marginBottom: 20 }}>
                 <div className="filter-search sm:min-w-[180px]" style={{ position: "relative", flex: 1 }}>
-                    <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
+                    <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#98a1b5" }} />
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
@@ -767,10 +767,10 @@ function ReviewsTab({
             ) : reviews.length === 0 ? (
                 <div style={{
                     textAlign: "center", padding: "60px 20px",
-                    color: "#9ca3af", fontSize: 14,
+                    color: "#98a1b5", fontSize: 14,
                     background: "#fff", borderRadius: 12, border: "1px solid var(--border)",
                 }}>
-                    <FileText size={36} style={{ margin: "0 auto 12px", display: "block", color: "#d1d5db" }} />
+                    <FileText size={36} style={{ margin: "0 auto 12px", display: "block", color: "#d5dae8" }} />
                     No reviews found
                 </div>
             ) : (
@@ -835,14 +835,14 @@ function ReviewCard({ review, onClick }: { review: PerformanceReview; onClick: (
                     <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {name}
                     </div>
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>{emp.designation || "—"}</div>
+                    <div style={{ fontSize: 12, color: "#555c72" }}>{emp.designation || "—"}</div>
                 </div>
                 <Badge label={statusCfg.label} color={statusCfg.color} bg={statusCfg.bg} />
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
                 <Badge label={cycleCfg.label} color={cycleCfg.color} bg={cycleCfg.bg} />
-                <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                <span style={{ fontSize: 12, color: "#98a1b5" }}>
                     {fmtDate(review.periodStart)} – {fmtDate(review.periodEnd)}
                 </span>
             </div>
@@ -906,12 +906,12 @@ function ReviewDrawer({
                     <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>
                         {review.employee.firstName} {review.employee.lastName}
                     </div>
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>
+                    <div style={{ fontSize: 12, color: "#555c72" }}>
                         {review.employee.designation || "—"} · {CYCLE_CONFIG[review.cycle]?.label}
                     </div>
                 </div>
                 <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-                    <X size={20} color="#6b7280" />
+                    <X size={20} color="#555c72" />
                 </button>
             </div>
 
@@ -997,7 +997,7 @@ function DrawerOverview({ review }: { review: PerformanceReview }) {
                 <tbody>
                     {rows.map(([label, val]) => (
                         <tr key={label} style={{ borderBottom: "1px solid var(--border)" }}>
-                            <td style={{ padding: "9px 0", color: "#6b7280", width: "44%" }}>{label}</td>
+                            <td style={{ padding: "9px 0", color: "#555c72", width: "44%" }}>{label}</td>
                             <td style={{ padding: "9px 0", color: "var(--text)", fontWeight: 500 }}>{val}</td>
                         </tr>
                     ))}
@@ -1007,13 +1007,13 @@ function DrawerOverview({ review }: { review: PerformanceReview }) {
             {review.strengths && (
                 <div style={{ marginTop: 16 }}>
                     <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Strengths</div>
-                    <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{review.strengths}</div>
+                    <div style={{ fontSize: 13, color: "#3a4157", lineHeight: 1.6 }}>{review.strengths}</div>
                 </div>
             )}
             {review.improvements && (
                 <div style={{ marginTop: 12 }}>
                     <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Areas of Improvement</div>
-                    <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{review.improvements}</div>
+                    <div style={{ fontSize: 13, color: "#3a4157", lineHeight: 1.6 }}>{review.improvements}</div>
                 </div>
             )}
         </div>
@@ -1085,7 +1085,7 @@ function DrawerSelfReview({
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <StarRating value={selfRating} onChange={setSelfRating} size={22} />
                     {selfRating > 0 && (
-                        <span style={{ fontSize: 13, color: "#6b7280" }}>{ratingLabels[selfRating]}</span>
+                        <span style={{ fontSize: 13, color: "#555c72" }}>{ratingLabels[selfRating]}</span>
                     )}
                 </div>
             </div>
@@ -1249,7 +1249,7 @@ function DrawerManagerReview({
 
     if (!isAdminOrManager) {
         return (
-            <div style={{ fontSize: 13, color: "#6b7280" }}>
+            <div style={{ fontSize: 13, color: "#555c72" }}>
                 <p>Manager review details:</p>
                 <p><strong>Rating:</strong> {review.overallRating ?? "—"}</p>
                 <p><strong>Comments:</strong> {review.managerComments || "—"}</p>
@@ -1281,7 +1281,7 @@ function DrawerManagerReview({
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <StarRating value={form.overallRating} onChange={v => setForm(f => ({ ...f, overallRating: v }))} size={22} />
                     {form.overallRating > 0 && (
-                        <span style={{ fontSize: 13, color: "#6b7280" }}>
+                        <span style={{ fontSize: 13, color: "#555c72" }}>
                             {["", "Poor", "Needs Improvement", "Meets Expectations", "Exceeds Expectations", "Outstanding"][form.overallRating]}
                         </span>
                     )}
@@ -1456,7 +1456,7 @@ function DrawerHRApproval({
 
             <div>
                 <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Review Summary</label>
-                <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 13, color: "#3a4157", lineHeight: 1.7 }}>
                     <div><strong>Overall Rating:</strong> {review.overallRating ?? "—"} / 5</div>
                     <div><strong>Rank:</strong> {review.performanceRank ? RANK_CONFIG[review.performanceRank]?.label : "—"}</div>
                     <div><strong>Promotion:</strong> {review.promotionRecommended ? "Yes" : "No"}</div>
@@ -1469,13 +1469,13 @@ function DrawerHRApproval({
             {review.strengths && (
                 <div>
                     <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Strengths</label>
-                    <p style={{ fontSize: 13, color: "#374151", margin: 0 }}>{review.strengths}</p>
+                    <p style={{ fontSize: 13, color: "#3a4157", margin: 0 }}>{review.strengths}</p>
                 </div>
             )}
             {review.improvements && (
                 <div>
                     <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>Areas of Improvement</label>
-                    <p style={{ fontSize: 13, color: "#374151", margin: 0 }}>{review.improvements}</p>
+                    <p style={{ fontSize: 13, color: "#3a4157", margin: 0 }}>{review.improvements}</p>
                 </div>
             )}
 
@@ -1485,7 +1485,7 @@ function DrawerHRApproval({
                     disabled={approving}
                     style={{
                         display: "flex", alignItems: "center", gap: 6, padding: "9px 18px",
-                        background: "#0b5cff", color: "#fff", border: "none",
+                        background: "#3d6ff5", color: "#fff", border: "none",
                         borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: approving ? "not-allowed" : "pointer",
                         alignSelf: "flex-start",
                     }}
@@ -1635,7 +1635,7 @@ function DrawerPIP({
 
     if (!showForm && !isAdminOrManager) {
         return (
-            <div style={{ color: "#6b7280", fontSize: 13, padding: "20px 0" }}>
+            <div style={{ color: "#555c72", fontSize: 13, padding: "20px 0" }}>
                 No PIP required for this employee.
             </div>
         )
@@ -1656,7 +1656,7 @@ function DrawerPIP({
 
             {pip && (
                 <div style={{
-                    background: pip.status === "ACTIVE" ? "#fff7ed" : pip.status === "COMPLETED" ? "#dcfce7" : "#f3f4f6",
+                    background: pip.status === "ACTIVE" ? "#fff7ed" : pip.status === "COMPLETED" ? "#dcfce7" : "#f6f7fc",
                     border: "1px solid var(--border)", borderRadius: 8,
                     padding: "10px 14px", fontSize: 13,
                 }}>
@@ -1769,7 +1769,7 @@ function DrawerPIP({
 
             {/* Read-only display for non-admins */}
             {!isAdminOrManager && pip && (
-                <div style={{ fontSize: 13, color: "#374151" }}>
+                <div style={{ fontSize: 13, color: "#3a4157" }}>
                     <p><strong>Period:</strong> {fmtDateFull(pip.startDate)} — {fmtDateFull(pip.endDate)}</p>
                     <p><strong>Status:</strong> {pip.status}</p>
                     <p><strong>Goals:</strong></p>
@@ -1798,7 +1798,7 @@ function TemplatesTab({ templates, loading }: { templates: KPITemplate[]; loadin
 
     if (templates.length === 0) {
         return (
-            <div style={{ textAlign: "center", padding: 60, color: "#9ca3af", fontSize: 14 }}>
+            <div style={{ textAlign: "center", padding: 60, color: "#98a1b5", fontSize: 14 }}>
                 No templates found
             </div>
         )
@@ -1819,7 +1819,7 @@ function TemplatesTab({ templates, loading }: { templates: KPITemplate[]; loadin
                     background: "#fff", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden",
                 }}>
                     <div style={{
-                        padding: "14px 18px", background: "#f8fafc",
+                        padding: "14px 18px", background: "#f6f7fc",
                         borderBottom: "1px solid var(--border)",
                         display: "flex", alignItems: "center", gap: 10,
                     }}>
@@ -1838,17 +1838,17 @@ function TemplatesTab({ templates, loading }: { templates: KPITemplate[]; loadin
                                 <div className="overflow-x-auto">
                                 <table style={{ width: "100%", minWidth: 460, borderCollapse: "collapse", fontSize: 12 }}>
                                     <thead>
-                                        <tr style={{ background: "#f9fafb" }}>
-                                            <th style={{ padding: "6px 10px", textAlign: "left", color: "#6b7280", fontWeight: 600, border: "1px solid var(--border)" }}>KPI Title</th>
-                                            <th style={{ padding: "6px 10px", textAlign: "left", color: "#6b7280", fontWeight: 600, border: "1px solid var(--border)" }}>Target Hint</th>
-                                            <th style={{ padding: "6px 10px", textAlign: "center", color: "#6b7280", fontWeight: 600, border: "1px solid var(--border)", width: 80 }}>Weight %</th>
+                                        <tr style={{ background: "#f6f7fc" }}>
+                                            <th style={{ padding: "6px 10px", textAlign: "left", color: "#555c72", fontWeight: 600, border: "1px solid var(--border)" }}>KPI Title</th>
+                                            <th style={{ padding: "6px 10px", textAlign: "left", color: "#555c72", fontWeight: 600, border: "1px solid var(--border)" }}>Target Hint</th>
+                                            <th style={{ padding: "6px 10px", textAlign: "center", color: "#555c72", fontWeight: 600, border: "1px solid var(--border)", width: 80 }}>Weight %</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {kpis.map(k => (
                                             <tr key={k.id}>
                                                 <td style={{ padding: "6px 10px", border: "1px solid var(--border)", color: "var(--text)" }}>{k.kpiTitle}</td>
-                                                <td style={{ padding: "6px 10px", border: "1px solid var(--border)", color: "#6b7280" }}>{k.targetHint ?? "—"}</td>
+                                                <td style={{ padding: "6px 10px", border: "1px solid var(--border)", color: "#555c72" }}>{k.targetHint ?? "—"}</td>
                                                 <td style={{ padding: "6px 10px", border: "1px solid var(--border)", color: "var(--text)", textAlign: "center" }}>{k.weightage}</td>
                                             </tr>
                                         ))}
@@ -1889,7 +1889,7 @@ function CreateReviewModal({
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                     <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--text)" }}>Create Performance Review</h2>
                     <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}>
-                        <X size={20} color="#6b7280" />
+                        <X size={20} color="#555c72" />
                     </button>
                 </div>
 
@@ -1961,7 +1961,7 @@ function CreateReviewModal({
                     <button
                         onClick={onClose}
                         style={{
-                            padding: "9px 18px", background: "#fff", color: "#6b7280",
+                            padding: "9px 18px", background: "#fff", color: "#555c72",
                             border: "1px solid var(--border)", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer",
                         }}
                     >

@@ -442,3 +442,9 @@
 @container (max-width: 190px) {
   .stat-value-fit { font-size: 22px !important; }
 }
+
+/* ICON ALIGNMENT — lucide icons never shrink when the text beside them is long
+   (a squeezed icon looks smaller and off-centre), and an icon placed inline in
+   running text sits on the text's middle instead of its baseline. Inside flex
+   rows vertical-align has no effect, so flex layouts keep their own alignment. */
+svg.lucide { flex-shrink: 0; vertical-align: -0.15em; }

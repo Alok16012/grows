@@ -35,7 +35,7 @@ const CH_ICON: Record<Channel, typeof Mail> = { whatsapp: MessageCircle, email: 
 const CH_LABEL: Record<Channel, string> = { whatsapp: "WhatsApp", email: "Email", inapp: "In-app" }
 const STATUS: Record<string, string> = {
     queued: "bg-[var(--surface2)] text-[var(--text2)]", sending: "bg-[var(--surface2)] text-[var(--text2)]",
-    sent: "bg-[#e8effe] text-[#0b5cff]", delivered: "bg-[#f5f3ff] text-[#7c3aed]", read: "bg-[#dcfce7] text-[#15803d]",
+    sent: "bg-[#eaf0ff] text-[#3d6ff5]", delivered: "bg-[#f1edff] text-[#6d4fe0]", read: "bg-[#dcfce7] text-[#15803d]",
     failed: "bg-[#fef2f2] text-[#dc2626]", skipped: "bg-[#fffbeb] text-[#b45309]",
 }
 const WA_ENV = [
@@ -89,7 +89,7 @@ export default function CommunicationCenterPage() {
         <div className="flex flex-col gap-5 p-4 pb-24 lg:p-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8effe] text-[#0b5cff]"><Megaphone size={20} /></div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eaf0ff] text-[#3d6ff5]"><Megaphone size={20} /></div>
                     <div>
                         <h1 className="m-0 text-2xl font-bold tracking-tight text-[var(--text)]">Communication Center</h1>
                         <p className="m-0 mt-0.5 text-[13px] text-[var(--text3)]">What employees and customers are told, and on which channel — WhatsApp, email, in-app.</p>
@@ -106,7 +106,7 @@ export default function CommunicationCenterPage() {
 
             <div className="flex gap-1 overflow-x-auto border-b border-[var(--border)]">
                 {tabs.map(([k, l]) => (
-                    <button key={k} onClick={() => setTab(k)} className={`whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-semibold ${tab === k ? "border-[#0b5cff] text-[#0b5cff]" : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"}`}>{l}</button>
+                    <button key={k} onClick={() => setTab(k)} className={`whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-semibold ${tab === k ? "border-[#3d6ff5] text-[#3d6ff5]" : "border-transparent text-[var(--text3)] hover:text-[var(--text)]"}`}>{l}</button>
                 ))}
             </div>
 
@@ -127,7 +127,7 @@ export default function CommunicationCenterPage() {
                 <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 shadow-lg">
                     <span className="text-[13px] text-[var(--text2)]">Unsaved changes</span>
                     <button onClick={load} className="h-8 rounded-lg border border-[var(--border)] px-3 text-xs font-semibold text-[var(--text2)]">Discard</button>
-                    <button onClick={save} disabled={saving} className="flex h-8 items-center gap-1.5 rounded-lg bg-[#0b5cff] px-3 text-xs font-semibold text-white disabled:opacity-60">{saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save</button>
+                    <button onClick={save} disabled={saving} className="flex h-8 items-center gap-1.5 rounded-lg bg-[#3d6ff5] px-3 text-xs font-semibold text-white disabled:opacity-60">{saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save</button>
                 </div>
             )}
         </div>
@@ -250,7 +250,7 @@ function EventEditor({ ev, s, info, canEdit, patch }: { ev: CommEvent; s: EventC
                 <div className="flex flex-wrap gap-1">
                     {ev.vars.map(v => (
                         <button key={v.key} disabled={!canEdit} onClick={() => insert(v.key)} title={`Insert ${v.label}`}
-                            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--text2)] hover:border-[#0b5cff] hover:text-[#0b5cff]">{`{${v.key}}`}</button>
+                            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--text2)] hover:border-[#3d6ff5] hover:text-[#3d6ff5]">{`{${v.key}}`}</button>
                     ))}
                 </div>
                 <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-[12px]">
@@ -273,7 +273,7 @@ function EventEditor({ ev, s, info, canEdit, patch }: { ev: CommEvent; s: EventC
                         </label>
                     )}
                     <button onClick={sendTest} disabled={test.busy || (test.channel !== "inapp" && !test.to.trim())}
-                        className="flex h-9 items-center gap-1.5 rounded-lg bg-[#0b5cff] px-3 text-[13px] font-semibold text-white disabled:opacity-50">
+                        className="flex h-9 items-center gap-1.5 rounded-lg bg-[#3d6ff5] px-3 text-[13px] font-semibold text-white disabled:opacity-50">
                         {test.busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send test
                     </button>
                     <span className="pb-2 text-[11px] text-[var(--text3)]">Uses the saved settings and sample values{test.channel === "email" ? " — save first if you changed the wording" : ""}.</span>
@@ -424,7 +424,7 @@ function LogTab({ info, canEdit, onChanged }: { info: Info; canEdit: boolean; on
                                             <td className="whitespace-nowrap px-3 py-2 text-[var(--text2)]">{fmt(m.deliveredAt)}</td>
                                             <td className="whitespace-nowrap px-3 py-2 text-[var(--text2)]">{fmt(m.readAt)}</td>
                                             <td className="px-3 py-2 text-right">{canEdit && ["failed", "skipped"].includes(m.status) && m.toAddress && (
-                                                <button onClick={() => resend(m.id)} disabled={busy === m.id} className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-1 text-[11px] font-semibold text-[var(--text2)] hover:border-[#0b5cff] hover:text-[#0b5cff] disabled:opacity-50">
+                                                <button onClick={() => resend(m.id)} disabled={busy === m.id} className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-1 text-[11px] font-semibold text-[var(--text2)] hover:border-[#3d6ff5] hover:text-[#3d6ff5] disabled:opacity-50">
                                                     {busy === m.id ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />} Resend</button>)}</td>
                                         </tr>
                                     )
@@ -477,7 +477,7 @@ function OptOutsTab({ canEdit }: { canEdit: boolean }) {
                     <select className={input} value={form.channel} onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select>
                     <input className={`${input} w-56`} placeholder={form.channel === "whatsapp" ? "Mobile number" : "Email address"} value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
                     <input className={`${input} min-w-[160px] flex-1`} placeholder="Reason (optional)" value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} />
-                    <button onClick={add} disabled={busy || !form.address.trim()} className="flex h-9 items-center gap-1.5 rounded-lg bg-[#0b5cff] px-3 text-[13px] font-semibold text-white disabled:opacity-50">{busy ? <Loader2 size={14} className="animate-spin" /> : null} Add</button>
+                    <button onClick={add} disabled={busy || !form.address.trim()} className="flex h-9 items-center gap-1.5 rounded-lg bg-[#3d6ff5] px-3 text-[13px] font-semibold text-white disabled:opacity-50">{busy ? <Loader2 size={14} className="animate-spin" /> : null} Add</button>
                 </div>
             )}
             {rows.length === 0 ? <p className="m-0 p-8 text-center text-sm text-[var(--text3)]">Nobody has opted out.</p> : (

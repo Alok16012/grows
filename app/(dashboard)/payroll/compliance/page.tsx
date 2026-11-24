@@ -106,9 +106,9 @@ async function buildHierarchicalSheet(
 // Column config
 const COLS = [
     { key: "wage", title: "Wage Sheet",       color: "#0f766e", bg: "#f0fdfa", border: "#99f6e4", items: WAGE_ITEMS },
-    { key: "pf",   title: "Provident Fund",   color: "#1d4ed8", bg: "#eff6ff", border: "#bfdbfe", items: PF_ITEMS   },
+    { key: "pf",   title: "Provident Fund",   color: "#2f5be0", bg: "#eaf0ff", border: "#d4e0ff", items: PF_ITEMS   },
     { key: "esic", title: "ESIC",             color: "#0369a1", bg: "#f0f9ff", border: "#bae6fd", items: ESIC_ITEMS },
-    { key: "pt",   title: "Professional Tax", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", items: PT_ITEMS   },
+    { key: "pt",   title: "Professional Tax", color: "#6d4fe0", bg: "#f1edff", border: "#ddd6fe", items: PT_ITEMS   },
 ]
 
 function ComplianceInner() {
@@ -296,13 +296,13 @@ function ComplianceInner() {
                             <PillCell items={WAGE_ITEMS} run={run} color="#0f766e" dlLoading={dlLoading} onDownload={handleDownload} />
 
                             {/* PF */}
-                            <PillCell items={PF_ITEMS} run={run} color="#1d4ed8" dlLoading={dlLoading} onDownload={handleDownload} />
+                            <PillCell items={PF_ITEMS} run={run} color="#2f5be0" dlLoading={dlLoading} onDownload={handleDownload} />
 
                             {/* ESIC */}
                             <PillCell items={ESIC_ITEMS} run={run} color="#0369a1" dlLoading={dlLoading} onDownload={handleDownload} />
 
                             {/* PT */}
-                            <PillCell items={PT_ITEMS} run={run} color="#7c3aed" dlLoading={dlLoading} onDownload={handleDownload} />
+                            <PillCell items={PT_ITEMS} run={run} color="#6d4fe0" dlLoading={dlLoading} onDownload={handleDownload} />
                         </div>
                     ))
                 )}

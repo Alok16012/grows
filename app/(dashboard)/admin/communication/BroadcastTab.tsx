@@ -34,13 +34,13 @@ function Picker({ label, options, value, onChange }: { label: string; options: O
                     <div className="max-h-56 overflow-y-auto">
                         {shown.map(o => (
                             <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-[var(--surface2)]">
-                                <input type="checkbox" className="accent-[#0b5cff]" checked={value.includes(o.id)} onChange={() => onChange(value.includes(o.id) ? value.filter(x => x !== o.id) : [...value, o.id])} />
+                                <input type="checkbox" className="accent-[#3d6ff5]" checked={value.includes(o.id)} onChange={() => onChange(value.includes(o.id) ? value.filter(x => x !== o.id) : [...value, o.id])} />
                                 {o.name}
                             </label>
                         ))}
                         {!shown.length && <p className="m-0 p-2 text-[12px] text-[var(--text3)]">Nothing found.</p>}
                     </div>
-                    <div className="mt-1 flex justify-end"><button type="button" onClick={() => setOpen(false)} className="h-7 rounded-md bg-[#0b5cff] px-3 text-xs font-semibold text-white">Done</button></div>
+                    <div className="mt-1 flex justify-end"><button type="button" onClick={() => setOpen(false)} className="h-7 rounded-md bg-[#3d6ff5] px-3 text-xs font-semibold text-white">Done</button></div>
                 </div>
             )}
         </div>
@@ -112,7 +112,7 @@ export default function BroadcastTab({ canEdit, waReady, emailReady, waTemplate 
                         <div className="flex flex-col gap-3">
                             <div className="flex rounded-lg border border-[var(--border)] p-0.5 text-xs font-semibold">
                                 {([["employees", "Employees", Users], ["customers", "Customers", Building2]] as const).map(([k, l, Icon]) => (
-                                    <button key={k} onClick={() => setKind(k)} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 ${kind === k ? "bg-[#0b5cff] text-white" : "text-[var(--text2)]"}`}><Icon size={13} /> {l}</button>
+                                    <button key={k} onClick={() => setKind(k)} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 ${kind === k ? "bg-[#3d6ff5] text-white" : "text-[var(--text2)]"}`}><Icon size={13} /> {l}</button>
                                 ))}
                             </div>
                             <Picker label="Sites" options={sites} value={siteIds} onChange={setSiteIds} />
@@ -129,8 +129,8 @@ export default function BroadcastTab({ canEdit, waReady, emailReady, waTemplate 
                                 {([["whatsapp", "WhatsApp", MessageCircle, waReady, waReady ? "" : !waTemplate ? "No template" : "Not connected"],
                                    ["email", "Email", Mail, emailReady, emailReady ? "" : "Not set up"],
                                    ["inapp", "In-app", Bell, kind === "employees", kind === "employees" ? "" : "Employees only"]] as const).map(([k, l, Icon, ok, why]) => (
-                                    <label key={k} title={why || undefined} className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border p-2 text-[12px] font-semibold ${channels[k] ? "border-[#c7dbff] bg-[#e8effe] text-[#0b5cff]" : "border-[var(--border)] text-[var(--text2)]"} ${!ok ? "cursor-not-allowed opacity-50" : ""}`}>
-                                        <span className="flex items-center gap-1"><input type="checkbox" className="accent-[#0b5cff]" disabled={!ok} checked={channels[k] && ok} onChange={e => setChannels(c => ({ ...c, [k]: e.target.checked }))} /><Icon size={13} /> {l}</span>
+                                    <label key={k} title={why || undefined} className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border p-2 text-[12px] font-semibold ${channels[k] ? "border-[#c7dbff] bg-[#eaf0ff] text-[#3d6ff5]" : "border-[var(--border)] text-[var(--text2)]"} ${!ok ? "cursor-not-allowed opacity-50" : ""}`}>
+                                        <span className="flex items-center gap-1"><input type="checkbox" className="accent-[#3d6ff5]" disabled={!ok} checked={channels[k] && ok} onChange={e => setChannels(c => ({ ...c, [k]: e.target.checked }))} /><Icon size={13} /> {l}</span>
                                         {why && <span className="text-[10.5px] font-normal text-[var(--text3)]">{why}</span>}
                                     </label>
                                 ))}
@@ -148,7 +148,7 @@ export default function BroadcastTab({ canEdit, waReady, emailReady, waTemplate 
                             </div>
                             <div className="flex items-center justify-end gap-3">
                                 {sending && <span className="flex items-center gap-1.5 text-[12.5px] text-[var(--text2)]"><Loader2 size={13} className="animate-spin" /> {sending}</span>}
-                                <button onClick={send} disabled={!can} className="flex h-10 items-center gap-2 rounded-lg bg-[#0b5cff] px-4 text-[13px] font-semibold text-white disabled:opacity-50"><Send size={15} /> Send to {reach}</button>
+                                <button onClick={send} disabled={!can} className="flex h-10 items-center gap-2 rounded-lg bg-[#3d6ff5] px-4 text-[13px] font-semibold text-white disabled:opacity-50"><Send size={15} /> Send to {reach}</button>
                             </div>
                         </div>
                     </div>

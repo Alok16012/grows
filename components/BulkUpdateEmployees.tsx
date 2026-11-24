@@ -235,7 +235,7 @@ export function BulkUpdateEmployees({ filters, onClose, onDone }: {
                         </p>
                         {result.errors.length > 0 && (
                             <>
-                                <ul style={{ margin: "8px 0 10px", padding: "0 0 0 16px", fontSize: 12, color: "#6b7280" }}>
+                                <ul style={{ margin: "8px 0 10px", padding: "0 0 0 16px", fontSize: 12, color: "#555c72" }}>
                                     {result.errors.slice(0, 8).map((e, i) => <li key={i}>Row {e.row}{e.employeeId && ` (${e.employeeId})`}: {e.reason}</li>)}
                                     {result.errors.length > 8 && <li>…and {result.errors.length - 8} more</li>}
                                 </ul>

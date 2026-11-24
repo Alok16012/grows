@@ -78,8 +78,8 @@ type LearnPolicy = {
 }
 
 const POLICY_CAT_COLORS_LEARN: Record<string, string> = {
-    Safety: "#f59e0b", HR: "#8b5cf6", Compliance: "#3b82f6",
-    Operations: "#10b981", IT: "#06b6d4", Finance: "#ec4899", Other: "#6b7280"
+    Safety: "#f59e0b", HR: "#8b6cf6", Compliance: "#3d6ff5",
+    Operations: "#10b981", IT: "#06b6d4", Finance: "#ec4899", Other: "#555c72"
 }
 
 function PoliciesSection({ onUrlPreview }: { onUrlPreview: (url: string, name: string) => void }) {
@@ -147,7 +147,7 @@ function PoliciesSection({ onUrlPreview }: { onUrlPreview: (url: string, name: s
             {expanded && (
                 <div className="border-t border-amber-200 divide-y divide-amber-100">
                     {policies.map(policy => {
-                        const catColor = POLICY_CAT_COLORS_LEARN[policy.category] ?? "#6b7280"
+                        const catColor = POLICY_CAT_COLORS_LEARN[policy.category] ?? "#555c72"
                         return (
                             <div key={policy.id} className="px-4 py-3 flex items-start gap-3">
                                 <div className="h-8 w-8 rounded-[8px] flex items-center justify-center shrink-0 mt-0.5" style={{ background: catColor + "22" }}>
@@ -197,12 +197,12 @@ function PoliciesSection({ onUrlPreview }: { onUrlPreview: (url: string, name: s
 
 const CATEGORY_COLORS: Record<string, string> = {
     Safety: "#f59e0b",
-    Security: "#8b5cf6",
-    Compliance: "#3b82f6",
+    Security: "#8b6cf6",
+    Compliance: "#3d6ff5",
     "Soft Skills": "#ec4899",
     Technical: "#10b981",
     Induction: "#0ea5e9",
-    Other: "#6b7280",
+    Other: "#555c72",
 }
 
 function ProgressRing({ progress, size = 60, strokeWidth = 6 }: { progress: number; size?: number; strokeWidth?: number }) {
@@ -642,7 +642,7 @@ function CertificateModal({ certificate, courseName, employeeName, issuedAt, onC
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50" onClick={onClose} />
             <div className="relative bg-[var(--surface)] rounded-[20px] border border-[var(--border)] shadow-2xl w-full max-w-lg overflow-hidden">
-                <div className="bg-gradient-to-br from-[var(--accent)] to-blue-600 p-8 text-center text-white">
+                <div className="bg-gradient-to-br from-[var(--accent)] to-[var(--accent)] p-8 text-center text-white">
                     <Award size={60} className="mx-auto" />
                     <h2 className="text-[24px] font-bold mt-4">Certificate of Completion</h2>
                     <p className="text-white/80 mt-2">This certifies that</p>
@@ -734,7 +734,7 @@ function CourseDetailView({ enrollment, onBack, onComplete, onUrlPreview }: {
             </button>
 
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden">
-                <div className="h-2 w-full" style={{ background: CATEGORY_COLORS[course.category] || "#6b7280" }} />
+                <div className="h-2 w-full" style={{ background: CATEGORY_COLORS[course.category] || "#555c72" }} />
                 <div className="p-6">
                     <span className="font-mono text-[11px] text-[var(--text3)]">{course.courseCode}</span>
                     <h2 className="text-[20px] font-bold text-[var(--text)] mt-1">{course.title}</h2>

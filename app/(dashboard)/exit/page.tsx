@@ -69,31 +69,31 @@ type EmployeeOption = { id: string; firstName: string; lastName: string; employe
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = ["#16a34a", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
+const AVATAR_COLORS = ["#16a34a", "#3d6ff5", "#8b6cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
 
 const STATUS_CONFIG: Record<ExitStatus, { label: string; color: string; bg: string }> = {
   INITIATED:          { label: "Initiated",       color: "#f59e0b", bg: "#fffbeb" },
-  NOTICE_PERIOD:      { label: "Notice Period",    color: "#3b82f6", bg: "#eff6ff" },
+  NOTICE_PERIOD:      { label: "Notice Period",    color: "#3d6ff5", bg: "#eaf0ff" },
   CLEARANCE_PENDING:  { label: "Clearance",        color: "#f97316", bg: "#fff7ed" },
   FULL_FINAL_PENDING: { label: "F&F Pending",      color: "#ef4444", bg: "#fef2f2" },
   COMPLETED:          { label: "Completed",        color: "#16a34a", bg: "#dcfce7" },
-  CANCELLED:          { label: "Cancelled",        color: "#6b7280", bg: "#f3f4f6" },
+  CANCELLED:          { label: "Cancelled",        color: "#555c72", bg: "#f6f7fc" },
 }
 
 const EXIT_TYPE_CONFIG: Record<ExitType, { label: string; color: string; bg: string }> = {
   RESIGNATION:  { label: "Resignation",  color: "#d97706", bg: "#fffbeb" },
   TERMINATION:  { label: "Termination",  color: "#ef4444", bg: "#fef2f2" },
-  RETIREMENT:   { label: "Retirement",   color: "#3b82f6", bg: "#eff6ff" },
-  CONTRACT_END: { label: "Contract End", color: "#6b7280", bg: "#f3f4f6" },
+  RETIREMENT:   { label: "Retirement",   color: "#3d6ff5", bg: "#eaf0ff" },
+  CONTRACT_END: { label: "Contract End", color: "#555c72", bg: "#f6f7fc" },
   ABSCONDING:   { label: "Absconding",   color: "#dc2626", bg: "#fef2f2" },
 }
 
 const DEPT_COLORS: Record<string, string> = {
-  HR: "#0b5cff",
-  IT: "#3b82f6",
-  Finance: "#8b5cf6",
+  HR: "#3d6ff5",
+  IT: "#3d6ff5",
+  Finance: "#8b6cf6",
   Operations: "#f97316",
-  Admin: "#6b7280",
+  Admin: "#555c72",
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -946,8 +946,8 @@ function TimelineTab({
               <div style={{
                 position: "absolute", left: -26, top: 2,
                 width: 18, height: 18, borderRadius: "50%",
-                background: isCancelled ? "#6b7280" : isPast ? "var(--accent)" : "var(--border)",
-                border: `2px solid ${isCancelled ? "#6b7280" : isPast ? "var(--accent)" : "var(--border)"}`,
+                background: isCancelled ? "#555c72" : isPast ? "var(--accent)" : "var(--border)",
+                border: `2px solid ${isCancelled ? "#555c72" : isPast ? "var(--accent)" : "var(--border)"}`,
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 {isPast && !isCancelled && <Check size={10} color="#fff" />}
@@ -1028,7 +1028,7 @@ function TimelineTab({
               disabled={statusLoading}
               style={{
                 padding: "8px 18px", borderRadius: 8, border: "none",
-                background: "#3b82f6", color: "#fff", fontSize: 13, fontWeight: 600,
+                background: "#3d6ff5", color: "#fff", fontSize: 13, fontWeight: 600,
                 cursor: statusLoading ? "not-allowed" : "pointer",
               }}
             >
@@ -1166,7 +1166,7 @@ function ClearanceTab({ exit, onRefresh }: { exit: ExitRequest; onRefresh: () =>
       {departments.map(dept => {
         const deptTasks = grouped[dept]
         if (!deptTasks || deptTasks.length === 0) return null
-        const deptColor = DEPT_COLORS[dept] || "#6b7280"
+        const deptColor = DEPT_COLORS[dept] || "#555c72"
 
         return (
           <div key={dept} style={{ marginBottom: 20 }}>
@@ -1241,7 +1241,7 @@ function ClearanceTab({ exit, onRefresh }: { exit: ExitRequest; onRefresh: () =>
                           {isWaived && (
                             <span style={{
                               fontSize: 11, fontWeight: 600,
-                              color: "#6b7280", background: "#f3f4f6",
+                              color: "#555c72", background: "#f6f7fc",
                               padding: "1px 7px", borderRadius: 10,
                             }}>Waived</span>
                           )}

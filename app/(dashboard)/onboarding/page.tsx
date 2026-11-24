@@ -106,7 +106,7 @@ type OnboardingRecord = {
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<OnboardingStatus, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
-    NOT_STARTED: { label: "Not Started", color: "#6b7280", bg: "#f3f4f6",   border: "#d1d5db", icon: Clock },
+    NOT_STARTED: { label: "Not Started", color: "#555c72", bg: "#f6f7fc",   border: "#d5dae8", icon: Clock },
     IN_PROGRESS: { label: "Pending Review", color: "#d97706", bg: "#fef3c7", border: "#fcd34d", icon: Clock },
     COMPLETED:   { label: "Approved",    color: "#15803d", bg: "#dcfce7",   border: "#86efac", icon: CheckCircle2 },
     ON_HOLD:     { label: "Rejected",    color: "#dc2626", bg: "#fee2e2",   border: "#fca5a5", icon: XCircle },
@@ -123,7 +123,7 @@ const FILTER_TABS = [
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
 function Avatar({ name, photo, size = 40 }: { name: string; photo?: string | null; size?: number }) {
-    const colors = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
+    const colors = ["#3d6ff5", "#0ea5a4", "#8b6cf6", "#f5a623", "#e5566b", "#06b6d4"]
     const color = colors[name.charCodeAt(0) % colors.length]
     if (photo) return <img src={photo} alt={name} style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover" }} />
     return (
@@ -768,7 +768,7 @@ function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, o
                         <div style={{ fontSize: 11.5, color: "var(--text3)", marginBottom: 4, whiteSpace: "nowrap" }}>{record.checklist ? `${record.checklist.done} of ${record.checklist.total} done` : record.status === "COMPLETED" ? "Approved" : "—"}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <div style={{ flex: 1, height: 6, borderRadius: 4, background: "var(--surface2)", overflow: "hidden" }}>
-                                <div style={{ width: `${progress}%`, height: "100%", borderRadius: 4, background: progress === 100 ? "#15803d" : "var(--accent, #0b5cff)" }} />
+                                <div style={{ width: `${progress}%`, height: "100%", borderRadius: 4, background: progress === 100 ? "#15803d" : "var(--accent, #3d6ff5)" }} />
                             </div>
                             <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text2)", fontVariantNumeric: "tabular-nums" }}>{progress}%</span>
                         </div>
@@ -784,7 +784,7 @@ function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, o
                 <td style={{ ...cell, borderRight: expanded ? "2px solid var(--accent)" : "none", borderTopRightRadius: expanded ? 12 : 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <button onClick={onOpen}
-                            style={{ padding: "7px 16px", borderRadius: 8, border: isPending ? "none" : "1px solid var(--border)", background: isPending ? "var(--accent, #0b5cff)" : "var(--surface)", color: isPending ? "#fff" : "var(--text2)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                            style={{ padding: "7px 16px", borderRadius: 8, border: isPending ? "none" : "1px solid var(--border)", background: isPending ? "var(--accent, #3d6ff5)" : "var(--surface)", color: isPending ? "#fff" : "var(--text2)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                             {isPending ? "Review" : "View"}
                         </button>
                         <button onClick={onToggle} title="Quick actions"
@@ -801,11 +801,11 @@ function OnboardingRow({ record, expanded, checked, onCheck, onToggle, onOpen, o
                     <td colSpan={9} style={{ padding: 0, background: "var(--accent-light, #f0fdf9)", borderLeft: "2px solid var(--accent)", borderRight: "2px solid var(--accent)", borderBottom: "2px solid var(--accent)", borderBottomLeftRadius: 12, borderBottomRightRadius: 12 }}>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, padding: "6px 16px 16px" }}>
                             {[
-                                { icon: Eye,           title: "Review",         sub: "Review employee details", color: "#3b82f6", onClick: onOpen },
+                                { icon: Eye,           title: "Review",         sub: "Review employee details", color: "#3d6ff5", onClick: onOpen },
                                 { icon: CheckCircle2,  title: "Approve",        sub: "Approve onboarding",      color: "#15803d", onClick: onApprove },
                                 { icon: XCircle,       title: "Reject",         sub: "Reject onboarding",       color: "#dc2626", onClick: onOpen },
                                 ...(record.checklist?.policiesPending && e.onboardingToken ? [{ icon: Send, title: "Send sign link", sub: "WhatsApp the policy sign link", color: "#b45309", onClick: () => sendSignLink(fullName, e.phone, e.onboardingToken!) }] : []),
-                                { icon: ClipboardList, title: "View Checklist", sub: record.checklist?.blocking.length ? `Waiting: ${record.checklist.blocking.slice(0, 2).join(", ")}${record.checklist.blocking.length > 2 ? "…" : ""}` : "See joining tasks", color: "#6b7280", onClick: () => { window.location.href = `/onboarding/checklist?id=${record.employee.id}` } },
+                                { icon: ClipboardList, title: "View Checklist", sub: record.checklist?.blocking.length ? `Waiting: ${record.checklist.blocking.slice(0, 2).join(", ")}${record.checklist.blocking.length > 2 ? "…" : ""}` : "See joining tasks", color: "#555c72", onClick: () => { window.location.href = `/onboarding/checklist?id=${record.employee.id}` } },
                             ].filter(a => canApprove || (a.title !== "Approve" && a.title !== "Reject")).map(a => (
                                 <button key={a.title} onClick={a.onClick}
                                     style={{ display: "flex", alignItems: "center", gap: 11, padding: "12px 14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", textAlign: "left" }}>
@@ -1151,7 +1151,7 @@ export default function OnboardingPage() {
                         style={{ background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", overflow: "hidden" }}>
                         <div style={{ padding: "18px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "#e8effe", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "#eaf0ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                     <Link2 size={18} style={{ color: "var(--accent)" }} />
                                 </div>
                                 <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", margin: 0 }}>Share Join Link</h2>

@@ -94,8 +94,8 @@ function SelectSitesInner() {
             {/* Stats */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
                 {[
-                    { label: "Sites with Wage Sheet", value: sites.length, icon: Building2,     color: "#3b82f6" },
-                    { label: "Selected Sites",         value: selected.size, icon: CheckCircle2, color: "#7c3aed" },
+                    { label: "Sites with Wage Sheet", value: sites.length, icon: Building2,     color: "#3d6ff5" },
+                    { label: "Selected Sites",         value: selected.size, icon: CheckCircle2, color: "#6d4fe0" },
                     { label: "Combined Staff",          value: totalEmps,    icon: Users,         color: "#16a34a" },
                     { label: "Est. Net Payable",        value: selected.size ? fmt(totalNet) : "—", icon: Wallet, color: "#d97706" },
                 ].map(s => (
@@ -166,7 +166,7 @@ function SelectSitesInner() {
                                     style={{
                                         padding: "14px 16px", borderRadius: 12, cursor: "pointer", transition: "all 0.15s",
                                         border: isSel ? "2px solid var(--accent)" : "2px solid var(--border)",
-                                        background: isSel ? "#f5f3ff" : "var(--surface2)",
+                                        background: isSel ? "#f1edff" : "var(--surface2)",
                                         position: "relative",
                                     }}>
                                     {isSel && (
@@ -175,7 +175,7 @@ function SelectSitesInner() {
                                         </div>
                                     )}
                                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                                        <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: "#eff6ff", color: "#1d4ed8", letterSpacing: "0.3px" }}>
+                                        <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: "#eaf0ff", color: "#2f5be0", letterSpacing: "0.3px" }}>
                                             {site.siteCode || "SITE"}
                                         </span>
                                     </div>
@@ -188,7 +188,7 @@ function SelectSitesInner() {
                                         </div>
                                         <div>
                                             <p style={{ fontSize: 9, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 2px 0" }}>Gross</p>
-                                            <p style={{ fontSize: 12, fontWeight: 700, color: "#0b5cff", margin: 0 }}>{fmt(site.totalGross)}</p>
+                                            <p style={{ fontSize: 12, fontWeight: 700, color: "#3d6ff5", margin: 0 }}>{fmt(site.totalGross)}</p>
                                         </div>
                                         <div>
                                             <p style={{ fontSize: 9, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 2px 0" }}>Net</p>
@@ -208,7 +208,7 @@ function SelectSitesInner() {
                     <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
                         <div>
                             <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Selected Sites</p>
-                            <p style={{ fontSize: 16, fontWeight: 800, color: "#7c3aed", margin: 0 }}>{selected.size} sites</p>
+                            <p style={{ fontSize: 16, fontWeight: 800, color: "#6d4fe0", margin: 0 }}>{selected.size} sites</p>
                         </div>
                         <div>
                             <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Total Staff</p>
@@ -216,7 +216,7 @@ function SelectSitesInner() {
                         </div>
                         <div>
                             <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Total Gross</p>
-                            <p style={{ fontSize: 16, fontWeight: 800, color: "#0b5cff", margin: 0 }}>{fmt(totalGross)}</p>
+                            <p style={{ fontSize: 16, fontWeight: 800, color: "#3d6ff5", margin: 0 }}>{fmt(totalGross)}</p>
                         </div>
                         <div>
                             <p style={{ fontSize: 10, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Total Net</p>

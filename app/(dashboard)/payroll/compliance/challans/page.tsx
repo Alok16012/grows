@@ -11,7 +11,7 @@ import { AlertTriangle, ArrowLeft, FileText, Info, Loader2, Paperclip, Plus, Tra
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const TYPES = ["PF", "ESI", "PT", "LWF", "TDS"] as const
 const TYPE_LABEL: Record<string, string> = { PF: "PF (EPFO)", ESI: "ESIC", PT: "Professional Tax", LWF: "Labour Welfare Fund", TDS: "TDS" }
-const STATUS: Record<string, [string, string]> = { PAID: ["Paid", "bg-green-50 text-green-700"], PART_PAID: ["Part paid", "bg-amber-50 text-amber-800"], DUE: ["Due", "bg-blue-50 text-blue-700"], OVERDUE: ["Overdue", "bg-red-50 text-red-700"], NOTHING_DUE: ["—", "text-[var(--text3)]"] }
+const STATUS: Record<string, [string, string]> = { PAID: ["Paid", "bg-green-50 text-green-700"], PART_PAID: ["Part paid", "bg-amber-50 text-amber-800"], DUE: ["Due", "bg-[var(--accent-light)] text-[var(--accent-text)]"], OVERDUE: ["Overdue", "bg-red-50 text-red-700"], NOTHING_DUE: ["—", "text-[var(--text3)]"] }
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`
 const day = (s: string | null) => s ? new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
 const th = "text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text3)] border-b border-[var(--border)] bg-[var(--surface2)] whitespace-nowrap"

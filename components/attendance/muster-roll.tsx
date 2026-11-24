@@ -125,7 +125,7 @@ export function MusterRoll({ month, siteId }: { month: string; siteId: string })
                                 <th className="sticky left-0 z-30 bg-[var(--surface2)] text-left font-semibold text-[var(--text3)] px-3 py-2 min-w-[200px] border-b border-r border-[var(--border)]">Employee</th>
                                 {data.days.map(d => (
                                     <th key={d.key} title={d.holiday ?? undefined}
-                                        className={`w-[30px] min-w-[30px] text-center font-semibold border-b border-[var(--border)] py-1 ${d.holiday ? "text-[#1d4ed8]" : d.weeklyOff ? "text-[var(--text3)]" : "text-[var(--text2)]"}`}>
+                                        className={`w-[30px] min-w-[30px] text-center font-semibold border-b border-[var(--border)] py-1 ${d.holiday ? "text-[#2f5be0]" : d.weeklyOff ? "text-[var(--text3)]" : "text-[var(--text2)]"}`}>
                                         <span className="block text-[10px] font-medium">{DOW[d.dow]}</span>{d.day}
                                     </th>
                                 ))}
@@ -156,7 +156,7 @@ export function MusterRoll({ month, siteId }: { month: string; siteId: string })
                                     })}
                                     <td className="text-center font-semibold text-[#15803d] border-b border-l border-[var(--border)]">{fmt(r.totals.present + r.totals.halfDay * 0.5)}</td>
                                     <td className="text-center font-semibold text-[#b91c1c] border-b border-l border-[var(--border)]">{r.totals.absent || ""}</td>
-                                    <td className="text-center font-semibold text-[#6d28d9] border-b border-l border-[var(--border)]">{r.totals.leave || ""}</td>
+                                    <td className="text-center font-semibold text-[#6d4fe0] border-b border-l border-[var(--border)]">{r.totals.leave || ""}</td>
                                     <td className="text-center text-[var(--text2)] border-b border-l border-[var(--border)]">{r.totals.otHours || ""}</td>
                                     <td className="text-center font-bold text-[var(--text)] border-b border-l border-[var(--border)]" title={`Present ${r.totals.present} + half ${r.totals.halfDay}×0.5 + paid leave ${r.totals.paidLeave} + weekly off ${r.totals.weeklyOff} + holiday ${r.totals.holiday}`}>{fmt(r.totals.payableDays)}</td>
                                 </tr>

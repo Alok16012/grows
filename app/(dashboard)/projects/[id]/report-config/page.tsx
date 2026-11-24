@@ -165,7 +165,7 @@ export default function ReportConfigPage() {
                                 {t.isHidden && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500" title="Hidden in the Form Builder — not selected unless you tick it">HIDDEN</span>}
                                 <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                                     t.category === "DEFECT" ? "bg-orange-100 text-orange-700" :
-                                    t.category === "AUTO" ? "bg-blue-100 text-blue-700" :
+                                    t.category === "AUTO" ? "bg-[#e3ebff] text-[var(--accent-text)]" :
                                     "bg-gray-100 text-gray-600"
                                 }`}>{t.category}</span>
                             </div>

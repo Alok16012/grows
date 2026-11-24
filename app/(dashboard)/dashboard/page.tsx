@@ -142,22 +142,22 @@ function PipelineCard({ href, icon: Icon, iconBg, iconColor, title, big, bigSub,
 
 const ALL_ACTIONS: { perm: string[]; href: string; icon: React.ElementType; label: string; sub: string; color: string; bg: string }[] = [
     { perm: ["approvals.view"],                      href: "/approvals",            icon: ClipboardCheck, label: "Approve Requests",  sub: "Pending approvals",   color: "#d97706", bg: "#fef3c7" },
-    { perm: ["attendance.view"],                     href: "/attendance",           icon: Clock,          label: "Attendance",        sub: "View & mark",         color: "#0b5cff", bg: "#e8effe" },
-    { perm: ["employees.view"],                      href: "/employees",            icon: UserCheck,      label: "Employees",         sub: "Employee directory",  color: "#3b82f6", bg: "#eff6ff" },
+    { perm: ["attendance.view"],                     href: "/attendance",           icon: Clock,          label: "Attendance",        sub: "View & mark",         color: "#3d6ff5", bg: "#eaf0ff" },
+    { perm: ["employees.view"],                      href: "/employees",            icon: UserCheck,      label: "Employees",         sub: "Employee directory",  color: "#3d6ff5", bg: "#eaf0ff" },
     { perm: ["employees.create"],                    href: "/employees",            icon: UserPlus,       label: "Add Employee",      sub: "Onboard new hire",    color: "#0891b2", bg: "#ecfeff" },
-    { perm: ["recruitment.view"],                    href: "/recruitment",          icon: Target,         label: "Recruitment",       sub: "Candidate pipeline",  color: "#8b5cf6", bg: "#f5f3ff" },
+    { perm: ["recruitment.view"],                    href: "/recruitment",          icon: Target,         label: "Recruitment",       sub: "Candidate pipeline",  color: "#8b6cf6", bg: "#f1edff" },
     { perm: ["onboarding.view"],                     href: "/onboarding",           icon: ClipboardList,  label: "Onboarding",        sub: "Review candidates",   color: "#0d9488", bg: "#f0fdfa" },
     { perm: ["leaves.view", "leaves.approve"],       href: "/leaves",               icon: CalendarOff,    label: "Leaves",            sub: "Requests & balances", color: "#f59e0b", bg: "#fef3c7" },
     { perm: ["expenses.view", "expenses.approve"],    href: "/expenses",             icon: CreditCard,     label: "Expenses",          sub: "Claims & approvals",  color: "#b45309", bg: "#fef3c7" },
-    { perm: ["payroll.view"],                        href: "/payroll",              icon: Wallet,         label: "Payroll",           sub: "Salary processing",   color: "#3b82f6", bg: "#eff6ff" },
-    { perm: ["projects.view"],                       href: "/projects",             icon: Folder,         label: "Projects",          sub: "All projects",        color: "#7c3aed", bg: "#f5f3ff" },
+    { perm: ["payroll.view"],                        href: "/payroll",              icon: Wallet,         label: "Payroll",           sub: "Salary processing",   color: "#3d6ff5", bg: "#eaf0ff" },
+    { perm: ["projects.view"],                       href: "/projects",             icon: Folder,         label: "Projects",          sub: "All projects",        color: "#6d4fe0", bg: "#f1edff" },
     { perm: ["sites.view"],                          href: "/sites",                icon: MapPin,         label: "Sites",             sub: "Site management",     color: "#0891b2", bg: "#ecfeff" },
     { perm: ["assignments.view"],                    href: "/assignments",          icon: ClipboardList,  label: "Assignments",       sub: "Inspection work",     color: "#0d9488", bg: "#f0fdfa" },
     { perm: ["documents.view"],                      href: "/documents/send",       icon: Send,           label: "Send Document",     sub: "Issue letters",       color: "#b45309", bg: "#fef3c7" },
     { perm: ["users.manage"],                        href: "/admin/employee-logins", icon: KeyRound,      label: "Employee Logins",   sub: "IDs & passwords",     color: "#dc2626", bg: "#fef2f2" },
-    { perm: ["helpdesk.view"],                       href: "/helpdesk",             icon: Headphones,     label: "Helpdesk",          sub: "Support tickets",     color: "#6b7280", bg: "#f3f4f6" },
+    { perm: ["helpdesk.view"],                       href: "/helpdesk",             icon: Headphones,     label: "Helpdesk",          sub: "Support tickets",     color: "#555c72", bg: "#f6f7fc" },
     { perm: ["reports.view"],                        href: "/reports",              icon: BarChart2,      label: "Reports",           sub: "Analytics & exports", color: "#0d9488", bg: "#f0fdfa" },
-    { perm: ["lms.view", "lms.edit"],              href: "/lms/learn",            icon: GraduationCap,  label: "Training",          sub: "Courses & learning",  color: "#8b5cf6", bg: "#f5f3ff" },
+    { perm: ["lms.view", "lms.edit"],              href: "/lms/learn",            icon: GraduationCap,  label: "Training",          sub: "Courses & learning",  color: "#8b6cf6", bg: "#f1edff" },
 ]
 
 // Phones get the Zavtoo-style MobileHome; md and up keep this dashboard.
@@ -226,7 +226,7 @@ function DesktopDashboard() {
     // ── KPI cards, in priority order — first 4 the user qualifies for ────────
     const kpis: React.ReactNode[] = []
     if (employees) kpis.push(
-        <KpiCard key="emp" href="/employees" icon={Users} iconBg="#e8effe" iconColor="#0847c7"
+        <KpiCard key="emp" href="/employees" icon={Users} iconBg="#eaf0ff" iconColor="#2f5be0"
             label="Active Employees" value={(employees.active ?? 0).toLocaleString("en-IN")}
             sub={employees.new30d > 0
                 ? <span className="inline-flex items-center gap-0.5 h-6 px-2 rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] text-[11px] font-semibold"><ArrowUpRight size={12} className="stroke-[3px]" />+{employees.new30d} last 30 days</span>
@@ -256,7 +256,7 @@ function DesktopDashboard() {
         />
     )
     if (recruitment) kpis.push(
-        <KpiCard key="rec" href="/recruitment" icon={Target} iconBg="#f5f3ff" iconColor="#8b5cf6"
+        <KpiCard key="rec" href="/recruitment" icon={Target} iconBg="#f1edff" iconColor="#8b6cf6"
             label="Active Candidates" value={String(recruitment.activeLeads)}
             sub={<span className="text-[11px] text-[var(--text3)]">+{recruitment.newLeads30d} new · {recruitment.joined30d} joined (30d)</span>}
         />
@@ -278,7 +278,7 @@ function DesktopDashboard() {
             label="Active Sites" value={String(stats.activeSites)} />
     )
     if (stats.openTickets !== undefined) kpis.push(
-        <KpiCard key="tkt" href="/helpdesk" icon={Headphones} iconBg="#f3f4f6" iconColor="#6b7280"
+        <KpiCard key="tkt" href="/helpdesk" icon={Headphones} iconBg="#f6f7fc" iconColor="#555c72"
             label="Open Tickets" value={String(stats.openTickets)} />
     )
     const kpiRow = kpis.slice(0, 4)
@@ -292,15 +292,15 @@ function DesktopDashboard() {
     const pbs = stats.projectsByStatus || null
     const projSlices: DonutSlice[] = pbs ? [
         { label: "Active", value: pbs.ACTIVE ?? 0, color: "#16a34a" },
-        { label: "Planning", value: pbs.PLANNING ?? 0, color: "#3b82f6" },
+        { label: "Planning", value: pbs.PLANNING ?? 0, color: "#3d6ff5" },
         { label: "On Hold", value: pbs.ON_HOLD ?? 0, color: "#ef4444" },
-        { label: "Completed", value: pbs.COMPLETED ?? 0, color: "#7c3aed" },
+        { label: "Completed", value: pbs.COMPLETED ?? 0, color: "#6d4fe0" },
     ] : []
 
     // ── Pipeline cards ───────────────────────────────────────────────────────
     const pipelines: React.ReactNode[] = []
     if (onboarding) pipelines.push(
-        <PipelineCard key="onb" href="/onboarding" icon={UserPlus} iconBg="#e8effe" iconColor="#0847c7"
+        <PipelineCard key="onb" href="/onboarding" icon={UserPlus} iconBg="#eaf0ff" iconColor="#2f5be0"
             title="Onboarding Pipeline" big={String(onboarding.inProgress)} bigSub="In progress"
             rows={[
                 { label: "Yet to start", value: String(onboarding.notStarted) },
@@ -314,7 +314,7 @@ function DesktopDashboard() {
             linkLabel="View details" />
     )
     if (payroll) pipelines.push(
-        <PipelineCard key="pay" href="/payroll" icon={Wallet} iconBg="#eff6ff" iconColor="#3b82f6"
+        <PipelineCard key="pay" href="/payroll" icon={Wallet} iconBg="#eaf0ff" iconColor="#3d6ff5"
             title="Payroll Status" big={`${payroll.pct}%`} bigSub={`Processed · ${format(new Date(), "MMM yyyy")}`}
             rows={[
                 { label: "Processed", value: payroll.processed.toLocaleString("en-IN") },

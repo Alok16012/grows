@@ -141,7 +141,7 @@ export default function InspectionDashboard() {
     return (
         <div className="min-h-screen bg-[var(--bg)] p-4 md:p-6 lg:p-0">
             {/* Mobile Welcome Banner */}
-            <div className="md:hidden bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] rounded-[16px] p-4 text-white shadow-sm mb-4">
+            <div className="md:hidden bg-gradient-to-br from-[#3d6ff5] to-[#2f5be0] rounded-[16px] p-4 text-white shadow-sm mb-4">
                 <p className="text-[11px] font-medium opacity-70 mb-0.5 uppercase tracking-wider">Welcome back 👋</p>
                 <p className="text-[20px] font-bold tracking-tight">Inspector Workspace</p>
                 <p className="text-[12px] opacity-70 mt-1">Track assignments and submit inspection reports</p>
@@ -200,8 +200,8 @@ export default function InspectionDashboard() {
             {/* SECTION 1: STATUS CARDS — hidden on mobile (shown in welcome banner) */}
             <div className="hidden md:grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                 <div className="bg-white border border-[var(--border)] rounded-[12px] p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
-                    <div className="w-[38px] h-[38px] rounded-full bg-[#eff6ff] flex items-center justify-center">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <div className="w-[38px] h-[38px] rounded-full bg-[#eaf0ff] flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3d6ff5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <rect x="3" y="3" width="7" height="7" />
                             <rect x="14" y="3" width="7" height="7" />
                             <rect x="14" y="14" width="7" height="7" />
@@ -226,8 +226,8 @@ export default function InspectionDashboard() {
                     </div>
                 </div>
                 <div className="bg-white border border-[var(--border)] rounded-[12px] p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
-                    <div className="w-[38px] h-[38px] rounded-full bg-[#f5f3ff] flex items-center justify-center">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <div className="w-[38px] h-[38px] rounded-full bg-[#f1edff] flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6d4fe0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="22" y1="2" x2="11" y2="13" />
                             <polygon points="22 2 15 22 11 13 2 9 22 2" />
                         </svg>
@@ -239,7 +239,7 @@ export default function InspectionDashboard() {
                 </div>
                 <div className="bg-white border border-[var(--border)] rounded-[12px] p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
                     <div className="w-[38px] h-[38px] rounded-full bg-[var(--accent-light)] flex items-center justify-center">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0b5cff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3d6ff5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                             <polyline points="22 4 12 14.01 9 11.01" />
                         </svg>
@@ -270,8 +270,8 @@ export default function InspectionDashboard() {
                     <>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                             <div className="bg-white border border-[var(--border)] rounded-[10px] p-4 flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-[#eff6ff] flex items-center justify-center shrink-0">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <div className="w-8 h-8 rounded-full bg-[#eaf0ff] flex items-center justify-center shrink-0">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3d6ff5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                                         <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                                     </svg>
@@ -283,7 +283,7 @@ export default function InspectionDashboard() {
                             </div>
                             <div className="bg-white border border-[var(--border)] rounded-[10px] p-4 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b5cff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3d6ff5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                                         <polyline points="22 4 12 14.01 9 11.01" />
                                     </svg>
@@ -440,7 +440,7 @@ export default function InspectionDashboard() {
                     {/* COMPLETED ASSIGNMENTS */}
                     <div className="mt-5">
                         <div className="flex items-center gap-2 mb-3">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0b5cff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3d6ff5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                                 <polyline points="22 4 12 14.01 9 11.01" />
                             </svg>
@@ -470,14 +470,14 @@ export default function InspectionDashboard() {
                                             </div>
                                             <div className="flex flex-wrap items-center gap-[8px]">
                                                 {a.recurrenceType && a.recurrenceType !== "none" && (
-                                                    <span className="bg-[#eff6ff] text-[#1d4ed8] text-[10.5px] font-[500] px-[7px] py-[2px] rounded-[20px]">
+                                                    <span className="bg-[#eaf0ff] text-[#2f5be0] text-[10.5px] font-[500] px-[7px] py-[2px] rounded-[20px]">
                                                         {a.recurrenceType === "daily" ? "📅 Daily" : "🗓️ Weekly"}
                                                     </span>
                                                 )}
                                                 {/* Whether an assignment is multi-part decides which list it belongs
                                                     in, so say it on the card — otherwise "why has this closed after
                                                     one part?" can only be answered by querying the database. */}
-                                                <span className={`text-[10.5px] font-[600] px-[7px] py-[2px] rounded-[20px] ${a.isMultiPart ? "bg-[#eef2ff] text-[#4338ca]" : "bg-[#f3f4f6] text-[#6b7280]"}`}>
+                                                <span className={`text-[10.5px] font-[600] px-[7px] py-[2px] rounded-[20px] ${a.isMultiPart ? "bg-[#eef2ff] text-[#4338ca]" : "bg-[#f6f7fc] text-[#555c72]"}`}>
                                                     {a.isMultiPart ? `Multi-part · ${a.partCount ?? 1} filed` : "One-time"}
                                                 </span>
                                                 <span className={`text-[11px] font-[500] px-[10px] py-[3px] rounded-[20px] ${badge.cls}`}>{badge.label}</span>
@@ -530,7 +530,7 @@ export default function InspectionDashboard() {
                                         <span className="bg-[var(--accent-light)] text-[var(--accent-text)] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Submitted</span>
                                     )}
                                     {s.status === "approved" && (
-                                        <span className="bg-[#eff6ff] text-[#3b82f6] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Approved</span>
+                                        <span className="bg-[#eaf0ff] text-[#3d6ff5] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Approved</span>
                                     )}
                                     {s.status === "rejected" && (
                                         <span className="bg-[#fef2f2] text-[#dc2626] rounded-[20px] px-3 py-1 text-[11.5px] font-medium">Rejected</span>

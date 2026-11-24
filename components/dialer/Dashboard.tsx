@@ -63,7 +63,7 @@ export function Dashboard({ defaultView }: { defaultView: "team" | "mine" }) {
                 <Card title="Live now" right={<span className="text-[11.5px] text-[var(--text3)]">Refreshes every 20 s · idle = no call for {s.idleAfterMin}+ min</span>}>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                         {d.live.map(l => {
-                            const st = { ON_CALL: ["On a call", "bg-green-50 border-green-200 text-green-800", "bg-green-500"], ACTIVE: ["Active", "bg-blue-50 border-blue-200 text-blue-800", "bg-blue-500"], IDLE: ["Idle", "bg-amber-50 border-amber-200 text-amber-800", "bg-amber-500"], OFFLINE: ["Phone offline", "bg-gray-50 border-gray-200 text-gray-600", "bg-gray-400"] }[l.state]
+                            const st = { ON_CALL: ["On a call", "bg-green-50 border-green-200 text-green-800", "bg-green-500"], ACTIVE: ["Active", "bg-[var(--accent-light)] border-[#d4e0ff] text-[var(--accent-text)]", "bg-[var(--accent)]"], IDLE: ["Idle", "bg-amber-50 border-amber-200 text-amber-800", "bg-amber-500"], OFFLINE: ["Phone offline", "bg-gray-50 border-gray-200 text-gray-600", "bg-gray-400"] }[l.state]
                             return (
                                 <div key={l.userId} className={`rounded-[10px] border px-3 py-2 ${st[1]}`}>
                                     <div className="flex items-center gap-2 text-[13px] font-semibold"><span className={`w-2 h-2 rounded-full ${st[2]} ${l.state === "ON_CALL" ? "animate-pulse" : ""}`} />{l.name}</div>

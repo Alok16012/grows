@@ -215,7 +215,7 @@ export function MyDetailsWizard({ onOpenTab }: { onOpenTab?: (tab: "documents" |
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
             {/* ── Header card ─────────────────────────────────────────────── */}
-            <div style={{ background: "linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%)", borderRadius: 16, padding: "20px 24px", color: "#fff", position: "relative", overflow: "hidden" }}>
+            <div style={{ background: "linear-gradient(135deg, var(--accent) 0%, #6d4fe0 100%)", borderRadius: 16, padding: "20px 24px", color: "#fff", position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", top: -30, right: -30, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
                 <div style={{ position: "absolute", bottom: -20, right: 60, width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.04)" }} />
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
@@ -443,7 +443,7 @@ export function MyDetailsWizard({ onOpenTab }: { onOpenTab?: (tab: "documents" |
                 {/* ── Step 3: ID numbers / statutory ────────────────────── */}
                 {step === 3 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                        <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1d4ed8" }}>
+                        <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eaf0ff", border: "1px solid #d4e0ff", fontSize: 12, color: "#2f5be0" }}>
                             Ensure your Aadhar and PAN numbers are accurate — they are used for PF, ESIC and income tax processing.
                         </div>
                         <Grid cols={2}>

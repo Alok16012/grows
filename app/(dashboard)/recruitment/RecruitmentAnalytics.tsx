@@ -9,7 +9,7 @@ import {
     PieChart, Pie, Cell, Legend
 } from "recharts"
 
-const PIE_COLORS = ["#3b82f6", "#8b5cf6", "#f59e0b", "#06b6d4", "#0b5cff", "#dc2626", "#65a30d", "#ea580c", "#6b7280"]
+const PIE_COLORS = ["#3d6ff5", "#8b6cf6", "#f59e0b", "#06b6d4", "#3d6ff5", "#dc2626", "#65a30d", "#ea580c", "#555c72"]
 
 export interface AnalyticsData {
     summary: {
@@ -29,13 +29,13 @@ export interface AnalyticsData {
 export default function RecruitmentAnalytics({ data }: { data: AnalyticsData }) {
     const { summary, funnelData, sourceBreakdown, recruiterPerformance } = data
     const summaryCards = [
-        { label: "Total Leads", value: summary.total, color: "#3b82f6" },
-        { label: "Today's Leads", value: summary.todayLeads, color: "#8b5cf6" },
+        { label: "Total Leads", value: summary.total, color: "#3d6ff5" },
+        { label: "Today's Leads", value: summary.todayLeads, color: "#8b6cf6" },
         { label: "Active Leads", value: summary.activeLeads, color: "#f59e0b" },
         { label: "Interviews", value: summary.interviews, color: "#06b6d4" },
         { label: "Offers", value: summary.offers, color: "#65a30d" },
         { label: "Joinings", value: summary.joinings, color: "#047857" },
-        { label: "Dropped", value: summary.dropped, color: "#9ca3af" },
+        { label: "Dropped", value: summary.dropped, color: "#98a1b5" },
     ]
 
     const stageLabels: Record<string, string> = {

@@ -79,8 +79,8 @@ const STATUS_COLORS: Record<string, { label: string; color: string; bg: string; 
     ABSENT:   { label: "Absent",    color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
     HALF_DAY: { label: "Half Day",  color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
     LATE:     { label: "Late",      color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
-    HOLIDAY:  { label: "Holiday",   color: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe" },
-    LEAVE:    { label: "On Leave",  color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe" },
+    HOLIDAY:  { label: "Holiday",   color: "#3d6ff5", bg: "#eaf0ff", border: "#d4e0ff" },
+    LEAVE:    { label: "On Leave",  color: "#8b6cf6", bg: "#f1edff", border: "#ddd6fe" },
 }
 
 const BULK_STATUSES = ["PRESENT", "ABSENT", "HALF_DAY", "LATE", "LEAVE"]
@@ -94,7 +94,7 @@ function Avatar({ firstName, lastName, photo, size = 36 }: {
 }) {
     const [imgErr, setImgErr] = useState(false)
     const initials = `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase()
-    const colors = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"]
+    const colors = ["#3d6ff5", "#0ea5a4", "#8b6cf6", "#f5a623", "#e5566b", "#06b6d4"]
     const bg = colors[(firstName.charCodeAt(0) + lastName.charCodeAt(0)) % colors.length]
     if (photo && !imgErr) return <img src={photo} alt="" style={{ width: size, height: size }} className="rounded-full object-cover shrink-0" onError={() => setImgErr(true)} />
     return (
@@ -107,7 +107,7 @@ function Avatar({ firstName, lastName, photo, size = 36 }: {
 
 function StatusBadge({ status }: { status: string }) {
     const s = STATUS_COLORS[status]
-    if (!s) return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold border bg-[#f9fafb] text-[#6b7280] border-[#e5e7eb]">Not Marked</span>
+    if (!s) return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold border bg-[#f6f7fc] text-[#555c72] border-[#dfe3ef]">Not Marked</span>
     return (
         <span style={{ color: s.color, background: s.bg, borderColor: s.border }}
             className="px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap">
@@ -454,7 +454,7 @@ function SelfCheckCard({
                             onClick={() => onAction("checkin")}
                             disabled={actionLoading}
                             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[10px] text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
-                            style={{ background: "#0b5cff" }}>
+                            style={{ background: "#3d6ff5" }}>
                             {actionLoading ? <Loader2 size={15} className="animate-spin" /> : <LogIn size={15} />}
                             Check In
                         </button>
@@ -469,8 +469,8 @@ function SelfCheckCard({
             {(checkedIn || checkedOut) && (
                 <div className="mt-5 pt-5 border-t border-[var(--border)] grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {checkedIn && (
-                        <div className="flex items-start gap-3 p-3 rounded-[10px]" style={{ background: "#e8effe" }}>
-                            <div className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0" style={{ background: "#0b5cff" }}>
+                        <div className="flex items-start gap-3 p-3 rounded-[10px]" style={{ background: "#eaf0ff" }}>
+                            <div className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0" style={{ background: "#3d6ff5" }}>
                                 <LogIn size={15} className="text-white" />
                             </div>
                             <div>
@@ -478,8 +478,8 @@ function SelfCheckCard({
                                 <p className="text-[15px] font-bold" style={{ color: "#16a34a" }}>{formatTime(todayRecord!.checkIn!)}</p>
                                 {formatCoords(todayRecord?.checkInLat, todayRecord?.checkInLng) && (
                                     <div className="flex items-center gap-1 mt-0.5">
-                                        <MapPin size={10} style={{ color: "#0b5cff" }} />
-                                        <span className="text-[10px]" style={{ color: "#0b5cff", opacity: 0.8 }}>
+                                        <MapPin size={10} style={{ color: "#3d6ff5" }} />
+                                        <span className="text-[10px]" style={{ color: "#3d6ff5", opacity: 0.8 }}>
                                             {formatCoords(todayRecord?.checkInLat, todayRecord?.checkInLng)}
                                         </span>
                                     </div>
@@ -558,8 +558,8 @@ function SelfMonthTable({ monthRecords, selectedMonth, register }: {
                     { label: "Present", value: present, color: "#16a34a", bg: "#dcfce7", border: "#bbf7d0" },
                     { label: "Absent", value: absent, color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
                     { label: "Late", value: late, color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
-                    { label: "Leave", value: leave, color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe" },
-                    { label: "Working Hrs", value: `${totalHrs.toFixed(1)}h`, color: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe" },
+                    { label: "Leave", value: leave, color: "#8b6cf6", bg: "#f1edff", border: "#ddd6fe" },
+                    { label: "Working Hrs", value: `${totalHrs.toFixed(1)}h`, color: "#3d6ff5", bg: "#eaf0ff", border: "#d4e0ff" },
                 ].map(s => (
                     <div key={s.label} className="flex items-center gap-2 px-3 py-1.5 rounded-[8px] border text-[12px] font-semibold"
                         style={{ color: s.color, background: s.bg, borderColor: s.border }}>
@@ -964,7 +964,7 @@ function AdminView() {
                     </div>
 
                     {(isOffDay || unmarkedIds.length > 0) && !loading && !employeesLoading && (
-                        <div className={`flex flex-wrap items-center gap-3 px-4 py-3 rounded-[12px] border text-[13px] ${isOffDay ? "bg-[#eff6ff] border-[#bfdbfe] text-[#1d4ed8]" : "bg-[var(--surface)] border-[var(--border)] text-[var(--text2)]"}`}>
+                        <div className={`flex flex-wrap items-center gap-3 px-4 py-3 rounded-[12px] border text-[13px] ${isOffDay ? "bg-[#eaf0ff] border-[#d4e0ff] text-[#2f5be0]" : "bg-[var(--surface)] border-[var(--border)] text-[var(--text2)]"}`}>
                             {isOffDay
                                 ? <span className="font-semibold">{holidayName ? `Holiday — ${holidayName}` : `${format(selectedDate, "EEEE")} is a weekly off`}. Only people who actually worked need marking.</span>
                                 : <span><b className="text-[var(--text)]">{unmarkedIds.length}</b> employee{unmarkedIds.length === 1 ? "" : "s"} not marked for {format(selectedDate, "dd MMM")}{isFutureDay ? " (future date)" : ""}.</span>}

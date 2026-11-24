@@ -13,7 +13,7 @@ const LEVELS = [
     { n: 3, label: "Independent", hint: "Works alone to the standard" },
     { n: 4, label: "Can train others", hint: "Can teach and check others" },
 ]
-const TONE = ["bg-[var(--surface2)] text-[var(--text3)]", "bg-[#fef3c7] text-[#92400e]", "bg-[#dbeafe] text-[#1e40af]", "bg-[#dcfce7] text-[#166534]", "bg-[#166534] text-white"]
+const TONE = ["bg-[var(--surface2)] text-[var(--text3)]", "bg-[#fef3c7] text-[#92400e]", "bg-[#e3ebff] text-[#2f5be0]", "bg-[#dcfce7] text-[#166534]", "bg-[#166534] text-white"]
 
 async function api<T = any>(url: string, body?: unknown): Promise<T> {
     const r = await fetch(url, body !== undefined ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined)

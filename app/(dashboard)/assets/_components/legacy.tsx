@@ -94,11 +94,11 @@ export type AssetWithAssignments = Asset & {
 
 
 export const CONDITION_CONFIG: Record<AssetCondition, { label: string; color: string; bg: string }> = {
-    NEW: { label: "New", color: "#0b5cff", bg: "#e8effe" },
+    NEW: { label: "New", color: "#3d6ff5", bg: "#eaf0ff" },
     GOOD: { label: "Good", color: "#0891b2", bg: "#e0f2fe" },
     FAIR: { label: "Fair", color: "#d97706", bg: "#fffbeb" },
     DAMAGED: { label: "Damaged", color: "#dc2626", bg: "#fef2f2" },
-    LOST: { label: "Lost", color: "#6b7280", bg: "#f3f4f6" },
+    LOST: { label: "Lost", color: "#555c72", bg: "#f6f7fc" },
 }
 
 export function fmtRupee(n?: number | null) {
@@ -796,7 +796,7 @@ export function LegacyIssued({ refreshKey, canManage, onChanged }: {
                                                 </span>
                                             ) : (
                                                 <div>
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#f3f4f6] text-[#6b7280]">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#f6f7fc] text-[#555c72]">
                                                         <RotateCcw size={10} /> Returned
                                                     </span>
                                                     {a.returnedAt && <p className="text-[11px] text-[var(--text3)] mt-0.5">{format(new Date(a.returnedAt), "dd MMM yyyy")}</p>}

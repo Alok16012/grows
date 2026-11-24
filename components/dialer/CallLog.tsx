@@ -9,7 +9,7 @@ import { fmtDur, TARGET_TYPES, type Outcome, type TargetType } from "@/lib/diale
 type C = { id: string; userId: string; userName: string; phone: string; direction: string; connected: boolean; startedAt: string; durationSec: number; targetType: string; targetId: string | null; targetName: string | null; outcome: string | null; notes: string | null; followUpAt: string | null }
 const box = "h-9 rounded-[9px] border border-[var(--border)] px-2.5 text-[13px] bg-white"
 const DIR: Record<string, [React.ReactNode, string]> = {
-    OUTGOING: [<ArrowUpRight key="o" size={13} />, "text-blue-600"], INCOMING: [<ArrowDownLeft key="i" size={13} />, "text-green-600"],
+    OUTGOING: [<ArrowUpRight key="o" size={13} />, "text-[var(--accent)]"], INCOMING: [<ArrowDownLeft key="i" size={13} />, "text-green-600"],
     MISSED: [<PhoneMissed key="m" size={13} />, "text-red-600"], REJECTED: [<PhoneMissed key="r" size={13} />, "text-red-400"],
 }
 

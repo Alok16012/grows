@@ -96,9 +96,9 @@ const selectCls = inputCls + " cursor-pointer"
 function displayStatus(a: Assignment): { key: string; label: string; bg: string; fg: string } {
     // not_assigned = virtual row (manager_only is the pre-rename API value).
     if (a.status === "not_assigned" || a.status === "manager_only") return { key: "not_assigned", label: "No assignment yet", bg: "var(--amber-light)", fg: "var(--amber)" }
-    if (a.status === "inactive") return { key: "inactive", label: "Inactive", bg: "#f3f4f6", fg: "#6b7280" }
-    if (a.status === "completed") return { key: "completed", label: "Completed", bg: "#f3f4f6", fg: "#374151" }
-    if (a.startDate && new Date(a.startDate) > new Date()) return { key: "scheduled", label: "Scheduled", bg: "#eff6ff", fg: "#1d4ed8" }
+    if (a.status === "inactive") return { key: "inactive", label: "Inactive", bg: "#f6f7fc", fg: "#555c72" }
+    if (a.status === "completed") return { key: "completed", label: "Completed", bg: "#f6f7fc", fg: "#3a4157" }
+    if (a.startDate && new Date(a.startDate) > new Date()) return { key: "scheduled", label: "Scheduled", bg: "#eaf0ff", fg: "#2f5be0" }
     return { key: "active", label: "Active", bg: "#dcfce7", fg: "#15803d" }
 }
 
@@ -779,14 +779,14 @@ export default function AssignmentsPage() {
                     </span>
                 </div>
                 <div className="flex items-center gap-2.5 sm:pl-4">
-                    <span className="w-9 h-9 rounded-[9px] bg-[#eff6ff] flex items-center justify-center"><Calendar size={15} className="text-[#3b82f6]" /></span>
+                    <span className="w-9 h-9 rounded-[9px] bg-[#eaf0ff] flex items-center justify-center"><Calendar size={15} className="text-[#3d6ff5]" /></span>
                     <span>
                         <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.oneTime}</span>
                         <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">One-time</span>
                     </span>
                 </div>
                 <div className="flex items-center gap-2.5 sm:pl-4">
-                    <span className="w-9 h-9 rounded-[9px] bg-[#f5f3ff] flex items-center justify-center"><RefreshCw size={15} className="text-[#7c3aed]" /></span>
+                    <span className="w-9 h-9 rounded-[9px] bg-[#f1edff] flex items-center justify-center"><RefreshCw size={15} className="text-[#6d4fe0]" /></span>
                     <span>
                         <span className="block text-[18px] font-bold text-[var(--text)] leading-none tabular-nums">{stats.recurring}</span>
                         <span className="block text-[10.5px] text-[var(--text3)] mt-0.5">Ongoing / Recurring</span>
@@ -1323,7 +1323,7 @@ export default function AssignmentsPage() {
                                 <p className="text-[12px] text-[var(--text2)] mb-1.5">Project managers</p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {(detail.project?.managers ?? []).length > 0 ? (detail.project?.managers ?? []).map(m => (
-                                        <span key={m.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#eff6ff] text-[#1d4ed8] text-[11px] font-semibold">
+                                        <span key={m.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#eaf0ff] text-[#2f5be0] text-[11px] font-semibold">
                                             <Users size={10} /> {m.name || "Unnamed"}
                                         </span>
                                     )) : <span className="text-[12px] text-[var(--text3)]">No managers on the project.</span>}

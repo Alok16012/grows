@@ -100,7 +100,7 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
                 </button>
                 {siteId && siteId !== ALL && (
                     <button type="button" onClick={() => setManualFor({ site: { id: siteId, name: nameOf.get(siteId) ?? "" }, kind: byId.get(rule)?.kind ?? null })} title="Set this site's employees' OT — type it or upload Excel"
-                    style={{ ...iconBtn, width: "auto", height: 28, padding: "0 9px", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#7c3aed", borderColor: "#c4b5fd", background: "#f5f3ff" }}>
+                    style={{ ...iconBtn, width: "auto", height: 28, padding: "0 9px", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#6d4fe0", borderColor: "#c4b5fd", background: "#f1edff" }}>
                     <Users size={13} /> Set employee OT
                 </button>
                 )}
@@ -120,7 +120,7 @@ export default function OtSiteRules({ ot, onChange }: { ot: Ot; onChange: (patch
                                 <span style={{ flex: "1 1 40%", fontWeight: 600, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
                                 <span style={{ flex: "1 1 45%", color: "var(--text2)" }}>{o.formula ? otFormulaLabel(o.formula) : "—"}</span>
                                 {<button type="button" onClick={() => setManualFor({ site: { id: o.id, name: o.name }, kind: o.formula?.kind ?? null })} title="Set this site's employees' OT — type it or upload Excel"
-                    style={{ ...iconBtn, width: "auto", height: 28, padding: "0 9px", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#7c3aed", borderColor: "#c4b5fd", background: "#f5f3ff" }}>
+                    style={{ ...iconBtn, width: "auto", height: 28, padding: "0 9px", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#6d4fe0", borderColor: "#c4b5fd", background: "#f1edff" }}>
                     <Users size={13} /> Employees
                 </button>}
                                 <button type="button" title="Change" onClick={() => pickSite(o.id)} style={{ border: "none", background: "none", color: "var(--text3)", cursor: "pointer" }}><Pencil size={13} /></button>
@@ -370,7 +370,7 @@ function BulkSitesPopup({ ot, sites, onChange, onClose, onEditRules, onManual }:
                                                 <option value={EDIT}>⚙ Add / edit OT rules…</option>
                                             </select>
                                             {isManualOt(formulas.find(f => f.id === (cur === DEFAULT ? ot.defaultRule : cur))) && <button type="button" onClick={() => onManual(x, formulas.find(f => f.id === (cur === DEFAULT ? ot.defaultRule : cur))?.kind ?? null)} title="Set this site's employees' OT — type it or upload Excel"
-                    style={{ ...iconBtn, width: "auto", height: 28, padding: "0 9px", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#7c3aed", borderColor: "#c4b5fd", background: "#f5f3ff" }}>
+                    style={{ ...iconBtn, width: "auto", height: 28, padding: "0 9px", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#6d4fe0", borderColor: "#c4b5fd", background: "#f1edff" }}>
                     <Users size={13} /> Employee OT
                 </button>}
                                             </div>

@@ -26,8 +26,8 @@ const d = (s: string | null) => s ? new Date(s).toLocaleDateString("en-IN", { da
 const MODES = ["NEFT", "IMPS", "UPI", "RTGS", "Cash", "Cheque", "Bank Transfer"]
 const STATUS: Record<string, { label: string; cls: string }> = {
     REQUESTED: { label: "Requested", cls: "bg-[#fef3c7] text-[#b45309]" },
-    APPROVED: { label: "Approved — to pay", cls: "bg-[#dbeafe] text-[#1d4ed8]" },
-    PAID: { label: "Paid — to settle", cls: "bg-[#ede9fe] text-[#6d28d9]" },
+    APPROVED: { label: "Approved — to pay", cls: "bg-[#e3ebff] text-[#2f5be0]" },
+    PAID: { label: "Paid — to settle", cls: "bg-[#ebe5ff] text-[#6d4fe0]" },
     SETTLED: { label: "Settled", cls: "bg-[#dcfce7] text-[#15803d]" },
     REJECTED: { label: "Rejected", cls: "bg-[#fee2e2] text-[#b91c1c]" },
 }
@@ -173,7 +173,7 @@ export default function AdvancesPage() {
                                                 <button disabled={busy} onClick={() => { const reason = prompt(`Reason for rejecting ${a.advanceNo}`); if (reason) act(a, { action: "REJECT", reason }, `${a.advanceNo} rejected`) }} className="h-7 px-2.5 rounded-[7px] border border-[var(--border)] text-[12px] font-semibold text-[#b91c1c]">Reject</button>
                                             </>)}
                                             {!mine && a.status === "APPROVED" && <button disabled={busy} onClick={() => setPayFor(a)} className="h-7 px-2.5 rounded-[7px] bg-[var(--accent)] text-white text-[12px] font-semibold">Pay</button>}
-                                            {!mine && a.status === "PAID" && <button disabled={busy} onClick={() => setSettleFor(a)} className="h-7 px-2.5 rounded-[7px] bg-[#6d28d9] text-white text-[12px] font-semibold">Settle</button>}
+                                            {!mine && a.status === "PAID" && <button disabled={busy} onClick={() => setSettleFor(a)} className="h-7 px-2.5 rounded-[7px] bg-[#6d4fe0] text-white text-[12px] font-semibold">Settle</button>}
                                         </td>
                                     </tr>
                                 )
@@ -291,7 +291,7 @@ function SettleModal({ a, allowed, busy, onClose, onSettle }: { a: Adv; allowed:
             )}
             <div className="flex justify-end gap-2 pt-1">
                 <button onClick={onClose} className="h-9 px-4 rounded-[9px] border border-[var(--border)] text-[13px]">Cancel</button>
-                <button onClick={() => onSettle(choice())} disabled={busy || a.claimed.pending > 0} className="h-9 px-4 rounded-[9px] bg-[#6d28d9] text-white text-[13px] font-semibold disabled:opacity-50">Settle</button>
+                <button onClick={() => onSettle(choice())} disabled={busy || a.claimed.pending > 0} className="h-9 px-4 rounded-[9px] bg-[#6d4fe0] text-white text-[13px] font-semibold disabled:opacity-50">Settle</button>
             </div>
         </Modal>
     )

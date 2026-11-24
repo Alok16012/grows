@@ -18,7 +18,7 @@ import {
     PageHead, NoAccess, type RoleCard,
 } from "../../_access/ui"
 
-const COLORS = ["#6366f1", "#3b82f6", "#0ea5e9", "#06b6d4", "#10b981", "#22c55e", "#f59e0b", "#f97316", "#ef4444", "#ec4899", "#a855f7", "#64748b"]
+const COLORS = ["#8b6cf6", "#3d6ff5", "#0ea5e9", "#06b6d4", "#10b981", "#22c55e", "#f59e0b", "#f97316", "#ef4444", "#ec4899", "#8b6cf6", "#64748b"]
 
 type Form = { name: string; description: string; color: string; scope: DataScope | null; permissions: string[]; isActive: boolean }
 const EMPTY: Form = { name: "", description: "", color: COLORS[0], scope: null, permissions: ["self.view"], isActive: true }

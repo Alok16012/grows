@@ -112,7 +112,7 @@ const DOCS_STEP = 7
 
 // ─── Input helpers ─────────────────────────────────────────────────────────────
 
-const inp = "w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-[13px] text-white outline-none focus:border-indigo-500 transition-colors placeholder:text-white/30"
+const inp = "w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-[13px] text-white outline-none focus:border-[var(--accent)] transition-colors placeholder:text-white/30"
 const lbl = "block text-[11px] font-medium text-white/50 mb-1.5 uppercase tracking-wider"
 
 function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string | null }) {
@@ -336,7 +336,7 @@ export default function OnboardingPortal() {
 
     if (loading) return (
         <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0a0a12" }}>
-            <Loader2 style={{ color: "#6366f1", animation: "spin 1s linear infinite" }} size={36} />
+            <Loader2 style={{ color: "#8b6cf6", animation: "spin 1s linear infinite" }} size={36} />
         </div>
     )
 
@@ -345,7 +345,7 @@ export default function OnboardingPortal() {
             <div style={{ textAlign: "center" }}>
                 <AlertCircle size={48} style={{ color: "#ef4444", margin: "0 auto 16px" }} />
                 <h1 style={{ fontSize: 20, fontWeight: 700 }}>Invalid or Expired Link</h1>
-                <p style={{ color: "#6b7280", marginTop: 8 }}>Please contact HR for a new onboarding access link.</p>
+                <p style={{ color: "#555c72", marginTop: 8 }}>Please contact HR for a new onboarding access link.</p>
             </div>
         </div>
     )
@@ -355,7 +355,7 @@ export default function OnboardingPortal() {
             <div style={{ textAlign: "center", padding: 40, background: "#111120", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, maxWidth: 360 }}>
                 <CheckCircle2 size={52} style={{ color: "#22c55e", margin: "0 auto 16px" }} />
                 <h1 style={{ fontSize: 22, fontWeight: 700 }}>Onboarding Complete!</h1>
-                <p style={{ fontSize: 13, color: "#6b7280", marginTop: 8 }}>Welcome aboard, {employee.firstName}! Your profile is now fully active.</p>
+                <p style={{ fontSize: 13, color: "#555c72", marginTop: 8 }}>Welcome aboard, {employee.firstName}! Your profile is now fully active.</p>
             </div>
         </div>
     )
@@ -370,16 +370,16 @@ export default function OnboardingPortal() {
                 <div style={{ maxWidth: 600, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div>
                         <p style={{ fontWeight: 700, fontSize: 16, margin: 0 }}>Digital Onboarding</p>
-                        <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Welcome, {employee.firstName} {employee.lastName} &bull; {employee.employeeId}</p>
+                        <p style={{ fontSize: 12, color: "#555c72", margin: 0 }}>Welcome, {employee.firstName} {employee.lastName} &bull; {employee.employeeId}</p>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                        <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 3px" }}>Step {step} of {STEPS.length}</p>
+                        <p style={{ fontSize: 11, color: "#555c72", margin: "0 0 3px" }}>Step {step} of {STEPS.length}</p>
                         <p style={{ fontSize: 13, fontWeight: 600, color: "#a5b4fc", margin: 0 }}>{STEPS[step - 1].label}</p>
                     </div>
                 </div>
                 {/* Progress bar */}
                 <div style={{ maxWidth: 600, margin: "10px auto 0", height: 3, background: "rgba(255,255,255,0.08)", borderRadius: 999 }}>
-                    <div style={{ height: "100%", width: `${progress + (100 / STEPS.length)}%`, background: "linear-gradient(90deg,#6366f1,#8b5cf6)", borderRadius: 999, transition: "width 0.3s ease" }} />
+                    <div style={{ height: "100%", width: `${progress + (100 / STEPS.length)}%`, background: "linear-gradient(90deg,#8b6cf6,#8b6cf6)", borderRadius: 999, transition: "width 0.3s ease" }} />
                 </div>
             </div>
 
@@ -398,14 +398,14 @@ export default function OnboardingPortal() {
                                 }}>
                                 <div style={{
                                     width: 32, height: 32, borderRadius: "50%",
-                                    background: done ? "#22c55e" : active ? "#6366f1" : "rgba(255,255,255,0.06)",
+                                    background: done ? "#22c55e" : active ? "#8b6cf6" : "rgba(255,255,255,0.06)",
                                     border: active ? "2px solid #818cf8" : "2px solid transparent",
                                     display: "flex", alignItems: "center", justifyContent: "center",
                                     transition: "all 0.2s",
                                 }}>
-                                    {done ? <CheckCircle2 size={14} color="#fff" /> : <s.icon size={14} color={active ? "#fff" : "#6b7280"} />}
+                                    {done ? <CheckCircle2 size={14} color="#fff" /> : <s.icon size={14} color={active ? "#fff" : "#555c72"} />}
                                 </div>
-                                <span style={{ fontSize: 10, color: active ? "#a5b4fc" : done ? "#4ade80" : "#6b7280", fontWeight: active ? 600 : 400 }}>{s.label}</span>
+                                <span style={{ fontSize: 10, color: active ? "#a5b4fc" : done ? "#4ade80" : "#555c72", fontWeight: active ? 600 : 400 }}>{s.label}</span>
                             </button>
                         )
                     })}
@@ -476,7 +476,7 @@ export default function OnboardingPortal() {
                                         </select>
                                     </Field>
                                 </div>
-                                <p style={{ fontSize: 11, color: "#6b7280", marginTop: 10, margin: "10px 0 0" }}>
+                                <p style={{ fontSize: 11, color: "#555c72", marginTop: 10, margin: "10px 0 0" }}>
                                     Select the site where you&apos;ll work, the HR person handling your onboarding, and your job role — the designation is printed on your official letters.
                                 </p>
                             </div>
@@ -487,16 +487,16 @@ export default function OnboardingPortal() {
                                     <div style={{ width: 72, height: 72, borderRadius: "50%", overflow: "hidden", background: "rgba(255,255,255,0.06)", border: "2px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                         {form.photo
                                             ? <img src={form.photo} alt="photo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                            : <User size={28} style={{ color: "#6b7280" }} />}
+                                            : <User size={28} style={{ color: "#555c72" }} />}
                                     </div>
-                                    <label style={{ position: "absolute", bottom: 0, right: 0, width: 22, height: 22, borderRadius: "50%", background: "#6366f1", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                                    <label style={{ position: "absolute", bottom: 0, right: 0, width: 22, height: 22, borderRadius: "50%", background: "#8b6cf6", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
                                         {photoUploading ? <Loader2 size={11} color="#fff" style={{ animation: "spin 1s linear infinite" }} /> : <Camera size={11} color="#fff" />}
                                         <input type="file" accept="image/*" className="hidden" onChange={uploadPhoto} disabled={photoUploading} />
                                     </label>
                                 </div>
                                 <div>
                                     <p style={{ fontWeight: 600, fontSize: 14, margin: "0 0 2px" }}>{employee.firstName} {employee.lastName}</p>
-                                    <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Upload your profile photo (optional)</p>
+                                    <p style={{ fontSize: 12, color: "#555c72", margin: 0 }}>Upload your profile photo (optional)</p>
                                 </div>
                             </div>
 
@@ -574,7 +574,7 @@ export default function OnboardingPortal() {
 
                             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, padding: "10px 14px", background: "rgba(99,102,241,0.08)", borderRadius: 10, border: "1px solid rgba(99,102,241,0.2)" }}>
                                 <input type="checkbox" id="sameAddr" checked={form.sameAsCurrent} onChange={e => handleSameAsCurrent(e.target.checked)}
-                                    style={{ width: 16, height: 16, accentColor: "#6366f1", cursor: "pointer" }} />
+                                    style={{ width: 16, height: 16, accentColor: "#8b6cf6", cursor: "pointer" }} />
                                 <label htmlFor="sameAddr" style={{ fontSize: 13, cursor: "pointer", color: "#a5b4fc" }}>Permanent address is same as current address</label>
                             </div>
 
@@ -602,7 +602,7 @@ export default function OnboardingPortal() {
                     {step === POLICY_STEP && (
                         <div>
                             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Company Policies</h2>
-                            <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>
+                            <p style={{ fontSize: 12, color: "#555c72", marginBottom: 16 }}>
                                 Read every policy for your role to the end and sign it. You can&apos;t submit your joining form until all of them are signed.
                             </p>
                             <PolicySignStep theme="dark" onProgress={onPolicyProgress}
@@ -655,7 +655,7 @@ export default function OnboardingPortal() {
                                 <p style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>
                                     Previous Employment — PF &amp; ESIC
                                 </p>
-                                <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 12 }}>
+                                <p style={{ fontSize: 11, color: "#555c72", marginBottom: 12 }}>
                                     If you worked before and have a UAN, PF or ESIC number, enter it so your account continues. Leave blank if this is your first job.
                                 </p>
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -719,7 +719,7 @@ export default function OnboardingPortal() {
                     {step === 7 && (
                         <div>
                             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Document Uploads</h2>
-                            <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>Upload clear, legible copies of each document.</p>
+                            <p style={{ fontSize: 12, color: "#555c72", marginBottom: 16 }}>Upload clear, legible copies of each document.</p>
 
                             {missingRequiredDocs.length > 0 && (
                                 <div style={{ display: "flex", gap: 10, padding: "12px 14px", borderRadius: 12, background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.25)", marginBottom: 16 }}>
@@ -738,7 +738,7 @@ export default function OnboardingPortal() {
                                         <div key={type} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: 12, border: `1px solid ${exist ? "rgba(34,197,94,0.25)" : "rgba(255,255,255,0.07)"}`, background: exist ? "rgba(34,197,94,0.04)" : "rgba(255,255,255,0.02)", gap: 12 }}>
                                             <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
                                                 <div style={{ width: 34, height: 34, borderRadius: 9, background: exist ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                                    <FileText size={16} style={{ color: exist ? "#4ade80" : "#6b7280" }} />
+                                                    <FileText size={16} style={{ color: exist ? "#4ade80" : "#555c72" }} />
                                                 </div>
                                                 <div style={{ minWidth: 0 }}>
                                                     <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 1px", color: "#fff" }}>
@@ -749,7 +749,7 @@ export default function OnboardingPortal() {
                                                         ? <p style={{ fontSize: 11, color: exist.status === "REJECTED" ? "#f87171" : "#4ade80", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                                             {exist.status === "REJECTED" ? `Rejected: ${exist.rejectionReason}` : `Uploaded: ${exist.fileName}`}
                                                         </p>
-                                                        : <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>Not uploaded</p>}
+                                                        : <p style={{ fontSize: 11, color: "#555c72", margin: 0 }}>Not uploaded</p>}
                                                 </div>
                                             </div>
                                             <label style={{ flexShrink: 0 }}>
@@ -789,17 +789,17 @@ export default function OnboardingPortal() {
                             // of the next step, which looks like nothing moved.
                             window.scrollTo({ top: 0, behavior: "smooth" })
                         }}
-                            style={{ flex: 1, padding: "13px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                            style={{ flex: 1, padding: "13px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#8b6cf6,#8b6cf6)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                             Continue <ChevronRight size={16} />
                         </button>
                     ) : (
                         <button onClick={handleSubmit} disabled={submitting}
-                            style={{ flex: 1, padding: "13px 0", borderRadius: 12, border: "none", background: submitting ? "#374151" : "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                            style={{ flex: 1, padding: "13px 0", borderRadius: 12, border: "none", background: submitting ? "#3a4157" : "linear-gradient(135deg,#8b6cf6,#8b6cf6)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                             {submitting ? <><Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> Submitting...</> : <>Submit for Verification <CheckCircle2 size={15} /></>}
                         </button>
                     )}
                 </div>
-                <p style={{ textAlign: "center", fontSize: 11, color: "#4b5563", marginTop: 12 }}>
+                <p style={{ textAlign: "center", fontSize: 11, color: "#555c72", marginTop: 12 }}>
                     I hereby declare that the details furnished are true and correct to the best of my knowledge.
                 </p>
             </div>

@@ -104,10 +104,10 @@ export const employeeFullName = (e: { firstName?: string | null; middleName?: st
 
 export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
     ACTIVE: { label: "Active", color: "#16a34a", bg: "#dcfce7", border: "#bbf7d0" },
-    INACTIVE: { label: "Inactive", color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
+    INACTIVE: { label: "Inactive", color: "#555c72", bg: "#f6f7fc", border: "#dfe3ef" },
     ON_LEAVE: { label: "On Leave", color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
     TERMINATED: { label: "Terminated", color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
-    RESIGNED: { label: "Resigned", color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe" },
+    RESIGNED: { label: "Resigned", color: "#8b6cf6", bg: "#f1edff", border: "#ddd6fe" },
 }
 
 // Force a real download even for cross-origin (Supabase) files: the <a download>
@@ -205,7 +205,7 @@ function CredentialsModal({ email, onClose }: { email: string; onClose: () => vo
                         <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Share the login ID with the employee</p>
                     </div>
                 </div>
-                <div style={{ background: "#f8fafc", border: "1px solid var(--border)", borderRadius: 10, padding: 14, marginBottom: 12 }}>
+                <div style={{ background: "#f6f7fc", border: "1px solid var(--border)", borderRadius: 10, padding: 14, marginBottom: 12 }}>
                     <div style={{ marginBottom: 10 }}>
                         <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", margin: "0 0 3px" }}>Login Email / ID</p>
                         <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", margin: 0, wordBreak: "break-all" }}>{email}</p>
@@ -963,8 +963,8 @@ export function EmployeeModal({
                     {/* Salary Tab */}
                     {activeTab === "salary" && (
                         <div className="space-y-4">
-                            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-[8px] px-3 py-2.5">
-                                <span className="text-[12px] text-blue-700">Set the detailed salary structure for payroll calculation. Basic Salary from Employment tab is used as the base.</span>
+                            <div className="flex items-start gap-2 bg-[var(--accent-light)] border border-[#e3ebff] rounded-[8px] px-3 py-2.5">
+                                <span className="text-[12px] text-[var(--accent-text)]">Set the detailed salary structure for payroll calculation. Basic Salary from Employment tab is used as the base.</span>
                             </div>
                             <div>
                                 <label className={labelCls}>Compliance Type</label>
@@ -1045,7 +1045,7 @@ export function EmployeeModal({
                                 const fmt     = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
                                 if (!basic) return null
                                 return (
-                                    <div style={{ background: "#f8fafc", border: `1px solid ${isCALL ? "#fed7aa" : "#e2e8f0"}`, borderRadius: 10, padding: "12px 14px", marginTop: 4 }}>
+                                    <div style={{ background: "#f6f7fc", border: `1px solid ${isCALL ? "#fed7aa" : "#e2e8f0"}`, borderRadius: 10, padding: "12px 14px", marginTop: 4 }}>
                                         <p style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 6px 0" }}>Live Salary Breakdown</p>
                                         {isCALL && (
                                             <p style={{ fontSize: 10, color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "4px 8px", margin: "0 0 8px 0", fontWeight: 600 }}>
@@ -1054,14 +1054,14 @@ export function EmployeeModal({
                                         )}
                                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "5px 12px" }}>
                                             {[
-                                                { label: "Basic",       value: fmt(basic),  color: "#1d4ed8" },
-                                                { label: "DA",          value: isCALL ? "—" : fmt(da),     color: isCALL ? "#cbd5e1" : "#1d4ed8" },
-                                                { label: "HRA",         value: isCALL ? "—" : fmt(hra),    color: isCALL ? "#cbd5e1" : "#6366f1" },
-                                                { label: "Washing",     value: isCALL ? "—" : fmt(wash),   color: isCALL ? "#cbd5e1" : "#1d4ed8" },
-                                                { label: "Conv.",       value: isCALL ? "—" : fmt(conv),   color: isCALL ? "#cbd5e1" : "#1d4ed8" },
-                                                { label: "LWW",         value: isCALL ? "—" : fmt(lww),    color: isCALL ? "#cbd5e1" : "#1d4ed8" },
-                                                { label: "Bonus",       value: isCALL ? "—" : fmt(bonus),  color: isCALL ? "#cbd5e1" : "#6366f1" },
-                                                { label: "Other",       value: isCALL ? "—" : fmt(other),  color: isCALL ? "#cbd5e1" : "#1d4ed8" },
+                                                { label: "Basic",       value: fmt(basic),  color: "#2f5be0" },
+                                                { label: "DA",          value: isCALL ? "—" : fmt(da),     color: isCALL ? "#cbd5e1" : "#2f5be0" },
+                                                { label: "HRA",         value: isCALL ? "—" : fmt(hra),    color: isCALL ? "#cbd5e1" : "#8b6cf6" },
+                                                { label: "Washing",     value: isCALL ? "—" : fmt(wash),   color: isCALL ? "#cbd5e1" : "#2f5be0" },
+                                                { label: "Conv.",       value: isCALL ? "—" : fmt(conv),   color: isCALL ? "#cbd5e1" : "#2f5be0" },
+                                                { label: "LWW",         value: isCALL ? "—" : fmt(lww),    color: isCALL ? "#cbd5e1" : "#2f5be0" },
+                                                { label: "Bonus",       value: isCALL ? "—" : fmt(bonus),  color: isCALL ? "#cbd5e1" : "#8b6cf6" },
+                                                { label: "Other",       value: isCALL ? "—" : fmt(other),  color: isCALL ? "#cbd5e1" : "#2f5be0" },
                                                 { label: "OT Rate/Hr",  value: fmt(otRate), color: "#64748b" },
                                                 { label: "Canteen/Day", value: fmt(canteen),color: "#64748b" },
                                             ].map(r => (
@@ -1077,9 +1077,9 @@ export function EmployeeModal({
                                                 <span style={{ fontSize: 10, fontWeight: 700, color: isCALL ? "#c2410c" : "#15803d" }}>CTC / Month</span>
                                                 <span style={{ fontSize: 13, fontWeight: 800, color: isCALL ? "#c2410c" : "#15803d" }}>{fmt(ctc)}</span>
                                             </div>
-                                            <div style={{ background: "#eff6ff", borderRadius: 7, padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                                <span style={{ fontSize: 10, fontWeight: 700, color: "#1d4ed8" }}>CTC / Year</span>
-                                                <span style={{ fontSize: 13, fontWeight: 800, color: "#1d4ed8" }}>{fmt(ctc * 12)}</span>
+                                            <div style={{ background: "#eaf0ff", borderRadius: 7, padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                <span style={{ fontSize: 10, fontWeight: 700, color: "#2f5be0" }}>CTC / Year</span>
+                                                <span style={{ fontSize: 13, fontWeight: 800, color: "#2f5be0" }}>{fmt(ctc * 12)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1300,7 +1300,7 @@ export function EmployeeModal({
                                                                 <>
                                                                     <button type="button"
                                                                         onClick={() => { setPreviewUrl(uploaded.fileUrl); setPreviewName(uploaded.fileName) }}
-                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-[var(--accent-light)] text-[var(--accent)] hover:bg-[#e3ebff] transition-colors">
                                                                         <Eye size={11} /> View
                                                                     </button>
                                                                     <button type="button"

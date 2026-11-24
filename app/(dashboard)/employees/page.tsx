@@ -62,7 +62,7 @@ const ROLE_OPTIONS = [
     "Other",
 ]
 
-const AVATAR_COLORS = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
+const AVATAR_COLORS = ["#3d6ff5", "#0ea5a4", "#8b6cf6", "#f5a623", "#e5566b", "#06b6d4", "#f97316"]
 
 function getAvatarColor(firstName: string, lastName: string) {
     const idx = (firstName.charCodeAt(0) + (lastName.charCodeAt(0) || 0)) % AVATAR_COLORS.length
@@ -146,13 +146,13 @@ function InfoItem({ label, value, icon }: { label: string; value: React.ReactNod
 // ─── Document Types Config ────────────────────────────────────────────────────
 
 const DOC_TYPE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-    AADHAAR: { label: "Aadhaar", color: "#1d4ed8", bg: "#dbeafe" },
+    AADHAAR: { label: "Aadhaar", color: "#2f5be0", bg: "#e3ebff" },
     PAN: { label: "PAN", color: "#b45309", bg: "#fef3c7" },
-    RESUME: { label: "Resume", color: "#7c3aed", bg: "#ede9fe" },
+    RESUME: { label: "Resume", color: "#6d4fe0", bg: "#ebe5ff" },
     PHOTO: { label: "Photo", color: "#15803d", bg: "#dcfce7" },
     CERTIFICATE: { label: "Certificate", color: "#0f766e", bg: "#ccfbf1" },
     OFFER_LETTER: { label: "Offer Letter", color: "#9333ea", bg: "#f3e8ff" },
-    OTHER: { label: "Other", color: "#6b7280", bg: "#f3f4f6" },
+    OTHER: { label: "Other", color: "#555c72", bg: "#f6f7fc" },
 }
 
 const DOC_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -186,15 +186,15 @@ function OnboardingCard({ employee }: { employee: Employee }) {
     const isComplete = pct === 100
 
     return (
-        <div style={{ borderRadius: 10, border: `1px solid ${isComplete ? "#86efac" : "#e5e7eb"}`, background: isComplete ? "#f0fdf4" : "#fafafa", padding: "12px 14px", marginTop: 4 }}>
+        <div style={{ borderRadius: 10, border: `1px solid ${isComplete ? "#86efac" : "#dfe3ef"}`, background: isComplete ? "#f0fdf4" : "#fafafa", padding: "12px 14px", marginTop: 4 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: isComplete ? "#15803d" : "var(--text2)" }}>Profile Completion</span>
                 <span style={{ fontSize: 11, fontWeight: 700, color: isComplete ? "#16a34a" : "var(--accent)" }}>{pct}%</span>
             </div>
-            <div style={{ height: 5, background: "#e5e7eb", borderRadius: 999, marginBottom: 8, overflow: "hidden" }}>
+            <div style={{ height: 5, background: "#dfe3ef", borderRadius: 999, marginBottom: 8, overflow: "hidden" }}>
                 <div style={{ height: "100%", width: `${pct}%`, background: isComplete ? "#22c55e" : "var(--accent)", borderRadius: 999, transition: "width 0.3s" }} />
             </div>
-            <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>
+            <p style={{ fontSize: 11, color: "#555c72", margin: 0 }}>
                 {isComplete
                     ? "All key details filled."
                     : `${filled}/${fields.length} key fields filled. Employee should log in and go to My Profile to complete.`}
@@ -443,9 +443,9 @@ function EmployeeDrawer({
                                 {(employee as any).user?.customRole?.name && (
                                     <span
                                         style={{
-                                            color: (employee as any).user.customRole.color || "#6366f1",
-                                            background: `${(employee as any).user.customRole.color || "#6366f1"}15`,
-                                            borderColor: `${(employee as any).user.customRole.color || "#6366f1"}40`,
+                                            color: (employee as any).user.customRole.color || "#8b6cf6",
+                                            background: `${(employee as any).user.customRole.color || "#8b6cf6"}15`,
+                                            borderColor: `${(employee as any).user.customRole.color || "#8b6cf6"}40`,
                                         }}
                                         className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold border"
                                     >
@@ -684,7 +684,7 @@ function EmployeeDrawer({
                                         const gross = s.basic + da + hra + wash + conv + lww + bonus + other
                                         const ctc   = gross  // CALL: no employer contributions
                                         return (
-                                            <div className={`border rounded-[8px] p-3 flex justify-between items-center ${isC ? "bg-amber-50 border-amber-200" : "bg-[#f5f3ff] border-purple-200"}`}>
+                                            <div className={`border rounded-[8px] p-3 flex justify-between items-center ${isC ? "bg-amber-50 border-amber-200" : "bg-[#f1edff] border-purple-200"}`}>
                                                 <span className={`text-[12px] font-medium ${isC ? "text-amber-700" : "text-purple-700"}`}>CTC / Month</span>
                                                 <span className={`text-[16px] font-bold ${isC ? "text-amber-700" : "text-purple-700"}`}>₹{Math.round(ctc).toLocaleString("en-IN")}</span>
                                             </div>
@@ -709,7 +709,7 @@ function EmployeeDrawer({
                         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
                             {/* KYC Checklist */}
-                            <div style={{ background: "#f8fafc", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
+                            <div style={{ background: "#f6f7fc", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
                                 <p style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 8px 0" }}>KYC Status</p>
                                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                                     {(["AADHAAR", "PAN", "PHOTO"] as const).map(type => {
@@ -919,7 +919,7 @@ function EmployeeDrawer({
                                                             <button
                                                                 onClick={() => handleDelete(doc.id)}
                                                                 disabled={actionLoading === doc.id + "_delete"}
-                                                                style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", background: "none", border: "none", padding: "3px 6px", cursor: "pointer", marginLeft: "auto", opacity: actionLoading === doc.id + "_delete" ? 0.5 : 1 }}
+                                                                style={{ fontSize: 11, fontWeight: 600, color: "#555c72", background: "none", border: "none", padding: "3px 6px", cursor: "pointer", marginLeft: "auto", opacity: actionLoading === doc.id + "_delete" ? 0.5 : 1 }}
                                                                 title="Delete document"
                                                             ><Trash2 size={12} /></button>
                                                         )}
@@ -1667,7 +1667,7 @@ function EmployeesPage() {
                     )}
                     {canCreateEmp && <button
                         onClick={() => { setEditEmployee(null); setShowModal(true) }}
-                        className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-[10px] text-white text-[14px] font-semibold bg-[linear-gradient(135deg,#2f6bff_0%,#1447e6_100%)] shadow-[0_8px_20px_-6px_rgba(31,95,255,0.6)] hover:brightness-110 transition"
+                        className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-[10px] text-white text-[14px] font-semibold bg-[linear-gradient(135deg,#3d6ff5_0%,#2f5be0_100%)] shadow-[0_8px_20px_-6px_rgba(31,95,255,0.6)] hover:brightness-110 transition"
                     >
                         <Plus size={18} /> Add Employee
                     </button>}
@@ -1714,7 +1714,7 @@ function EmployeesPage() {
                                 onClick={() => setStatusFilter(k)}
                                 className={`inline-flex items-center gap-2 h-10 px-5 rounded-full text-[14px] transition-colors whitespace-nowrap ${
                                     on
-                                        ? "bg-[linear-gradient(135deg,#2f6bff_0%,#1447e6_100%)] text-white font-semibold shadow-[0_4px_12px_rgba(31,95,255,0.3)]"
+                                        ? "bg-[linear-gradient(135deg,#3d6ff5_0%,#2f5be0_100%)] text-white font-semibold shadow-[0_4px_12px_rgba(31,95,255,0.3)]"
                                         : "text-[var(--text2)] font-medium hover:text-[var(--text)]"
                                 }`}
                             >
@@ -1907,9 +1907,9 @@ function EmployeesPage() {
                                                         {(emp as any).user?.customRole?.name && (
                                                             <span
                                                                 style={{
-                                                                    color: (emp as any).user.customRole.color || "#6366f1",
-                                                                    background: `${(emp as any).user.customRole.color || "#6366f1"}15`,
-                                                                    borderColor: `${(emp as any).user.customRole.color || "#6366f1"}40`,
+                                                                    color: (emp as any).user.customRole.color || "#8b6cf6",
+                                                                    background: `${(emp as any).user.customRole.color || "#8b6cf6"}15`,
+                                                                    borderColor: `${(emp as any).user.customRole.color || "#8b6cf6"}40`,
                                                                 }}
                                                                 className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border"
                                                             >
@@ -1933,7 +1933,7 @@ function EmployeesPage() {
                                             </td>
                                             <td className="px-2.5 py-3">
                                                 {emp.deployments?.[0]?.site ? (
-                                                    <span title={emp.deployments[0].site.name} className="inline-block max-w-full truncate align-middle px-2.5 py-1 bg-[#eef4ff] border border-[#c9dafe] rounded-[8px] text-[12.5px] text-[#1447e6] font-semibold whitespace-nowrap">
+                                                    <span title={emp.deployments[0].site.name} className="inline-block max-w-full truncate align-middle px-2.5 py-1 bg-[#eef4ff] border border-[#c9dafe] rounded-[8px] text-[12.5px] text-[#2f5be0] font-semibold whitespace-nowrap">
                                                         {emp.deployments[0].site.name}
                                                     </span>
                                                 ) : (
@@ -2010,7 +2010,7 @@ function EmployeesPage() {
                                     key={p} onClick={() => goToPage(p)} aria-current={p === page ? "page" : undefined}
                                     className={`h-10 min-w-[40px] px-2 rounded-[10px] text-[13.5px] tabular-nums transition-colors ${
                                         p === page
-                                            ? "bg-[linear-gradient(135deg,#2f6bff_0%,#1447e6_100%)] text-white font-semibold shadow-[0_4px_12px_rgba(31,95,255,0.3)]"
+                                            ? "bg-[linear-gradient(135deg,#3d6ff5_0%,#2f5be0_100%)] text-white font-semibold shadow-[0_4px_12px_rgba(31,95,255,0.3)]"
                                             : "border border-[var(--border2)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--accent)]"
                                     }`}
                                 >
@@ -2216,7 +2216,7 @@ function EmployeesPage() {
                                     ✓ {importResult.imported} imported, {importResult.skipped} skipped (duplicates / errors)
                                 </p>
                                 {importResult.errors.length > 0 && (
-                                    <ul style={{ margin: "8px 0 0 0", padding: "0 0 0 16px", fontSize: "12px", color: "#6b7280" }}>
+                                    <ul style={{ margin: "8px 0 0 0", padding: "0 0 0 16px", fontSize: "12px", color: "#555c72" }}>
                                         {importResult.errors.slice(0, 5).map((e, i) => <li key={i}>Row {e.row}: {e.reason}</li>)}
                                         {importResult.errors.length > 5 && <li>…and {importResult.errors.length - 5} more</li>}
                                     </ul>

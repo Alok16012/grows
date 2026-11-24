@@ -493,7 +493,7 @@ function SalaryMasterInner() {
                     <IndianRupee size={20} style={{ color: "var(--accent)" }} />
                     <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>Salary Structure Master</h1>
                     {filterSite && (
-                        <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "#dbeafe", color: "#1e40af", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "#e3ebff", color: "#2f5be0", display: "inline-flex", alignItems: "center", gap: 4 }}>
                             <MapPin size={12} /> Site Mode: {filterSite} ({filtered.length})
                         </span>
                     )}
@@ -512,7 +512,7 @@ function SalaryMasterInner() {
                         <CalendarRange size={13} style={{ color: "var(--text3)", flexShrink: 0 }} />
                         <EffectiveMonthPicker compact prefix="Effective" onChange={c => { setEffChoice(c); if (c) { setEffMonth(c.effectiveMonth); setEffYear(c.effectiveYear) } }} />
                     </div>
-                    <label style={{ ...btnPrimary, background: uploading ? "#a78bfa" : "#7c3aed", cursor: uploading ? "not-allowed" : "pointer" }}
+                    <label style={{ ...btnPrimary, background: uploading ? "#a78bfa" : "#6d4fe0", cursor: uploading ? "not-allowed" : "pointer" }}
                         title={filterSite
                             ? `Upload affects only ${filterSite} employees, effective ${MONTHS_LONG[effMonth - 1]} ${effYear}`
                             : `Upload affects all matched employees, effective ${MONTHS_LONG[effMonth - 1]} ${effYear}`}>
@@ -559,7 +559,7 @@ function SalaryMasterInner() {
             </div>
 
             {isHistoricalView && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", borderRadius: 8, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1e40af" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", borderRadius: 8, background: "#eaf0ff", border: "1px solid #d4e0ff", fontSize: 12, color: "#2f5be0" }}>
                     <Search size={14} style={{ flexShrink: 0 }} />
                     <span>
                         Showing the structure <b>{MONTHS_LONG[Number(viewMonth) - 1]} {viewYear}</b> is paid on — exactly what payroll
@@ -613,14 +613,14 @@ function SalaryMasterInner() {
                             <tr style={{ background: "var(--surface2)", borderBottom: "2px solid var(--border)" }}>
                                 <th style={th}>Emp Code</th>
                                 <th style={{ ...th, textAlign: "left" }}>Employee</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Basic</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>DA</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>HRA</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Washing</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Conv.</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>LWW</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Bonus</th>
-                                <th style={{ ...th, background: "#eff6ff", color: "#1d4ed8" }}>Other</th>
+                                <th style={{ ...th, background: "#eaf0ff", color: "#2f5be0" }}>Basic</th>
+                                <th style={{ ...th, background: "#eaf0ff", color: "#2f5be0" }}>DA</th>
+                                <th style={{ ...th, background: "#eaf0ff", color: "#2f5be0" }}>HRA</th>
+                                <th style={{ ...th, background: "#eaf0ff", color: "#2f5be0" }}>Washing</th>
+                                <th style={{ ...th, background: "#eaf0ff", color: "#2f5be0" }}>Conv.</th>
+                                <th style={{ ...th, background: "#eaf0ff", color: "#2f5be0" }}>LWW</th>
+                                <th style={{ ...th, background: "#eaf0ff", color: "#2f5be0" }}>Bonus</th>
+                                <th style={{ ...th, background: "#eaf0ff", color: "#2f5be0" }}>Other</th>
                                 <th style={{ ...th, background: "#dcfce7", color: "#15803d" }}>Gross<span style={calcTag}>auto</span></th>
                                 <th style={{ ...th, background: "#fef2f2", color: "#dc2626" }}>Co.PF<span style={calcTag}>auto</span></th>
                                 <th style={{ ...th, background: "#fef2f2", color: "#dc2626" }}>Co.ESIC<span style={calcTag}>auto</span></th>
@@ -677,29 +677,29 @@ function SalaryMasterInner() {
                                             <div style={{ fontSize: 10, color: "var(--text3)" }}>{emp.designation || emp.deployments?.[0]?.site?.name || "—"}</div>
                                         </td>
                                         {/* Earnings */}
-                                        <td style={{ ...td, background: "#eff6ff" }}>
-                                            {isEditing ? numIn("basic", "#eff6ff") : s ? fmtN(s.basic) : <span style={{ color: "#f59e0b" }}>—</span>}
+                                        <td style={{ ...td, background: "#eaf0ff" }}>
+                                            {isEditing ? numIn("basic", "#eaf0ff") : s ? fmtN(s.basic) : <span style={{ color: "#f59e0b" }}>—</span>}
                                         </td>
-                                        <td style={{ ...td, background: "#eff6ff" }}>
-                                            {isEditing ? numIn("da", "#eff6ff") : s ? fmtN(s.da) : "—"}
+                                        <td style={{ ...td, background: "#eaf0ff" }}>
+                                            {isEditing ? numIn("da", "#eaf0ff") : s ? fmtN(s.da) : "—"}
                                         </td>
-                                        <td style={{ ...td, background: "#eff6ff" }}>
-                                            {isEditing ? numIn("hra", "#eff6ff") : s ? fmtN(s.hra ?? 0) : "—"}
+                                        <td style={{ ...td, background: "#eaf0ff" }}>
+                                            {isEditing ? numIn("hra", "#eaf0ff") : s ? fmtN(s.hra ?? 0) : "—"}
                                         </td>
-                                        <td style={{ ...td, background: "#eff6ff" }}>
-                                            {isEditing ? numIn("washing", "#eff6ff") : s ? fmtN(s.washing) : "—"}
+                                        <td style={{ ...td, background: "#eaf0ff" }}>
+                                            {isEditing ? numIn("washing", "#eaf0ff") : s ? fmtN(s.washing) : "—"}
                                         </td>
-                                        <td style={{ ...td, background: "#eff6ff" }}>
-                                            {isEditing ? numIn("conveyance", "#eff6ff") : s ? fmtN(s.conveyance) : "—"}
+                                        <td style={{ ...td, background: "#eaf0ff" }}>
+                                            {isEditing ? numIn("conveyance", "#eaf0ff") : s ? fmtN(s.conveyance) : "—"}
                                         </td>
-                                        <td style={{ ...td, background: "#eff6ff" }}>
-                                            {isEditing ? numIn("leaveWithWages", "#eff6ff") : s ? fmtN(s.leaveWithWages) : "—"}
+                                        <td style={{ ...td, background: "#eaf0ff" }}>
+                                            {isEditing ? numIn("leaveWithWages", "#eaf0ff") : s ? fmtN(s.leaveWithWages) : "—"}
                                         </td>
-                                        <td style={{ ...td, background: "#eff6ff" }} title="Per-employee bonus (Payment of Bonus Act). Min-wage based: ₹625 = 7500×8.33%, ₹650 = 7800×8.33%">
-                                            {isEditing ? numIn("bonus", "#eff6ff") : (s ? fmtN(bonus) : "—")}
+                                        <td style={{ ...td, background: "#eaf0ff" }} title="Per-employee bonus (Payment of Bonus Act). Min-wage based: ₹625 = 7500×8.33%, ₹650 = 7800×8.33%">
+                                            {isEditing ? numIn("bonus", "#eaf0ff") : (s ? fmtN(bonus) : "—")}
                                         </td>
-                                        <td style={{ ...td, background: "#eff6ff" }}>
-                                            {isEditing ? numIn("otherAllowance", "#eff6ff") : s ? fmtN(s.otherAllowance) : "—"}
+                                        <td style={{ ...td, background: "#eaf0ff" }}>
+                                            {isEditing ? numIn("otherAllowance", "#eaf0ff") : s ? fmtN(s.otherAllowance) : "—"}
                                         </td>
                                         {/* Gross */}
                                         <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>{s || isEditing ? fmt(gross) : "—"}</td>
@@ -736,8 +736,8 @@ function SalaryMasterInner() {
                                                     style={{
                                                         padding: "3px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700,
                                                         border: "none", cursor: "pointer", outline: "none",
-                                                        background: effectiveType === "CALL" ? "#fef3c7" : "#eff6ff",
-                                                        color: effectiveType === "CALL" ? "#b45309" : "#1d4ed8",
+                                                        background: effectiveType === "CALL" ? "#fef3c7" : "#eaf0ff",
+                                                        color: effectiveType === "CALL" ? "#b45309" : "#2f5be0",
                                                         appearance: "auto",
                                                         opacity: savingType === emp.id ? 0.5 : 1,
                                                     }}>
@@ -765,7 +765,7 @@ function SalaryMasterInner() {
                                                 <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
                                                     <button onClick={() => openDrawer(emp)} disabled={!canManage}
                                                         title={canManage ? `Open detailed edit form — saves effective ${editEffectiveLabel}` : "Requires payroll manage permission"}
-                                                        style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#7c3aed", color: "#fff", fontSize: 11, fontWeight: 700, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.45, display: "flex", alignItems: "center", gap: 4 }}>
+                                                        style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#6d4fe0", color: "#fff", fontSize: 11, fontWeight: 700, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.45, display: "flex", alignItems: "center", gap: 4 }}>
                                                         <Edit2 size={11} /> {s ? "Edit" : "Add Salary"}
                                                     </button>
                                                     {s && (
@@ -799,7 +799,7 @@ function SalaryMasterInner() {
                                         filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary, e.isHandicap, e.gender, rules).bonus : 0), 0),
                                         filtered.reduce((s,e) => s + (e.employeeSalary?.otherAllowance || 0), 0),
                                     ].map((v, i) => (
-                                        <td key={i} style={{ ...td, background: "#eff6ff", fontWeight: 700 }}>{fmtN(v)}</td>
+                                        <td key={i} style={{ ...td, background: "#eaf0ff", fontWeight: 700 }}>{fmtN(v)}</td>
                                     ))}
                                     <td style={{ ...td, background: "#dcfce7", fontWeight: 700, color: "#15803d" }}>
                                         {fmt(filtered.reduce((s,e) => s + (e.employeeSalary ? calc(e.employeeSalary!, e.isHandicap, e.gender, rules).gross : 0), 0))}
@@ -874,7 +874,7 @@ function SalaryMasterInner() {
                                         {" · "}{drawerEmp.firstName} {drawerEmp.lastName}
                                         {drawerEmp.deployments?.[0]?.site?.name && <span style={{ color: "var(--text3)" }}> · 📍 {drawerEmp.deployments[0].site.name}</span>}
                                     </p>
-                                    <p style={{ fontSize: 11.5, color: "#6d28d9", margin: "4px 0 0 0", fontWeight: 600 }}>
+                                    <p style={{ fontSize: 11.5, color: "#6d4fe0", margin: "4px 0 0 0", fontWeight: 600 }}>
                                         Saves effective {editEffectiveLabel}{isHistoricalView ? " onward" : ""}
                                     </p>
                                 </div>
@@ -886,14 +886,14 @@ function SalaryMasterInner() {
                             {/* Body */}
                             <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
                                 {/* Compliance type */}
-                                <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 8, background: isCALL ? "#fef3c7" : "#eff6ff", border: `1px solid ${isCALL ? "#fde047" : "#bfdbfe"}` }}>
-                                    <label style={{ fontSize: 11, fontWeight: 700, color: isCALL ? "#92400e" : "#1e40af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Compliance Type</label>
+                                <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 8, background: isCALL ? "#fef3c7" : "#eaf0ff", border: `1px solid ${isCALL ? "#fde047" : "#d4e0ff"}` }}>
+                                    <label style={{ fontSize: 11, fontWeight: 700, color: isCALL ? "#92400e" : "#2f5be0", textTransform: "uppercase", letterSpacing: "0.5px" }}>Compliance Type</label>
                                     <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                                         {[
                                             { v: "OR",   label: "OR — Full PF + ESIC", desc: "Full-time / compliance role" },
                                             { v: "CALL", label: "CALL — No PF, No ESIC", desc: "Temporary / non-compliance" },
                                         ].map(opt => (
-                                            <label key={opt.v} style={{ flex: 1, cursor: "pointer", padding: "8px 10px", borderRadius: 7, border: `2px solid ${drawerForm.complianceType === opt.v ? (opt.v === "CALL" ? "#f59e0b" : "#3b82f6") : "transparent"}`, background: drawerForm.complianceType === opt.v ? "var(--surface)" : "transparent" }}>
+                                            <label key={opt.v} style={{ flex: 1, cursor: "pointer", padding: "8px 10px", borderRadius: 7, border: `2px solid ${drawerForm.complianceType === opt.v ? (opt.v === "CALL" ? "#f59e0b" : "#3d6ff5") : "transparent"}`, background: drawerForm.complianceType === opt.v ? "var(--surface)" : "transparent" }}>
                                                 <input type="radio" checked={drawerForm.complianceType === opt.v} onChange={() => setDrawerForm(f => ({ ...f, complianceType: opt.v }))} style={{ display: "none" }} />
                                                 <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{opt.label}</div>
                                                 <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 1 }}>{opt.desc}</div>
@@ -903,7 +903,7 @@ function SalaryMasterInner() {
                                 </div>
 
                                 {/* Earnings */}
-                                <p style={{ fontSize: 11, fontWeight: 800, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.6px", padding: "8px 0 6px", borderBottom: "1px solid #dbeafe", marginBottom: 12 }}>Earnings (Full-Month Rate)</p>
+                                <p style={{ fontSize: 11, fontWeight: 800, color: "#2f5be0", textTransform: "uppercase", letterSpacing: "0.6px", padding: "8px 0 6px", borderBottom: "1px solid #e3ebff", marginBottom: 12 }}>Earnings (Full-Month Rate)</p>
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
                                     {numField("basic",          "Basic",          "₹")}
                                     {numField("da",             "DA",             "₹")}
@@ -916,7 +916,7 @@ function SalaryMasterInner() {
                                 </div>
 
                                 {/* Rates */}
-                                <p style={{ fontSize: 11, fontWeight: 800, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.6px", padding: "8px 0 6px", borderBottom: "1px solid #ede9fe", marginBottom: 12, marginTop: 14 }}>Rates</p>
+                                <p style={{ fontSize: 11, fontWeight: 800, color: "#6d4fe0", textTransform: "uppercase", letterSpacing: "0.6px", padding: "8px 0 6px", borderBottom: "1px solid #ebe5ff", marginBottom: 12, marginTop: 14 }}>Rates</p>
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
                                     {numField("otRatePerHour",     "OT Rate / Hour",     "₹/hr")}
                                     {numField("canteenRatePerDay", "Canteen Rate / Day", "₹/day")}
@@ -924,11 +924,11 @@ function SalaryMasterInner() {
                                 <p style={{ fontSize: 10.5, color: "var(--text3)", margin: "-4px 0 8px" }}>OT rate: a value you type here is a manual rate and is always used. Leave it unchanged and the site&apos;s OT formula (Payroll → Calculation Settings) fills it in. To go back to the formula, clear the rate in Calculation Settings → OT Rule by Site → Employee OT.</p>
 
                                 {/* Live Calculation Preview */}
-                                <div style={{ marginTop: 18, padding: "12px 14px", borderRadius: 10, background: "#f8fafc", border: "1px dashed #94a3b8" }}>
+                                <div style={{ marginTop: 18, padding: "12px 14px", borderRadius: 10, background: "#f6f7fc", border: "1px dashed #94a3b8" }}>
                                     <p style={{ fontSize: 11, fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.6px", margin: "0 0 8px 0" }}>📊 Live Calculation Preview</p>
                                     {previewRow("Basic + DA",      drawerForm.basic + drawerForm.da)}
-                                    {previewRow("HRA",             live.hra, "#1d4ed8")}
-                                    {previewRow("Bonus (stored)",  live.bonus, "#7c3aed")}
+                                    {previewRow("HRA",             live.hra, "#2f5be0")}
+                                    {previewRow("Bonus (stored)",  live.bonus, "#6d4fe0")}
                                     <div style={{ borderTop: "1px solid #cbd5e1", margin: "6px 0" }} />
                                     {previewRow("Gross (full)",    live.gross,    "#15803d", true)}
                                     <div style={{ borderTop: "1px solid #cbd5e1", margin: "6px 0" }} />
@@ -941,7 +941,7 @@ function SalaryMasterInner() {
                                     <div style={{ borderTop: "1px solid #cbd5e1", margin: "6px 0" }} />
                                     {previewRow("Co PF",           live.empPF,  "#0369a1")}
                                     {previewRow("Co ESIC",         live.empESI, "#0369a1")}
-                                    {previewRow("CTC",             live.ctc,    "#1e40af", true)}
+                                    {previewRow("CTC",             live.ctc,    "#2f5be0", true)}
                                 </div>
                             </div>
 
@@ -952,7 +952,7 @@ function SalaryMasterInner() {
                                     Cancel
                                 </button>
                                 <button onClick={saveDrawer} disabled={drawerSaving}
-                                    style={{ padding: "8px 22px", borderRadius: 8, border: "none", background: drawerSaving ? "#a78bfa" : "#7c3aed", color: "#fff", fontSize: 13, fontWeight: 700, cursor: drawerSaving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                                    style={{ padding: "8px 22px", borderRadius: 8, border: "none", background: drawerSaving ? "#a78bfa" : "#6d4fe0", color: "#fff", fontSize: 13, fontWeight: 700, cursor: drawerSaving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                                     {drawerSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                                     {drawerSaving ? "Saving…" : "Save Salary"}
                                 </button>
@@ -967,7 +967,7 @@ function SalaryMasterInner() {
 
 const th: React.CSSProperties = { padding: "8px 10px", fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", textAlign: "center", whiteSpace: "nowrap" }
 const td: React.CSSProperties = { padding: "6px 10px", textAlign: "center", color: "var(--text)", whiteSpace: "nowrap" }
-const calcTag: React.CSSProperties = { marginLeft: 3, fontSize: 8, background: "#dbeafe", color: "#1d4ed8", borderRadius: 3, padding: "1px 3px", fontWeight: 400, letterSpacing: 0, textTransform: "none" }
+const calcTag: React.CSSProperties = { marginLeft: 3, fontSize: 8, background: "#e3ebff", color: "#2f5be0", borderRadius: 3, padding: "1px 3px", fontWeight: 400, letterSpacing: 0, textTransform: "none" }
 const btnGhost: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", fontSize: 12, color: "var(--text2)", cursor: "pointer", fontWeight: 600 }
 const btnPrimary: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", color: "#fff", fontSize: 12, fontWeight: 700 }
 

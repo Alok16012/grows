@@ -251,9 +251,9 @@ function PeopleCard({ title, icon: Icon, items }: {
 // Real LeadStatus values, grouped into the funnel's stages. The old keys
 // (APPLIED, SCREENING, ONBOARDED) don't exist, so those boxes always read 0.
 const PIPELINE_STAGES = [
-    { key: "LEADS", statuses: ["NEW_LEAD", "CONTACTED", "INTERESTED"], label: "Leads", color: "#6366f1" },
+    { key: "LEADS", statuses: ["NEW_LEAD", "CONTACTED", "INTERESTED"], label: "Leads", color: "#8b6cf6" },
     { key: "INTERVIEW", statuses: ["INTERVIEW_SCHEDULED"], label: "Interview", color: "#f59e0b" },
-    { key: "DONE", statuses: ["INTERVIEW_DONE"], label: "Done", color: "#3b82f6" },
+    { key: "DONE", statuses: ["INTERVIEW_DONE"], label: "Done", color: "#3d6ff5" },
     { key: "SELECTED", statuses: ["SELECTED", "OFFERED"], label: "Selected", color: "#16a34a" },
     { key: "JOINED", statuses: ["JOINED", "ON_SITE_JOINED"], label: "Joined", color: "#059669" },
 ]
@@ -470,7 +470,7 @@ export default function AnalyticsPage() {
                             {(attendance?.monthlyTrend?.length ?? 0) > 0 && (
                                 <ResponsiveContainer width="100%" height={120}>
                                     <BarChart data={attendance!.monthlyTrend} barSize={8}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#eceef6" />
                                         <XAxis dataKey="date" tick={{ fontSize: 9 }} interval={2} />
                                         <YAxis tick={{ fontSize: 9 }} />
                                         <Tooltip
@@ -503,13 +503,13 @@ export default function AnalyticsPage() {
                                         data={leave!.byType}
                                         margin={{ left: 0, right: 16 }}
                                     >
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#eceef6" />
                                         <XAxis type="number" tick={{ fontSize: 10 }} />
                                         <YAxis type="category" dataKey="type" tick={{ fontSize: 11 }} width={36} />
                                         <Tooltip
                                             contentStyle={{ borderRadius: 8, border: "1px solid #e6eaf5", fontSize: 11 }}
                                         />
-                                        <Bar dataKey="count" fill="#0b5cff" name="Leaves" radius={[0, 4, 4, 0]} />
+                                        <Bar dataKey="count" fill="#3d6ff5" name="Leaves" radius={[0, 4, 4, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             ) : (
@@ -649,7 +649,7 @@ export default function AnalyticsPage() {
                                 </h2>
                                 <ResponsiveContainer width="100%" height={220}>
                                     <LineChart data={monthlyTrend}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#eceef6" />
                                         <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                                         <YAxis tick={{ fontSize: 11 }} />
                                         <Tooltip
@@ -657,7 +657,7 @@ export default function AnalyticsPage() {
                                             formatter={(val: number | string | undefined, name: string | undefined) => [val, name === "rate" ? "Approval Rate %" : (name ?? "")]}
                                         />
                                         <Legend wrapperStyle={{ fontSize: 12 }} />
-                                        <Line type="monotone" dataKey="submitted" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Submitted" />
+                                        <Line type="monotone" dataKey="submitted" stroke="#3d6ff5" strokeWidth={2} dot={{ r: 3 }} name="Submitted" />
                                         <Line type="monotone" dataKey="approved" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} name="Approved" />
                                         <Line type="monotone" dataKey="rate" stroke="#d97706" strokeWidth={2} dot={{ r: 3 }} name="Rate %" strokeDasharray="4 2" />
                                     </LineChart>
@@ -678,7 +678,7 @@ export default function AnalyticsPage() {
                                     <p className="text-[13px] text-[var(--text3)]">No inspector data yet</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-[#f0f0f0]">
+                                <div className="divide-y divide-[#eceef6]">
                                     {inspectors.map((inspector, idx) => (
                                         <div key={inspector.id} className={cn(
                                             "p-4 hover:bg-[var(--surface2)] transition-colors",
@@ -706,7 +706,7 @@ export default function AnalyticsPage() {
                                                             <span className="text-[11px] text-[var(--text3)]">acceptance</span>
                                                         </div>
                                                     </div>
-                                                    <div className="h-1.5 bg-[#f0f0f0] rounded-full mb-3">
+                                                    <div className="h-1.5 bg-[#eceef6] rounded-full mb-3">
                                                         <div
                                                             className={cn(
                                                                 "h-1.5 rounded-full transition-all",
@@ -785,7 +785,7 @@ export default function AnalyticsPage() {
                                         rejected: i.rejected,
                                         pending: i.pending
                                     }))}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#eceef6" />
                                         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                                         <YAxis tick={{ fontSize: 11 }} />
                                         <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e6eaf5", fontSize: 12 }} />

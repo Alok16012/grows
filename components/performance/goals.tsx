@@ -70,7 +70,7 @@ function KpiLine({ kpi, editable, onChanged, self }: { kpi: KPI; editable: boole
                     · target {kpi.target} · weight {kpi.weightage}%{cleanDescription(kpi.description) ? ` · ${cleanDescription(kpi.description)}` : ""}
                 </p>
                 {self && (self.actual !== null || self.rating || self.comment) && (
-                    <p className="text-[11.5px] text-[#6d28d9] mt-0.5" title={self.comment || undefined}>
+                    <p className="text-[11.5px] text-[#6d4fe0] mt-0.5" title={self.comment || undefined}>
                         Employee: {self.actual !== null ? `actual ${self.actual}` : "no actual"}{self.rating ? ` · self ${self.rating}/5` : ""}{self.comment ? ` · “${self.comment.length > 70 ? self.comment.slice(0, 70) + "…" : self.comment}”` : ""}
                     </p>
                 )}

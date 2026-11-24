@@ -149,7 +149,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
         if (type === "send_back") return "bg-orange-100 text-orange-700"
         if (type === "approval_needed") return "bg-yellow-100 text-yellow-700"
         if (type === "risk_alert") return "bg-red-100 text-red-700"
-        return "bg-blue-100 text-blue-700"
+        return "bg-[#e3ebff] text-[var(--accent-text)]"
     }
 
     return (
@@ -218,7 +218,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                                 {results.projects.map(p => (
                                     <Link key={p.id} href="/projects" className="flex flex-col px-3 py-1.5 rounded-[8px] hover:bg-[var(--surface2)] transition-colors">
                                         <div className="flex items-center gap-3">
-                                            <Folder size={16} className="text-blue-500" />
+                                            <Folder size={16} className="text-[var(--accent)]" />
                                             <span className="text-[13px] font-medium text-[var(--text)]">{p.name}</span>
                                         </div>
                                         <span className="text-[10px] text-[var(--text3)] ml-7">{p.siteName}</span>
@@ -303,13 +303,13 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                                         <div
                                             key={n.id}
                                             onClick={() => { markRead(n.id); if (n.link) window.location.href = n.link }}
-                                            className={cn("px-4 py-3 border-b border-[var(--border)] last:border-0 cursor-pointer hover:bg-[var(--surface2)] transition-colors", !n.isRead && "bg-blue-50/40")}
+                                            className={cn("px-4 py-3 border-b border-[var(--border)] last:border-0 cursor-pointer hover:bg-[var(--surface2)] transition-colors", !n.isRead && "bg-[var(--accent-light)]/40")}
                                         >
                                             <div className="flex items-start gap-2">
                                                 <span className={cn("mt-0.5 shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase", notifTypeColor(n.type))}>
                                                     {n.type.replace(/_/g, " ")}
                                                 </span>
-                                                {!n.isRead && <span className="h-2 w-2 rounded-full bg-blue-500 mt-1 shrink-0 ml-auto" />}
+                                                {!n.isRead && <span className="h-2 w-2 rounded-full bg-[var(--accent)] mt-1 shrink-0 ml-auto" />}
                                             </div>
                                             <p className="text-[12px] font-semibold text-[var(--text)] mt-1">{n.title}</p>
                                             <p className="text-[11px] text-[var(--text2)] mt-0.5 line-clamp-2">{n.message}</p>
@@ -355,9 +355,9 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                                     {(session?.user as any)?.customRoleName ? (
                                         <span
                                             style={{
-                                                color: (session?.user as any)?.customRoleColor || "#6366f1",
-                                                background: `${(session?.user as any)?.customRoleColor || "#6366f1"}15`,
-                                                borderColor: `${(session?.user as any)?.customRoleColor || "#6366f1"}40`,
+                                                color: (session?.user as any)?.customRoleColor || "#8b6cf6",
+                                                background: `${(session?.user as any)?.customRoleColor || "#8b6cf6"}15`,
+                                                borderColor: `${(session?.user as any)?.customRoleColor || "#8b6cf6"}40`,
                                             }}
                                             className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
                                         >

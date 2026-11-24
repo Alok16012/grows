@@ -210,13 +210,13 @@ function SortableFieldRow({ field, onEdit, onDelete, onToggleHidden, isDeleting 
 
     let pillClass = ""
     let pillText = field.fieldType.toUpperCase()
-    if (field.fieldType === "date") pillClass = "bg-[#eff6ff] text-[#3b82f6]"
-    else if (field.fieldType === "dropdown") pillClass = "bg-[#f5f3ff] text-[#7c3aed]"
+    if (field.fieldType === "date") pillClass = "bg-[#eaf0ff] text-[#3d6ff5]"
+    else if (field.fieldType === "dropdown") pillClass = "bg-[#f1edff] text-[#6d4fe0]"
     else if (field.fieldType === "number") pillClass = "bg-[#fef3c7] text-[#d97706]"
     else pillClass = "bg-[var(--surface2)] border border-[var(--border)] text-[var(--text3)]"
 
     let catBadge = ""
-    if (isFixed) catBadge = "bg-[#eff6ff] text-[#3b82f6]"
+    if (isFixed) catBadge = "bg-[#eaf0ff] text-[#3d6ff5]"
     else if (isDefect) catBadge = "bg-[#fef3c7] text-[#d97706]"
     else if (isAuto) catBadge = "bg-[var(--accent-light)] text-[var(--accent-text)]"
 
@@ -234,7 +234,7 @@ function SortableFieldRow({ field, onEdit, onDelete, onToggleHidden, isDeleting 
                 <span className={`text-[12.5px] font-[500] truncate ${field.isHidden ? "text-[var(--text3)] line-through" : "text-[var(--text)]"}`}>{field.fieldLabel}</span>
                 {field.isRequired && !field.isHidden && !isDefect && <span className="text-[#dc2626] ml-[4px] text-[12px]">*</span>}
                 {field.isHidden && (
-                    <span className="ml-[6px] text-[10px] font-[700] rounded-[20px] px-[7px] py-[2px] bg-[#f3f4f6] text-[#6b7280] shrink-0">HIDDEN</span>
+                    <span className="ml-[6px] text-[10px] font-[700] rounded-[20px] px-[7px] py-[2px] bg-[#f6f7fc] text-[#555c72] shrink-0">HIDDEN</span>
                 )}
             </div>
 
@@ -275,8 +275,8 @@ function SortableFieldRow({ field, onEdit, onDelete, onToggleHidden, isDeleting 
 function FieldPreview({ field }: { field: FormField }) {
     let pillClass = ""
     let pillText = field.fieldType.toUpperCase()
-    if (field.fieldType === "date") pillClass = "bg-[#eff6ff] text-[#3b82f6]"
-    else if (field.fieldType === "dropdown") pillClass = "bg-[#f5f3ff] text-[#7c3aed]"
+    if (field.fieldType === "date") pillClass = "bg-[#eaf0ff] text-[#3d6ff5]"
+    else if (field.fieldType === "dropdown") pillClass = "bg-[#f1edff] text-[#6d4fe0]"
     else if (field.fieldType === "number") pillClass = "bg-[#fef3c7] text-[#d97706]"
     else pillClass = "bg-[var(--surface2)] border border-[var(--border)] text-[var(--text3)]"
 

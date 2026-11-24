@@ -26,7 +26,7 @@ const td = "px-3 py-2 border-b border-[var(--border)] text-[12.5px] align-top"
 const box = "h-9 rounded-[9px] border border-[var(--border)] px-2.5 text-[13px] bg-white"
 
 function Bar({ pct }: { pct: number }) {
-    const c = pct >= 100 ? "#16a34a" : pct >= 80 ? "#2563eb" : pct >= 60 ? "#d97706" : "#dc2626"
+    const c = pct >= 100 ? "#16a34a" : pct >= 80 ? "#3d6ff5" : pct >= 60 ? "#d97706" : "#dc2626"
     return <div className="flex items-center gap-2 min-w-[110px]"><div className="h-1.5 flex-1 rounded-full bg-[var(--surface2)] overflow-hidden"><div style={{ width: `${pct}%`, background: c }} className="h-full" /></div><span className="text-[11.5px] font-semibold tabular-nums" style={{ color: c }}>{pct}%</span></div>
 }
 

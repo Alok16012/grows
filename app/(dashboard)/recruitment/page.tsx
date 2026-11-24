@@ -57,36 +57,36 @@ function todayLocalISO(): string {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STATUSES = [
-    { key: "NEW_LEAD",            label: "New Lead",            color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
-    { key: "CONTACTED",           label: "Contacted",           color: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe" },
-    { key: "INTERESTED",          label: "Interested",          color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe" },
+    { key: "NEW_LEAD",            label: "New Lead",            color: "#555c72", bg: "#f6f7fc", border: "#dfe3ef" },
+    { key: "CONTACTED",           label: "Contacted",           color: "#3d6ff5", bg: "#eaf0ff", border: "#d4e0ff" },
+    { key: "INTERESTED",          label: "Interested",          color: "#8b6cf6", bg: "#f1edff", border: "#ddd6fe" },
     { key: "INTERVIEW_SCHEDULED", label: "Interview Scheduled", color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
     { key: "INTERVIEW_DONE",      label: "Interview Done",      color: "#06b6d4", bg: "#ecfeff", border: "#a5f3fc" },
     { key: "SELECTED",            label: "Selected",            color: "#16a34a", bg: "#dcfce7", border: "#bbf7d0" },
     { key: "OFFERED",             label: "Offered",             color: "#65a30d", bg: "#f7fee7", border: "#bef264" },
     { key: "JOINED",              label: "Joined ✓",            color: "#047857", bg: "#ecfdf5", border: "#bbf7d0" },
     { key: "ON_SITE_JOINED",      label: "On-site Joined ✓✓",   color: "#0d9488", bg: "#f0fdfa", border: "#5eead4" },
-    { key: "REJECTED",            label: "Rejected",            color: "#9ca3af", bg: "#f9fafb", border: "#e5e7eb" },
-    { key: "DROPPED",             label: "Dropped",             color: "#9ca3af", bg: "#f3f4f6", border: "#d1d5db" },
+    { key: "REJECTED",            label: "Rejected",            color: "#98a1b5", bg: "#f6f7fc", border: "#dfe3ef" },
+    { key: "DROPPED",             label: "Dropped",             color: "#98a1b5", bg: "#f6f7fc", border: "#d5dae8" },
 ]
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
     HIGH:   { label: "High",   color: "#dc2626", dot: "bg-[#dc2626]" },
     MEDIUM: { label: "Medium", color: "#f59e0b", dot: "bg-[#f59e0b]" },
-    LOW:    { label: "Low",    color: "#0b5cff", dot: "bg-[var(--accent)]" },
+    LOW:    { label: "Low",    color: "#3d6ff5", dot: "bg-[var(--accent)]" },
 }
 
 const SCORE_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
     HOT:  { label: "Hot",  color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
     WARM: { label: "Warm", color: "#ea580c", bg: "#fff7ed", border: "#fdba74" },
-    COLD: { label: "Cold", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
+    COLD: { label: "Cold", color: "#3d6ff5", bg: "#eaf0ff", border: "#d4e0ff" },
 }
 
 const ACTIVITY_TYPES = [
-    { key: "note",      label: "Note",      icon: StickyNote,   color: "#6b7280" },
-    { key: "call",      label: "Call",      icon: PhoneCall,    color: "#3b82f6" },
+    { key: "note",      label: "Note",      icon: StickyNote,   color: "#555c72" },
+    { key: "call",      label: "Call",      icon: PhoneCall,    color: "#3d6ff5" },
     { key: "whatsapp",  label: "WhatsApp",  icon: MessageSquare,color: "#25d366" },
-    { key: "email",     label: "Email",     icon: Send,         color: "#8b5cf6" },
+    { key: "email",     label: "Email",     icon: Send,         color: "#8b6cf6" },
     { key: "interview", label: "Interview", icon: UserCheck,    color: "#f59e0b" },
 ]
 
@@ -131,7 +131,7 @@ const QUALIFICATIONS = ["8th Pass", "10th Pass", "12th Pass", "ITI", "Diploma", 
 const INTERVIEW_MODES = ["In-person", "Phone", "Video Call", "WhatsApp Video"]
 const DOC_TYPES = ["RESUME", "AADHAAR", "PAN", "CERTIFICATE", "OTHER"]
 const FOLLOWUP_TYPES = ["CALL", "INTERVIEW", "DOCUMENT", "OTHER"]
-const PIE_COLORS = ["#3b82f6", "#8b5cf6", "#f59e0b", "#06b6d4", "#0b5cff", "#dc2626", "#65a30d", "#ea580c", "#6b7280"]
+const PIE_COLORS = ["#3d6ff5", "#8b6cf6", "#f59e0b", "#06b6d4", "#3d6ff5", "#dc2626", "#65a30d", "#ea580c", "#555c72"]
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1664,7 +1664,7 @@ export default function RecruitmentPage() {
                         style={{ background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", overflow: "hidden" }}>
                         <div style={{ padding: "18px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "#e8effe", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "#eaf0ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                     <Link2 size={18} style={{ color: "var(--accent)" }} />
                                 </div>
                                 <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", margin: 0 }}>Onboarding Link</h2>
@@ -1791,7 +1791,7 @@ export default function RecruitmentPage() {
                                     ✓ {importResult.imported} imported, {importResult.skipped} skipped (duplicates / errors)
                                 </p>
                                 {importResult.errors.length > 0 && (
-                                    <ul style={{ margin: "8px 0 0 0", padding: "0 0 0 16px", fontSize: "12px", color: "#6b7280" }}>
+                                    <ul style={{ margin: "8px 0 0 0", padding: "0 0 0 16px", fontSize: "12px", color: "#555c72" }}>
                                         {importResult.errors.slice(0, 5).map((e, i) => <li key={i}>Row {e.row}: {e.reason}</li>)}
                                         {importResult.errors.length > 5 && <li>…and {importResult.errors.length - 5} more</li>}
                                     </ul>
@@ -2206,7 +2206,7 @@ function DocumentsTabView({ leads, onLeadClick, onView }: { leads: Lead[]; onLea
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border"
-                            style={{ color: verifiedColor[doc.verified] ?? "#6b7280", borderColor: verifiedColor[doc.verified] ?? "#6b7280", background: (verifiedColor[doc.verified] ?? "#6b7280") + "15" }}>
+                            style={{ color: verifiedColor[doc.verified] ?? "#555c72", borderColor: verifiedColor[doc.verified] ?? "#555c72", background: (verifiedColor[doc.verified] ?? "#555c72") + "15" }}>
                             {doc.verified}
                         </span>
                         <button 
@@ -2380,7 +2380,7 @@ function DetailDrawer({
     const verifiedBadge = (v: string) => {
         const colors: Record<string, string> = { PENDING: "#f59e0b", APPROVED: "#16a34a", REJECTED: "#dc2626" }
         return <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border"
-            style={{ color: colors[v] ?? "#6b7280", borderColor: colors[v] ?? "#6b7280", background: (colors[v] ?? "#6b7280") + "15" }}>
+            style={{ color: colors[v] ?? "#555c72", borderColor: colors[v] ?? "#555c72", background: (colors[v] ?? "#555c72") + "15" }}>
             {v}
         </span>
     }
@@ -2884,14 +2884,14 @@ function DetailDrawer({
                                     <p className="text-[12px] text-[var(--text3)] text-center py-8">No follow-ups scheduled</p>
                                 )}
                                 {(lead.followUps ?? []).map(fu => {
-                                    const statusColors: Record<string, string> = { PENDING: "#f59e0b", DONE: "#16a34a", SNOOZED: "#6b7280" }
+                                    const statusColors: Record<string, string> = { PENDING: "#f59e0b", DONE: "#16a34a", SNOOZED: "#555c72" }
                                     return (
                                         <div key={fu.id} className="border border-[var(--border)] rounded-[10px] p-3 bg-white">
                                             <div className="flex items-center justify-between mb-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[12px] font-semibold text-[var(--text)]">{fu.type}</span>
                                                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border"
-                                                        style={{ color: statusColors[fu.status] ?? "#6b7280", borderColor: statusColors[fu.status] ?? "#6b7280", background: (statusColors[fu.status] ?? "#6b7280") + "15" }}>
+                                                        style={{ color: statusColors[fu.status] ?? "#555c72", borderColor: statusColors[fu.status] ?? "#555c72", background: (statusColors[fu.status] ?? "#555c72") + "15" }}>
                                                         {fu.status}
                                                     </span>
                                                 </div>
@@ -3273,8 +3273,8 @@ function ConvertModal({ lead, onClose, onConverted }: {
                     {/* ── Salary ── */}
                     {activeTab === "salary" && (
                         <div className="space-y-4">
-                            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-[8px] px-3 py-2.5">
-                                <span className="text-[12px] text-blue-700">Set the detailed salary structure for payroll calculation.</span>
+                            <div className="flex items-start gap-2 bg-[var(--accent-light)] border border-[#e3ebff] rounded-[8px] px-3 py-2.5">
+                                <span className="text-[12px] text-[var(--accent-text)]">Set the detailed salary structure for payroll calculation.</span>
                             </div>
                             <div>
                                 <label className={lCls}>Compliance Type</label>
@@ -3459,7 +3459,7 @@ function ConvertModal({ lead, onClose, onConverted }: {
                                                                 <>
                                                                     <button type="button"
                                                                         onClick={() => { setPreviewUrl(pending.fileUrl); setPreviewName(pending.fileName) }}
-                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100">
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] font-medium bg-[var(--accent-light)] text-[var(--accent)] hover:bg-[#e3ebff]">
                                                                         <Eye size={11} /> View
                                                                     </button>
                                                                     <button type="button"

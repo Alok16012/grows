@@ -7,10 +7,10 @@ import { TrendingDown, TrendingUp, Minus } from "lucide-react"
 // footer in the tone's mid shade, the figure in its darkest shade. Replaced the
 // big gradient squares (about half the height, calmer on every page).
 const SOFT = {
-    blue:   { bg: "#e8effe", ink: "#0b3aa8", sub: "#3b5bb5" },
+    blue:   { bg: "#eaf0ff", ink: "#0b3aa8", sub: "#3b5bb5" },
     teal:   { bg: "#e1f5ee", ink: "#085041", sub: "#0f6e56" },
     amber:  { bg: "#faeeda", ink: "#633806", sub: "#854f0b" },
-    violet: { bg: "#efe7fe", ink: "#4c1d95", sub: "#6d28d9" },
+    violet: { bg: "#efe7fe", ink: "#4c1d95", sub: "#6d4fe0" },
     green:  { bg: "#eaf3de", ink: "#27500a", sub: "#3b6d11" },
     rose:   { bg: "#fcebeb", ink: "#791f1f", sub: "#a32d2d" },
     sky:    { bg: "#e0f2fe", ink: "#0c4a6e", sub: "#075985" },

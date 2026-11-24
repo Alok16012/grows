@@ -84,7 +84,7 @@ type Employee = {
 const SITE_TYPES = ["Security", "Housekeeping", "Facility", "Mixed"]
 const SHIFTS = ["Day", "Night", "24x7", "Rotating"]
 const DEPLOY_SHIFTS = ["Morning", "Evening", "Night", "Rotating"]
-const AVATAR_COLORS = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"]
+const AVATAR_COLORS = ["#3d6ff5", "#0ea5a4", "#8b6cf6", "#f5a623", "#e5566b", "#06b6d4", "#f97316"]
 
 function getAvatarColor(name: string) {
     const idx = (name.charCodeAt(0) || 0) % AVATAR_COLORS.length
@@ -130,15 +130,15 @@ function SiteTypeIcon({ type }: { type?: string }) {
 // ─── Site Type Badge ──────────────────────────────────────────────────────────
 
 const TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-    Security: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
+    Security: { bg: "#eaf0ff", text: "#2f5be0", border: "#d4e0ff" },
     Housekeeping: { bg: "#f0fdf4", text: "#16a34a", border: "#bbf7d0" },
     Facility: { bg: "#fefce8", text: "#b45309", border: "#fde68a" },
-    Mixed: { bg: "#f5f3ff", text: "#7c3aed", border: "#ddd6fe" },
+    Mixed: { bg: "#f1edff", text: "#6d4fe0", border: "#ddd6fe" },
 }
 
 function TypeBadge({ type }: { type?: string }) {
     if (!type) return null
-    const c = TYPE_COLORS[type] || { bg: "#f9fafb", text: "#6b7280", border: "#e5e7eb" }
+    const c = TYPE_COLORS[type] || { bg: "#f6f7fc", text: "#555c72", border: "#dfe3ef" }
     return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold border"
             style={{ background: c.bg, color: c.text, borderColor: c.border }}>
@@ -593,7 +593,7 @@ function SiteCard({ site, onView, onEdit, onDeploy, onToggle, onDelete, role }: 
                         <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold border ${
                             site.isActive
                                 ? "bg-[var(--success-light)] text-[var(--success-strong)] border-[var(--success-border)]"
-                                : "bg-[#f9fafb] text-[#6b7280] border-[#e5e7eb]"
+                                : "bg-[#f6f7fc] text-[#555c72] border-[#dfe3ef]"
                         }`}>
                             {site.isActive ? "Active" : "Inactive"}
                         </span>
@@ -959,13 +959,13 @@ function SiteTeamSection({ siteId, canManage }: { siteId: string; canManage: boo
                                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#fef3c7] text-[#b45309] border border-[#fcd34d]">Inspector</span>
                                 )}
                                 {m.isManager && (
-                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]">Manager</span>
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#eaf0ff] text-[#2f5be0] border border-[#d4e0ff]">Manager</span>
                                 )}
                                 {/* A member whose custom role lost both permissions stays
                                     listed but can no longer be picked anywhere — say so
                                     rather than showing an unexplained blank row. */}
                                 {!m.isInspector && !m.isManager && (
-                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#f9fafb] text-[#6b7280] border border-[#e5e7eb]">No permission</span>
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#f6f7fc] text-[#555c72] border border-[#dfe3ef]">No permission</span>
                                 )}
                             </div>
                             {canManage && (
@@ -1084,7 +1084,7 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                                 <span className="font-mono text-[11px] text-[var(--accent)] font-bold bg-[var(--accent-light)] px-2 py-0.5 rounded">{s.code}</span>
                             )}
                             <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold border ${
-                                s.isActive ? "bg-[var(--success-light)] text-[var(--success-strong)] border-[var(--success-border)]" : "bg-[#f9fafb] text-[#6b7280] border-[#e5e7eb]"
+                                s.isActive ? "bg-[var(--success-light)] text-[var(--success-strong)] border-[var(--success-border)]" : "bg-[#f6f7fc] text-[#555c72] border-[#dfe3ef]"
                             }`}>
                                 {s.isActive ? "Active" : "Inactive"}
                             </span>
@@ -1136,7 +1136,7 @@ function SiteDrawer({ site, onClose, onRefresh, session }: {
                                 Current Deployment
                             </h3>
                             <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-                                !required ? "bg-[#f9fafb] text-[#6b7280] border-[#e5e7eb]"
+                                !required ? "bg-[#f6f7fc] text-[#555c72] border-[#dfe3ef]"
                                 : staff.pct >= 100 ? "bg-[var(--success-light)] text-[var(--success-strong)] border-[var(--success-border)]"
                                 : staff.pct >= 70 ? "bg-[var(--amber-light)] text-[var(--amber)] border-[#fcd34d]"
                                 : "bg-red-50 text-[var(--red)] border-red-200"

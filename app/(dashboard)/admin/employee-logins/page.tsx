@@ -186,7 +186,7 @@ export default function EmployeeLoginsPage() {
 
     const roleBadge = (row: Row) => {
         if (row.customRole) {
-            const c = row.customRole.color || "#6366f1"
+            const c = row.customRole.color || "#8b6cf6"
             return (
                 <span className="px-[9px] py-0.5 rounded-[20px] text-[11px] font-medium"
                     style={{ background: `${c}20`, color: c }}>
@@ -393,7 +393,7 @@ export default function EmployeeLoginsPage() {
                             )}
                             <button
                                 onClick={() => openEdit(row)}
-                                className="h-[30px] px-2.5 rounded-[7px] bg-[var(--surface2)] border border-[var(--border)] flex items-center gap-1.5 text-[12px] text-[var(--text2)] hover:bg-[#eff6ff] hover:text-[#1d4ed8] hover:border-[#93c5fd] transition-colors"
+                                className="h-[30px] px-2.5 rounded-[7px] bg-[var(--surface2)] border border-[var(--border)] flex items-center gap-1.5 text-[12px] text-[var(--text2)] hover:bg-[#eaf0ff] hover:text-[#2f5be0] hover:border-[#b9ccfb] transition-colors"
                                 title={row.hasLogin ? "Edit login" : "Create login"}
                             >
                                 {row.hasLogin ? <Pencil className="h-[13px] w-[13px]" /> : <KeyRound className="h-[13px] w-[13px]" />}

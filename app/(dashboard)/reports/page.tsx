@@ -51,7 +51,7 @@ import { REPORT_SHEETS, ALL_REPORT_SHEETS, type ReportSheetKey } from "./reportS
 // orange = rework, red = rejected. `cumulative` is the Pareto line, kept off
 // those three so it can't be read as a quantity.
 const THEME = {
-    primary: "#3b82f6",
+    primary: "#3d6ff5",
     success: "#16a34a",
     warning: "#d97706",
     danger: "#dc2626",
@@ -612,7 +612,7 @@ function ExportColumns({ rows, nameKey, keys = QTY, plotHeight = 230, xLabel, yL
     const top = 14
     return (
         <BarChart width={EXPORT_W} height={top + plotHeight + layout.height + X_TITLE_H + 4} data={rows} margin={{ top, left, right, bottom: 4 }} barGap={2}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eceef6" />
             <XAxis dataKey={nameKey} axisLine={AXIS_LINE} tickLine={false} interval={0} height={layout.height + X_TITLE_H} tick={<NameTick layout={layout} />} label={xAxisTitle(xLabel, PDF_TICK)} />
             <YAxis width={EXPORT_YAXIS} axisLine={AXIS_LINE} tickLine={false} tick={PDF_TICK} {...qtyAxis(maxOf(rows, ...keys), upright)} label={axisTitle(yLabel, "left", PDF_TICK)} />
             {keys.map(k => (
@@ -643,7 +643,7 @@ function QuantityColumnsLive({ rows, nameKey, max, what, height = 380, xLabel }:
             <div ref={boxRef} style={{ height: 6 + 32 + plotHeight + layout.height + X_TITLE_H + 4 }} className="w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={shown} margin={{ top: 6, left, right: 10, bottom: 4 }} barGap={2}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eceef6" />
                         <XAxis dataKey={nameKey} axisLine={AXIS_LINE} tickLine={false} interval={0} height={layout.height + X_TITLE_H} tick={<NameTick layout={layout} />} label={xAxisTitle(xLabel, SCREEN_TICK)} />
                         <YAxis width={74} axisLine={AXIS_LINE} tickLine={false} tick={SCREEN_TICK} {...qtyAxis(maxOf(shown, ...QTY), upright)} label={axisTitle("Quantity", "left", SCREEN_TICK)} />
                         <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f5f7fd" }} />
@@ -1663,7 +1663,7 @@ export default function ReportsPage() {
                                                         <linearGradient id="colorAccepted" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.1} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                                                         <linearGradient id="colorInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.15} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                                                     </defs>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eceef6" />
                                                     <XAxis dataKey="label" axisLine={AXIS_LINE} tickLine={false} tick={SCREEN_TICK} dy={10} padding={{ left: 12, right: 6 }} height={30 + X_TITLE_H} label={xAxisTitle("Date", SCREEN_TICK)} />
                                                     <YAxis width={74} axisLine={AXIS_LINE} tickLine={false} tick={SCREEN_TICK} {...qtyAxis(maxOf(areaData, ...QTY), true)} label={axisTitle("Quantity", "left", SCREEN_TICK)} />
                                                     <Tooltip content={<CustomTooltip />} />
@@ -1760,7 +1760,7 @@ export default function ReportsPage() {
                                     <div ref={paretoBoxRef} className="w-full" style={{ height: 26 + 300 + paretoAxis.layout.height + X_TITLE_H + 4 + 34 }}>
                                         <ResponsiveContainer width="100%" height="100%">
                                             <ComposedChart data={paretoData} margin={{ top: 26, right: 8, left: paretoAxis.left, bottom: 4 }}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eceef6" />
                                                 <XAxis dataKey="defectName" axisLine={AXIS_LINE} tickLine={false} interval={0} height={paretoAxis.layout.height + X_TITLE_H} tick={<NameTick layout={paretoAxis.layout} />} label={xAxisTitle("Defect", SCREEN_TICK)} />
                                                 <YAxis yAxisId="left" width={64} axisLine={AXIS_LINE} tickLine={false} tick={SCREEN_TICK} domain={[0, paretoTop(paretoData)]} ticks={quarters(paretoTop(paretoData))} tickFormatter={fmtQty} label={axisTitle("Defect Qty", "left", SCREEN_TICK)} />
                                                 <YAxis yAxisId="right" width={78} orientation="right" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} axisLine={AXIS_LINE} tickLine={false} tick={SCREEN_TICK} tickFormatter={pct2} label={axisTitle("Cumulative %", "right", SCREEN_TICK)} />
@@ -1768,7 +1768,7 @@ export default function ReportsPage() {
                                                 <Legend itemSorter={null} wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingTop: 8 }} />
                                                 <Bar yAxisId="left" dataKey="rework" name="Rework defects" stackId="d" fill={THEME.warning} maxBarSize={50} />
                                                 <Bar yAxisId="left" dataKey="rejected" name="Rejected defects" stackId="d" fill={THEME.danger} maxBarSize={50} />
-                                                <Bar yAxisId="left" dataKey="unclassified" name="Not classified" stackId="d" fill="#9ca3af" maxBarSize={50} legendType="none" />
+                                                <Bar yAxisId="left" dataKey="unclassified" name="Not classified" stackId="d" fill="#98a1b5" maxBarSize={50} legendType="none" />
                                                 <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.cumulative} strokeWidth={3} dot={{ r: 4, fill: THEME.cumulative, strokeWidth: 2, stroke: "white" }}>
                                                     <LabelList dataKey="cumulative" content={<ParetoLabels rows={paretoData} top={paretoTop(paretoData)} barWidth={50} />} />
                                                 </Line>
@@ -2098,7 +2098,7 @@ export default function ReportsPage() {
                                 {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
                             </Pie>
                             <text x={350} y={73} textAnchor="middle" fontSize={15} fontWeight={700} fill="#111827">{ratePct(s?.totalAccepted, s?.totalInspected)}</text>
-                            <text x={350} y={88} textAnchor="middle" fontSize={9} fontWeight={600} fill="#4b5563">ACCEPTED</text>
+                            <text x={350} y={88} textAnchor="middle" fontSize={9} fontWeight={600} fill="#555c72">ACCEPTED</text>
                         </PieChart>
                     </div>
                     {/* Daily trend: inspected quantity labelled at each day; the rework / rejected
@@ -2109,7 +2109,7 @@ export default function ReportsPage() {
                                 <linearGradient id="capAccepted" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.15} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                                 <linearGradient id="capInspected" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={THEME.success} stopOpacity={0.18} /><stop offset="95%" stopColor={THEME.success} stopOpacity={0} /></linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eceef6" />
                             <XAxis dataKey="label" axisLine={AXIS_LINE} tickLine={false} tick={PDF_TICK} dy={6} padding={{ left: 14, right: 6 }} height={30 + X_TITLE_H} label={xAxisTitle("Date", PDF_TICK)} />
                             <YAxis width={74} axisLine={AXIS_LINE} tickLine={false} tick={PDF_TICK} {...qtyAxis(maxOf(areaData, ...QTY), true)} label={axisTitle("Quantity", "left", PDF_TICK)} />
                             <Area type="monotone" dataKey="totalInspected" name="Total Inspected" stroke={THEME.success} strokeWidth={2} fillOpacity={1} fill="url(#capInspected)" dot={{ r: 2.5, fill: THEME.success, stroke: 'white', strokeWidth: 1 }} isAnimationActive={false}>
@@ -2149,13 +2149,13 @@ export default function ReportsPage() {
                             const ax = fitNames(paretoData.map((d: any) => String(d.defectName ?? "")), EXPORT_W - 4 - 70 - 86, 70, 26, PDF_TICK, 150)
                             return (
                         <ComposedChart width={EXPORT_W} height={26 + 210 + ax.layout.height + X_TITLE_H + 4} data={paretoData} margin={{ top: 26, right: 4, left: ax.left, bottom: 4 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eceef6" />
                             <XAxis dataKey="defectName" axisLine={AXIS_LINE} tickLine={false} interval={0} height={ax.layout.height + X_TITLE_H} tick={<NameTick layout={ax.layout} />} label={xAxisTitle("Defect", PDF_TICK)} />
                             <YAxis yAxisId="left" width={70} axisLine={AXIS_LINE} tickLine={false} tick={PDF_TICK} domain={[0, paretoTop(paretoData)]} ticks={quarters(paretoTop(paretoData))} tickFormatter={fmtQty} label={axisTitle("Defect Qty", "left", PDF_TICK)} />
                             <YAxis yAxisId="right" width={86} orientation="right" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} axisLine={AXIS_LINE} tickLine={false} tick={PDF_TICK} tickFormatter={pct2} label={axisTitle("Cumulative %", "right", PDF_TICK)} />
                             <Bar yAxisId="left" dataKey="rework" name="Rework defects" stackId="d" fill={THEME.warning} maxBarSize={40} isAnimationActive={false} />
                             <Bar yAxisId="left" dataKey="rejected" name="Rejected defects" stackId="d" fill={THEME.danger} maxBarSize={40} isAnimationActive={false} />
-                            <Bar yAxisId="left" dataKey="unclassified" name="Not classified" stackId="d" fill="#9ca3af" maxBarSize={40} isAnimationActive={false} />
+                            <Bar yAxisId="left" dataKey="unclassified" name="Not classified" stackId="d" fill="#98a1b5" maxBarSize={40} isAnimationActive={false} />
                             <Line yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative %" stroke={THEME.cumulative} strokeWidth={3} dot={{ r: 4, fill: THEME.cumulative, stroke: 'white', strokeWidth: 2 }} isAnimationActive={false}>
                                 <LabelList dataKey="cumulative" content={<ParetoLabels rows={paretoData} top={paretoTop(paretoData)} barWidth={40} />} />
                             </Line>

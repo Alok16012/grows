@@ -171,7 +171,7 @@ type ColDef = { key: string; label: string; get: (e: Employee) => string }
 
 const COLUMN_GROUPS: { group: string; color: string; cols: ColDef[] }[] = [
     {
-        group: "Basic Info", color: "#3b82f6",
+        group: "Basic Info", color: "#3d6ff5",
         cols: [
             { key: "employeeId",    label: "Emp ID",        get: e => e.employeeId },
             { key: "fullName",      label: "Full Name",     get: e => [e.firstName, e.middleName, e.lastName].filter(Boolean).join(" ") },
@@ -186,7 +186,7 @@ const COLUMN_GROUPS: { group: string; color: string; cols: ColDef[] }[] = [
         ]
     },
     {
-        group: "Personal", color: "#8b5cf6",
+        group: "Personal", color: "#8b6cf6",
         cols: [
             { key: "dob",           label: "Date of Birth",    get: e => e.dateOfBirth ? new Date(e.dateOfBirth).toLocaleDateString("en-IN") : "" },
             { key: "gender",        label: "Gender",           get: e => e.gender || "" },
@@ -257,7 +257,7 @@ const COLUMN_GROUPS: { group: string; color: string; cols: ColDef[] }[] = [
         ]
     },
     {
-        group: "Contract", color: "#7c3aed",
+        group: "Contract", color: "#6d4fe0",
         cols: [
             { key: "workSkill",     label: "Work Skill",       get: e => e.workSkill || "" },
             { key: "natureOfWork",  label: "Nature of Work",   get: e => e.natureOfWork || "" },
@@ -282,7 +282,7 @@ const COLUMN_GROUPS: { group: string; color: string; cols: ColDef[] }[] = [
         ]
     },
     {
-        group: "Background / Medical", color: "#6b7280",
+        group: "Background / Medical", color: "#555c72",
         cols: [
             { key: "bgCheck",       label: "BG Checked",       get: e => e.isBackgroundChecked ? "Yes" : "No" },
             { key: "bgRemark",      label: "BG Remark",        get: e => e.backgroundCheckRemark || "" },
@@ -344,10 +344,10 @@ function sortEmployees(rows: Employee[], sort: { key: string; dir: SortDir } | n
 
 const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
     ACTIVE:     { bg: "#dcfce7", color: "#16a34a" },
-    INACTIVE:   { bg: "#f3f4f6", color: "#6b7280" },
+    INACTIVE:   { bg: "#f6f7fc", color: "#555c72" },
     ON_LEAVE:   { bg: "#fef9c3", color: "#ca8a04" },
     TERMINATED: { bg: "#fee2e2", color: "#dc2626" },
-    RESIGNED:   { bg: "#ede9fe", color: "#7c3aed" },
+    RESIGNED:   { bg: "#ebe5ff", color: "#6d4fe0" },
 }
 
 // ─── Field helpers ────────────────────────────────────────────────────────────
@@ -474,11 +474,11 @@ function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => v
     }
 
     const sections = [
-        { id: "basic",    label: "Basic Info",         color: "#3b82f6" },
-        { id: "personal", label: "Personal",           color: "#8b5cf6" },
+        { id: "basic",    label: "Basic Info",         color: "#3d6ff5" },
+        { id: "personal", label: "Personal",           color: "#8b6cf6" },
         { id: "contact",  label: "Contact & Address",  color: "#0891b2" },
         { id: "statutory",label: "Statutory / Bank",   color: "#dc2626" },
-        { id: "contract", label: "Contract / Work",    color: "#7c3aed" },
+        { id: "contract", label: "Contract / Work",    color: "#6d4fe0" },
         { id: "safety",   label: "Safety & Medical",   color: "#f59e0b" },
     ]
 
@@ -527,7 +527,7 @@ function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => v
 
                     {section === "basic" && (
                         <>
-                            <p style={sectionHeadStyle("#3b82f6")}>Basic Info</p>
+                            <p style={sectionHeadStyle("#3d6ff5")}>Basic Info</p>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
                                 <Field label="First Name"     value={form.firstName}     onChange={set("firstName")} />
                                 <Field label="Middle Name"    value={form.middleName}    onChange={set("middleName")} />
@@ -568,7 +568,7 @@ function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => v
 
                     {section === "personal" && (
                         <>
-                            <p style={sectionHeadStyle("#8b5cf6")}>Personal</p>
+                            <p style={sectionHeadStyle("#8b6cf6")}>Personal</p>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
                                 <Field label="Date of Birth"   type="date" value={form.dateOfBirth}     onChange={set("dateOfBirth")} />
                                 <Field label="Gender" type="select" value={form.gender} onChange={set("gender")}
@@ -652,7 +652,7 @@ function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => v
 
                     {section === "contract" && (
                         <>
-                            <p style={sectionHeadStyle("#7c3aed")}>Contract / Work</p>
+                            <p style={sectionHeadStyle("#6d4fe0")}>Contract / Work</p>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
                                 <Field label="Work Skill"       value={form.workSkill}       onChange={set("workSkill")} />
                                 <Field label="Nature of Work"   value={form.natureOfWork}    onChange={set("natureOfWork")} />
@@ -678,7 +678,7 @@ function EditDrawer({ emp, onClose, onSaved }: { emp: Employee; onClose: () => v
                                 <CheckField label="Ear Muffs" checked={form.safetyEarMuffs} onChange={set("safetyEarMuffs") as (v: boolean) => void} />
                                 <CheckField label="Shoes"     checked={form.safetyShoes}    onChange={set("safetyShoes") as (v: boolean) => void} />
                             </div>
-                            <p style={{ ...sectionHeadStyle("#6b7280"), marginTop: 14 }}>Background &amp; Medical</p>
+                            <p style={{ ...sectionHeadStyle("#555c72"), marginTop: 14 }}>Background &amp; Medical</p>
                             <CheckField label="Background Check Done" checked={form.isBackgroundChecked} onChange={set("isBackgroundChecked") as (v: boolean) => void} />
                             <Field label="BG Remark" type="textarea" value={form.backgroundCheckRemark} onChange={set("backgroundCheckRemark")} />
                             <CheckField label="Medical Done" checked={form.isMedicalDone} onChange={set("isMedicalDone") as (v: boolean) => void} />
@@ -1053,7 +1053,7 @@ export default function EmployeeMasterPage() {
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0" style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--accent-light, #e8effe)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--accent-light, #eaf0ff)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
                         <Users size={19} style={{ color: "var(--accent)" }} />
                     </div>
                     <div>
@@ -1076,7 +1076,7 @@ export default function EmployeeMasterPage() {
                     </button>
                     <button onClick={selectedIds.size > 0 ? handleDownloadSelected : handleExport} disabled={exporting || filteredEmployees.length === 0}
                         title={selectedIds.size > 0 ? "Downloads only the selected rows, with the columns you've picked" : "Downloads all rows, with the columns you've picked"}
-                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 17px", borderRadius: 9, border: "none", background: "var(--accent, #0b5cff)", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", opacity: (exporting || filteredEmployees.length === 0) ? 0.6 : 1, boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 17px", borderRadius: 9, border: "none", background: "var(--accent, #3d6ff5)", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", opacity: (exporting || filteredEmployees.length === 0) ? 0.6 : 1, boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
                         {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
                         {exporting ? "Exporting…" : selectedIds.size > 0 ? `Download Excel (${selectedIds.size})` : "Download Excel"}
                     </button>
@@ -1225,15 +1225,15 @@ export default function EmployeeMasterPage() {
                     <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%", fontSize: 12.5 }}>
                         <thead>
                             {/* Column labels row */}
-                            <tr style={{ background: "#f8fafc" }}>
-                                <th style={{ position: "sticky", left: 0, top: 0, zIndex: 3, background: "#f8fafc", padding: "10px 10px", borderBottom: "1px solid var(--border)", textAlign: "center", whiteSpace: "nowrap", minWidth: 40 }}>
+                            <tr style={{ background: "#f6f7fc" }}>
+                                <th style={{ position: "sticky", left: 0, top: 0, zIndex: 3, background: "#f6f7fc", padding: "10px 10px", borderBottom: "1px solid var(--border)", textAlign: "center", whiteSpace: "nowrap", minWidth: 40 }}>
                                     <input type="checkbox" checked={allSelected} ref={el => { if (el) el.indeterminate = someSelected }} onChange={toggleAll}
                                         style={{ width: 14, height: 14, cursor: "pointer", accentColor: "var(--accent)" }} />
                                 </th>
-                                <th style={{ position: "sticky", left: 40, top: 0, zIndex: 3, background: "#f8fafc", padding: "10px 8px", borderBottom: "1px solid var(--border)", textAlign: "center", fontSize: 11, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 34 }}>
+                                <th style={{ position: "sticky", left: 40, top: 0, zIndex: 3, background: "#f6f7fc", padding: "10px 8px", borderBottom: "1px solid var(--border)", textAlign: "center", fontSize: 11, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 34 }}>
                                     #
                                 </th>
-                                <th style={{ position: "sticky", left: 74, top: 0, zIndex: 3, background: "#f8fafc", padding: "10px 8px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 11, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 46 }}>
+                                <th style={{ position: "sticky", left: 74, top: 0, zIndex: 3, background: "#f6f7fc", padding: "10px 8px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", textAlign: "center", fontSize: 11, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 46 }}>
                                     Edit
                                 </th>
                                 {tableCols.map(col => {
@@ -1241,7 +1241,7 @@ export default function EmployeeMasterPage() {
                                     const SortIcon = dir === "asc" ? ArrowUp : dir === "desc" ? ArrowDown : ArrowUpDown
                                     return (
                                         <th key={col.key} aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none"}
-                                            style={{ position: "sticky", top: 0, zIndex: 2, background: "#f8fafc", padding: 0, borderBottom: "1px solid var(--border)", textAlign: "left", whiteSpace: "nowrap", minWidth: 110 }}>
+                                            style={{ position: "sticky", top: 0, zIndex: 2, background: "#f6f7fc", padding: 0, borderBottom: "1px solid var(--border)", textAlign: "left", whiteSpace: "nowrap", minWidth: 110 }}>
                                             <button type="button" onClick={() => cycleSort(col.key)}
                                                 title={dir === "asc" ? `Sorted by ${col.label}, ascending — click for descending`
                                                     : dir === "desc" ? `Sorted by ${col.label}, descending — click to clear`
@@ -1288,11 +1288,11 @@ export default function EmployeeMasterPage() {
                                 </tr>
                             )}
                             {pagedEmployees.map((emp, idx) => {
-                                const sc = STATUS_COLOR[emp.status] || { bg: "#f3f4f6", color: "#6b7280" }
+                                const sc = STATUS_COLOR[emp.status] || { bg: "#f6f7fc", color: "#555c72" }
                                 const isChecked = selectedIds.has(emp.id)
                                 return (
-                                    <tr key={emp.id} style={{ background: isChecked ? "#eff6ff" : "#fff", borderBottom: "1px solid #eef0f3" }}
-                                        onMouseEnter={e => { if (!isChecked) e.currentTarget.style.background = "#f9fafb" }}
+                                    <tr key={emp.id} style={{ background: isChecked ? "#eaf0ff" : "#fff", borderBottom: "1px solid #eef0f3" }}
+                                        onMouseEnter={e => { if (!isChecked) e.currentTarget.style.background = "#f6f7fc" }}
                                         onMouseLeave={e => { if (!isChecked) e.currentTarget.style.background = "#fff" }}>
                                         <td style={{ position: "sticky", left: 0, zIndex: 2, background: "inherit", padding: "9px 10px", textAlign: "center", minWidth: 40 }}>
                                             <input type="checkbox" checked={isChecked} onChange={() => toggleOne(emp.id)}

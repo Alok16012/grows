@@ -83,7 +83,7 @@ export default function RegisterDesignerPage() {
                                         </td>
                                         <td className={`${tdCls} text-right font-mono`}>{r.entryCount}</td>
                                         <td className={tdCls}>
-                                            <Pill tone={r.isActive ? { label: "Active", bg: "#dcfce7", color: "#15803d" } : { label: "Inactive", bg: "#f3f4f6", color: "#6b7280" }} />
+                                            <Pill tone={r.isActive ? { label: "Active", bg: "#dcfce7", color: "#15803d" } : { label: "Inactive", bg: "#f6f7fc", color: "#555c72" }} />
                                         </td>
                                         <td className={`${tdCls} text-right`}>
                                             <div className="inline-flex gap-1.5">

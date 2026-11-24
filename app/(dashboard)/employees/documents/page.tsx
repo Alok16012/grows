@@ -38,7 +38,7 @@ type Employee = {
 // ─── Document columns shown in the table ─────────────────────────────────────
 const POLICIES_COL = "POLICIES"
 const DOC_COLS = [
-    { key: "AADHAAR",      label: "Aadhaar",      hint: "Aadhaar card (front & back)",   color: "#1d4ed8", bg: "#dbeafe" },
+    { key: "AADHAAR",      label: "Aadhaar",      hint: "Aadhaar card (front & back)",   color: "#2f5be0", bg: "#e3ebff" },
     { key: "PAN",          label: "PAN",          hint: "PAN card",                       color: "#b45309", bg: "#fef3c7" },
     { key: "PHOTO",        label: "Photo",        hint: "Passport-size photo",            color: "#15803d", bg: "#dcfce7" },
     { key: "OFFER_LETTER", label: "Agreement",    hint: "Offer letter / agreement",       color: "#9333ea", bg: "#f3e8ff" },
@@ -47,8 +47,8 @@ const DOC_COLS = [
     // Not an upload: the employee's signed policies (Policies → sign-off),
     // shown only to roles with the Policies report permission.
     { key: POLICIES_COL,   label: "Policies",     hint: "Policies the employee must sign", color: "#be185d", bg: "#fce7f3" },
-    { key: "RESUME",       label: "Resume",       hint: "Resume / CV",                    color: "#7c3aed", bg: "#ede9fe" },
-    { key: "OTHER",        label: "Other",        hint: "Any other document",             color: "#6b7280", bg: "#f3f4f6" },
+    { key: "RESUME",       label: "Resume",       hint: "Resume / CV",                    color: "#6d4fe0", bg: "#ebe5ff" },
+    { key: "OTHER",        label: "Other",        hint: "Any other document",             color: "#555c72", bg: "#f6f7fc" },
 ]
 
 // What an employee file must hold to count as complete. Certificate, Resume,
@@ -61,7 +61,7 @@ const REQUIRED_DOCS = ["AADHAAR", "PAN", "PHOTO", "BANK_DETAILS"]
 const PROFILE_PHOTO_ID = "__profile_photo__"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const AVATAR_COLORS = ["#0b5cff","#3b82f6","#8b5cf6","#f59e0b","#ef4444","#06b6d4","#f97316"]
+const AVATAR_COLORS = ["#3d6ff5", "#0ea5a4", "#8b6cf6", "#f5a623", "#e5566b","#06b6d4","#f97316"]
 function avatarColor(name: string) {
     return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length]
 }
@@ -206,12 +206,12 @@ function DocCell({
                 {/* Verify link for pending docs */}
                 {canVer && !isVerified && doc.id !== PROFILE_PHOTO_ID && (
                     <button onClick={handleVerify} disabled={verifying}
-                        className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#2563eb] hover:underline disabled:opacity-50">
+                        className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#3d6ff5] hover:underline disabled:opacity-50">
                         {verifying ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Verify
                     </button>
                 )}
                 <button onClick={handleView} disabled={fetchingFile}
-                    className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#2563eb] hover:underline disabled:opacity-50">
+                    className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#3d6ff5] hover:underline disabled:opacity-50">
                     {fetchingFile ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />} View
                 </button>
                 <button onClick={handleDownload} disabled={fetchingFile}
@@ -263,7 +263,7 @@ function PolicyCell({ list, loading }: { list: PolicySignoff[] | undefined; load
                     {p.signed && p.ackId ? (
                         <div className="flex items-center gap-3">
                             <a href={`/api/policies/acks/${p.ackId}/pdf`} target="_blank" rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#2563eb] hover:underline">
+                                className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#3d6ff5] hover:underline">
                                 <Eye size={12} /> View
                             </a>
                             <a href={`/api/policies/acks/${p.ackId}/pdf`} download
@@ -611,7 +611,7 @@ export default function MasterDocumentsPage() {
                     </button>
                     {isAdmin && (
                         <button onClick={() => toast.info("Use the per-document Upload buttons in each employee's row.")}
-                            className="flex items-center justify-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent,#0b5cff)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity"
+                            className="flex items-center justify-center gap-2 h-[42px] px-5 rounded-[10px] bg-[var(--accent,#3d6ff5)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity"
                             style={{ boxShadow: "0 1px 3px rgba(26,158,110,0.35)" }}>
                             <Upload size={16} /> Upload Documents
                         </button>

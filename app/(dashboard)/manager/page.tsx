@@ -18,14 +18,14 @@ import { StatCard, statGridClass } from "@/components/StatCard"
 // ─── Expense Team Summary Table ───────────────────────────────────────────────
 
 const EXP_COLS = [
-    { key: "TRAVEL",          label: "Travel",   color: "#3b82f6" },
+    { key: "TRAVEL",          label: "Travel",   color: "#3d6ff5" },
     { key: "FUEL",            label: "Fuel",     color: "#ca8a04" },
     { key: "FOOD",            label: "Food",     color: "#f97316" },
-    { key: "HOTEL",           label: "Hotel",    color: "#a855f7" },
+    { key: "HOTEL",           label: "Hotel",    color: "#8b6cf6" },
     { key: "MATERIAL",        label: "Material", color: "#b45309" },
     { key: "MOBILE_RECHARGE", label: "Mobile",   color: "#0891b2" },
     { key: "OFFICE_SUPPLIES", label: "Office",   color: "#0d9488" },
-    { key: "OTHER",           label: "Other",    color: "#6b7280" },
+    { key: "OTHER",           label: "Other",    color: "#555c72" },
 ]
 
 function fmt(n: number) {
@@ -345,7 +345,7 @@ export default function ManagerDashboard() {
                                             "rounded-[20px] px-3 py-1 text-[11.5px] font-medium",
                                             a.status === "active" ? "bg-[var(--success-light)] text-[var(--success)]" :
                                             a.status === "pending" ? "bg-[#fef3c7] text-[#d97706]" :
-                                            a.status === "completed" ? "bg-[#eff6ff] text-[#1d4ed8]" : "bg-[var(--surface2)] text-[var(--text2)]"
+                                            a.status === "completed" ? "bg-[#eaf0ff] text-[#2f5be0]" : "bg-[var(--surface2)] text-[var(--text2)]"
                                         )}>
                                             {a.status}
                                         </span>
@@ -363,8 +363,8 @@ export default function ManagerDashboard() {
             {/* Quick Links */}
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                    { label: "Performance Analytics", href: "/manager/analytics", icon: TrendingUp, color: "#0b5cff" },
-                    { label: "All Reports", href: "/reports", icon: BarChart2, color: "#3b82f6" },
+                    { label: "Performance Analytics", href: "/manager/analytics", icon: TrendingUp, color: "#3d6ff5" },
+                    { label: "All Reports", href: "/reports", icon: BarChart2, color: "#3d6ff5" },
                     { label: "All Approvals", href: "/approvals", icon: ClipboardCheck, color: "#d97706" },
                     { label: "Assignments", href: "/assignments", icon: HardHat, color: "#5b6478" },
                 ].map(q => (

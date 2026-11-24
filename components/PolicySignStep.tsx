@@ -22,8 +22,8 @@ export type PolicyProgress = { ready: boolean; total: number; signed: number; al
 
 const THEMES = {
     dark: {
-        card: "#111120", panel: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.08)", text: "#ffffff", text2: "#d1d5db",
-        muted: "#6b7280", accent: "#6366f1", accentSoft: "rgba(99,102,241,0.12)", accentText: "#a5b4fc",
+        card: "#111120", panel: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.08)", text: "#ffffff", text2: "#d5dae8",
+        muted: "#555c72", accent: "#8b6cf6", accentSoft: "rgba(99,102,241,0.12)", accentText: "#a5b4fc",
         ok: "#4ade80", okSoft: "rgba(34,197,94,0.1)", warn: "#fbbf24", warnSoft: "rgba(234,179,8,0.08)", err: "#f87171",
         input: "rgba(255,255,255,0.05)", reader: "#0d0d18",
     },
@@ -336,7 +336,7 @@ function SignForm({ policy, theme, source, designation, signerName, onSigned, on
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 13, color: t.text2 }}>
                 <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)}
-                    style={{ width: 17, height: 17, marginTop: 1, accentColor: theme === "dark" ? "#6366f1" : undefined, flexShrink: 0 }} />
+                    style={{ width: 17, height: 17, marginTop: 1, accentColor: theme === "dark" ? "#8b6cf6" : undefined, flexShrink: 0 }} />
                 <span>I have read <b style={{ color: t.text }}>{policy.title}</b> (version {policy.versionNo}) to the end, understood it and agree to follow it.</span>
             </label>
 
@@ -359,7 +359,7 @@ function SignForm({ policy, theme, source, designation, signerName, onSigned, on
             <button onClick={sign} disabled={!can}
                 style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0", borderRadius: 12, border: "none",
-                    background: can ? (theme === "dark" ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "var(--accent)") : (theme === "dark" ? "#374151" : "var(--border)"),
+                    background: can ? (theme === "dark" ? "linear-gradient(135deg,#8b6cf6,#8b6cf6)" : "var(--accent)") : (theme === "dark" ? "#3a4157" : "var(--border)"),
                     color: can ? "#fff" : t.muted, fontSize: 14, fontWeight: 700, cursor: can ? "pointer" : "not-allowed",
                 }}>
                 {busy ? <Loader2 size={15} className="animate-spin" /> : <FileSignature size={15} />} Sign policy
@@ -426,10 +426,10 @@ const SignaturePad = forwardRef<SignaturePadHandle, { border: string }>(function
             <canvas ref={canvasRef} aria-label="Signature pad — draw with your finger or mouse"
                 onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}
                 style={{ width: "100%", height: 120, borderRadius: 10, border: `1px dashed ${border}`, background: "#ffffff", touchAction: "none", cursor: "crosshair", display: "block" }} />
-            {!hasInk && <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#9ca3af", pointerEvents: "none" }}>Sign here</span>}
+            {!hasInk && <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#98a1b5", pointerEvents: "none" }}>Sign here</span>}
             {hasInk && (
                 <button type="button" onClick={clear}
-                    style={{ position: "absolute", top: 6, right: 6, display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", fontSize: 11, color: "#374151", cursor: "pointer" }}>
+                    style={{ position: "absolute", top: 6, right: 6, display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 8, border: "1px solid #dfe3ef", background: "#fff", fontSize: 11, color: "#3a4157", cursor: "pointer" }}>
                     <RotateCcw size={11} /> Clear
                 </button>
             )}

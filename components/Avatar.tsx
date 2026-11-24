@@ -2,7 +2,7 @@
 import { useState } from "react"
 
 const AVATAR_COLORS = [
-    "#0b5cff", "#3b82f6", "#8b5cf6",
+    "#3d6ff5", "#3d6ff5", "#8b6cf6",
     "#f59e0b", "#ef4444", "#06b6d4", "#f97316",
 ]
 

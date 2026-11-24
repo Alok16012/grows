@@ -778,7 +778,7 @@ export default function JoinPage() {
                                         <div>
                                             <Lbl text="Assigned HR / Manager" required />
                                             {referrer ? (
-                                                <div style={{ ...sel, display: "flex", alignItems: "center", gap: 8, background: "#e8effe", borderColor: "#0b5cff", color: "#0847c7", fontWeight: 600 }}>
+                                                <div style={{ ...sel, display: "flex", alignItems: "center", gap: 8, background: "#eaf0ff", borderColor: "#3d6ff5", color: "#2f5be0", fontWeight: 600 }}>
                                                     <Lock size={13} /> {referrer.name}
                                                     <span style={{ fontSize: 11, fontWeight: 500, color: "#15803d", marginLeft: "auto" }}>Auto-assigned</span>
                                                 </div>

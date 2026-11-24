@@ -71,7 +71,7 @@ export default function ChangeControlPanel({ versions, window, viewing, onView, 
                                 <button onClick={() => onView({ month: v.fromMonth, year: v.fromYear })} className="flex-1 text-left">
                                     From <b>{MONTHS[v.fromMonth]} {v.fromYear}</b>
                                     {inForce && k(inForce) === k(v) && <span className="ml-2 rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10.5px] font-semibold text-[#15803d]">in force for the open month</span>}
-                                    {k(v) > openKey && <span className="ml-2 rounded-full bg-[#dbeafe] px-2 py-0.5 text-[10.5px] font-semibold text-[#1d4ed8]">upcoming</span>}
+                                    {k(v) > openKey && <span className="ml-2 rounded-full bg-[#e3ebff] px-2 py-0.5 text-[10.5px] font-semibold text-[#2f5be0]">upcoming</span>}
                                     <span className="block text-[11px] text-[var(--text3)]">saved {new Date(v.savedAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}{v.note ? ` · ${v.note}` : ""}</span>
                                 </button>
                                 {future && <button disabled={busy} onClick={() => remove(v)} title="Remove (not used by any payroll yet)" className="p-1 text-[var(--text3)] hover:text-[#dc2626]"><Trash2 size={14} /></button>}

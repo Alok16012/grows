@@ -689,7 +689,7 @@ export default function InspectionFormPage() {
                                 )}
                             </div>
                         </div>
-                        <div className={`text-[12px] font-[700] px-[10px] py-[4px] rounded-[20px] flex-shrink-0 ml-3 transition-all ${isChecked ? "bg-[#dcfce7] text-[#15803d]" : "bg-[#f3f4f6] text-[#9ca3af]"}`}>
+                        <div className={`text-[12px] font-[700] px-[10px] py-[4px] rounded-[20px] flex-shrink-0 ml-3 transition-all ${isChecked ? "bg-[#dcfce7] text-[#15803d]" : "bg-[#f6f7fc] text-[#98a1b5]"}`}>
                             {isChecked ? "✓ Done" : "Pending"}
                         </div>
                     </button>
@@ -712,7 +712,7 @@ export default function InspectionFormPage() {
                             {template.fieldLabel}
                             {template.isRequired && <span className="text-[#dc2626] ml-1">*</span>}
                         </div>
-                        <div className="text-[10px] font-[500] px-[8px] py-[2px] rounded-[20px] bg-[#f5f3ff] text-[#7c3aed]">INSPECTION</div>
+                        <div className="text-[10px] font-[500] px-[8px] py-[2px] rounded-[20px] bg-[#f1edff] text-[#6d4fe0]">INSPECTION</div>
                     </div>
                     <div className="grid grid-cols-2 gap-[8px]">
                         <button type="button" disabled={readOnly}
@@ -764,8 +764,8 @@ export default function InspectionFormPage() {
         // ── Default fields (text, number, date, textarea, dropdown) ───────────
         let pillClass = ""
         let pillText = template.fieldType.toUpperCase()
-        if (template.fieldType === "date") pillClass = "bg-[#eff6ff] text-[#3b82f6]"
-        else if (template.fieldType === "dropdown") pillClass = "bg-[#f5f3ff] text-[#7c3aed]"
+        if (template.fieldType === "date") pillClass = "bg-[#eaf0ff] text-[#3d6ff5]"
+        else if (template.fieldType === "dropdown") pillClass = "bg-[#f1edff] text-[#6d4fe0]"
         else if (template.fieldType === "number") pillClass = "bg-[#fef3c7] text-[#d97706]"
         else pillClass = "bg-[var(--surface2)] text-[var(--text3)] border border-[var(--border)]"
 
@@ -918,7 +918,7 @@ export default function InspectionFormPage() {
                         <div className={cn(
                             "hidden sm:flex items-center gap-1 text-[11px] px-2 py-1 rounded-full",
                             gpsStatus === "ok" ? "bg-green-100 text-green-700" :
-                            gpsStatus === "loading" ? "bg-blue-50 text-blue-500" :
+                            gpsStatus === "loading" ? "bg-[var(--accent-light)] text-[var(--accent)]" :
                             gpsStatus === "denied" ? "bg-gray-100 text-gray-500" : "hidden"
                         )}>
                             <MapPin className="h-3 w-3" />
@@ -933,8 +933,8 @@ export default function InspectionFormPage() {
                         {saving ? (
                             <>
                                 <span className="relative flex h-[8px] w-[8px]">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3b82f6] opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-[8px] w-[8px] bg-[#3b82f6]"></span>
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3d6ff5] opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-[8px] w-[8px] bg-[#3d6ff5]"></span>
                                 </span>
                                 <span className="text-[12.5px] text-[var(--text2)] hidden sm:inline">Saving...</span>
                             </>
@@ -1010,9 +1010,9 @@ export default function InspectionFormPage() {
                     </div>
                 )}
                 {isAdmin && isSubmitted && (
-                    <div className="bg-[#eff6ff] border border-[rgba(59,130,246,0.25)] rounded-[12px] p-[14px_18px] flex items-center gap-[12px] mb-[24px]">
-                        <CheckCircle2 className="h-[20px] w-[20px] text-[#3b82f6] shrink-0" />
-                        <span className="text-[13px] font-[500] text-[#1d4ed8] flex-1">
+                    <div className="bg-[#eaf0ff] border border-[rgba(59,130,246,0.25)] rounded-[12px] p-[14px_18px] flex items-center gap-[12px] mb-[24px]">
+                        <CheckCircle2 className="h-[20px] w-[20px] text-[#3d6ff5] shrink-0" />
+                        <span className="text-[13px] font-[500] text-[#2f5be0] flex-1">
                             Admin edit mode — you can modify and save this {inspection?.status} inspection.
                         </span>
                     </div>
@@ -1354,8 +1354,8 @@ export default function InspectionFormPage() {
                             {saving ? (
                                 <>
                                     <span className="relative flex h-[8px] w-[8px]">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3b82f6] opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-[8px] w-[8px] bg-[#3b82f6]"></span>
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3d6ff5] opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-[8px] w-[8px] bg-[#3d6ff5]"></span>
                                     </span>
                                     <span className="text-[12.5px] text-[var(--text2)]">Saving...</span>
                                 </>
@@ -1391,7 +1391,7 @@ export default function InspectionFormPage() {
                             type="button"
                             onClick={() => saveForm(inspection?.status || "approved")}
                             disabled={saving}
-                            className="bg-[#3b82f6] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[#2563eb] disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors shadow-sm"
+                            className="bg-[#3d6ff5] text-white border-none rounded-[9px] text-[13px] font-[500] px-[20px] py-[9px] hover:bg-[#3d6ff5] disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors shadow-sm"
                         >
                             {saving ? "Saving..." : isDirty ? "Save Admin Changes" : "Saved ✓"}
                         </button>
@@ -1471,7 +1471,7 @@ export default function InspectionFormPage() {
                             {/* Other pending forms */}
                             {otherPending.map((a: any) => (
                                 <button key={a.id} onClick={() => switchToAssignment(a.id)}
-                                    className="w-full flex items-center gap-3 p-3 rounded-[12px] border border-[var(--border)] bg-white text-left hover:border-[#0b5cff]/50 hover:bg-[var(--surface2)] transition-colors">
+                                    className="w-full flex items-center gap-3 p-3 rounded-[12px] border border-[var(--border)] bg-white text-left hover:border-[#3d6ff5]/50 hover:bg-[var(--surface2)] transition-colors">
                                     <span className="w-9 h-9 rounded-[9px] bg-[#fef3c7] flex items-center justify-center shrink-0">
                                         <ClipboardList size={15} className="text-[#d97706]" />
                                     </span>

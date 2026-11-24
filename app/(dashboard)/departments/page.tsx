@@ -304,7 +304,7 @@ export default function DepartmentsPage() {
                                 {dept.isActive ? (
                                     <span className="px-2 py-0.5 bg-[var(--success-light)] text-[var(--success-strong)] border border-[var(--success-border)] rounded-full text-[10.5px] font-semibold whitespace-nowrap">Active</span>
                                 ) : (
-                                    <span className="px-2 py-0.5 bg-[#f9fafb] text-[#6b7280] border border-[#e5e7eb] rounded-full text-[10.5px] font-semibold whitespace-nowrap">Inactive</span>
+                                    <span className="px-2 py-0.5 bg-[#f6f7fc] text-[#555c72] border border-[#dfe3ef] rounded-full text-[10.5px] font-semibold whitespace-nowrap">Inactive</span>
                                 )}
                             </div>
 

@@ -18,7 +18,7 @@ type Data = {
 }
 const STATUS: Record<string, string> = {
     queued: "bg-[var(--surface2)] text-[var(--text2)]", sending: "bg-[var(--surface2)] text-[var(--text2)]",
-    sent: "bg-[#e8effe] text-[#0b5cff]", delivered: "bg-[#f5f3ff] text-[#7c3aed]", read: "bg-[#dcfce7] text-[#15803d]",
+    sent: "bg-[#eaf0ff] text-[#3d6ff5]", delivered: "bg-[#f1edff] text-[#6d4fe0]", read: "bg-[#dcfce7] text-[#15803d]",
     failed: "bg-[#fef2f2] text-[#dc2626]", skipped: "bg-[#fffbeb] text-[#b45309]",
 }
 const fmt = (s: string | null) => (s ? new Date(s).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "")
@@ -89,7 +89,7 @@ export default function SendToCustomerModal({ inspectionId, onClose }: { inspect
             <div className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xl" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
                     <div className="min-w-0">
-                        <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><Send size={15} className="text-[#0b5cff]" /> Send report to customer</div>
+                        <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><Send size={15} className="text-[#3d6ff5]" /> Send report to customer</div>
                         {d && <div className="truncate text-[12px] text-[var(--text3)]">{d.inspection.project.name} · {d.inspection.site?.clientName || d.inspection.site?.name || "No site"}{d.inspection.submittedAt ? ` · ${new Date(d.inspection.submittedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}` : ""}</div>}
                     </div>
                     <button onClick={onClose} disabled={sending} aria-label="Close" className="text-[var(--text3)]"><X size={16} /></button>
@@ -105,8 +105,8 @@ export default function SendToCustomerModal({ inspectionId, onClose }: { inspect
                         <div className="grid grid-cols-2 gap-2">
                             {([["whatsapp", "WhatsApp", MessageCircle, d.channels.whatsapp.ready, !d.channels.whatsapp.connected ? "Not connected yet" : !d.channels.whatsapp.template ? "No template chosen" : "PDF + message"],
                                ["email", "Email", Mail, d.channels.email.ready, d.channels.email.ready ? "PDF attached + link" : "Email not set up"]] as const).map(([k, l, Icon, ready, note]) => (
-                                <label key={k} className={`flex cursor-pointer items-start gap-2 rounded-xl border p-3 ${channels[k] ? "border-[#c7dbff] bg-[#e8effe]" : "border-[var(--border)]"} ${!ready ? "cursor-not-allowed opacity-60" : ""}`}>
-                                    <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#0b5cff]" disabled={!ready} checked={channels[k]} onChange={e => setChannels(c => ({ ...c, [k]: e.target.checked }))} />
+                                <label key={k} className={`flex cursor-pointer items-start gap-2 rounded-xl border p-3 ${channels[k] ? "border-[#c7dbff] bg-[#eaf0ff]" : "border-[var(--border)]"} ${!ready ? "cursor-not-allowed opacity-60" : ""}`}>
+                                    <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#3d6ff5]" disabled={!ready} checked={channels[k]} onChange={e => setChannels(c => ({ ...c, [k]: e.target.checked }))} />
                                     <span><span className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--text)]"><Icon size={14} /> {l}</span><span className="text-[11.5px] text-[var(--text3)]">{note}</span></span>
                                 </label>
                             ))}
@@ -119,7 +119,7 @@ export default function SendToCustomerModal({ inspectionId, onClose }: { inspect
                         <div>
                             <div className="mb-1.5 flex items-center justify-between">
                                 <span className="text-[12.5px] font-bold text-[var(--text)]">Send to</span>
-                                {d.inspection.site && d.contactsInstalled && <button onClick={() => setAdding(a => !a)} className="flex items-center gap-1 text-[12px] font-semibold text-[#0b5cff]"><UserPlus size={13} /> Add contact</button>}
+                                {d.inspection.site && d.contactsInstalled && <button onClick={() => setAdding(a => !a)} className="flex items-center gap-1 text-[12px] font-semibold text-[#3d6ff5]"><UserPlus size={13} /> Add contact</button>}
                             </div>
                             {adding && (
                                 <div className="mb-2 grid gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-3 sm:grid-cols-2">
@@ -127,10 +127,10 @@ export default function SendToCustomerModal({ inspectionId, onClose }: { inspect
                                     <input className={input} placeholder="Designation" value={form.designation} onChange={e => setForm(f => ({ ...f, designation: e.target.value }))} />
                                     <input className={input} placeholder="WhatsApp mobile" inputMode="numeric" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
                                     <input className={input} placeholder="Email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-                                    <label className="flex items-center gap-2 text-[12px] text-[var(--text2)] sm:col-span-2"><input type="checkbox" className="accent-[#0b5cff]" checked={form.onlyThis} onChange={e => setForm(f => ({ ...f, onlyThis: e.target.checked }))} /> Only for this project (otherwise every project at this site)</label>
+                                    <label className="flex items-center gap-2 text-[12px] text-[var(--text2)] sm:col-span-2"><input type="checkbox" className="accent-[#3d6ff5]" checked={form.onlyThis} onChange={e => setForm(f => ({ ...f, onlyThis: e.target.checked }))} /> Only for this project (otherwise every project at this site)</label>
                                     <div className="flex justify-end gap-2 sm:col-span-2">
                                         <button onClick={() => setAdding(false)} className="h-8 rounded-lg border border-[var(--border)] px-3 text-xs font-semibold text-[var(--text2)]">Cancel</button>
-                                        <button onClick={addContact} disabled={saving || !form.name.trim()} className="flex h-8 items-center gap-1.5 rounded-lg bg-[#0b5cff] px-3 text-xs font-semibold text-white disabled:opacity-50">{saving && <Loader2 size={12} className="animate-spin" />} Save contact</button>
+                                        <button onClick={addContact} disabled={saving || !form.name.trim()} className="flex h-8 items-center gap-1.5 rounded-lg bg-[#3d6ff5] px-3 text-xs font-semibold text-white disabled:opacity-50">{saving && <Loader2 size={12} className="animate-spin" />} Save contact</button>
                                     </div>
                                 </div>
                             )}
@@ -142,7 +142,7 @@ export default function SendToCustomerModal({ inspectionId, onClose }: { inspect
                                             const noReach = !(channels.whatsapp && c.phone) && !(channels.email && c.email)
                                             return (
                                                 <label key={c.id} className="flex cursor-pointer items-center gap-3 px-3 py-2.5">
-                                                    <input type="checkbox" className="h-4 w-4 accent-[#0b5cff]" checked={picked.has(c.id)} onChange={() => toggle(c.id)} />
+                                                    <input type="checkbox" className="h-4 w-4 accent-[#3d6ff5]" checked={picked.has(c.id)} onChange={() => toggle(c.id)} />
                                                     <span className="min-w-0 flex-1">
                                                         <span className="block text-[13px] font-semibold text-[var(--text)]">{c.name}{c.designation && <span className="font-normal text-[var(--text3)]"> · {c.designation}</span>}</span>
                                                         <span className="block text-[11.5px] text-[var(--text3)]">
@@ -162,8 +162,8 @@ export default function SendToCustomerModal({ inspectionId, onClose }: { inspect
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <a href={`/api/inspections/${inspectionId}/report-pdf`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--text2)] hover:text-[#0b5cff]"><FileText size={14} /> Preview the PDF</a>
-                            <button onClick={send} disabled={!canSend || sending} className="flex h-10 items-center gap-2 rounded-lg bg-[#0b5cff] px-4 text-[13px] font-semibold text-white disabled:opacity-50">
+                            <a href={`/api/inspections/${inspectionId}/report-pdf`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--text2)] hover:text-[#3d6ff5]"><FileText size={14} /> Preview the PDF</a>
+                            <button onClick={send} disabled={!canSend || sending} className="flex h-10 items-center gap-2 rounded-lg bg-[#3d6ff5] px-4 text-[13px] font-semibold text-white disabled:opacity-50">
                                 {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Send to {reach} contact{reach === 1 ? "" : "s"}
                             </button>
                         </div>

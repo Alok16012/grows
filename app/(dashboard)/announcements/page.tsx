@@ -90,16 +90,16 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 // ─── Category styling ─────────────────────────────────────────────────────────
 
 const CATEGORY_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
-    NOTICE: { label: "Notice", color: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe", icon: Bell },
-    EVENT:  { label: "Event",  color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe", icon: PartyPopper },
-    POLICY: { label: "Policy", color: "#0b5cff", bg: "#e8effe", border: "#c7dbff", icon: FileText },
+    NOTICE: { label: "Notice", color: "#3d6ff5", bg: "#eaf0ff", border: "#d4e0ff", icon: Bell },
+    EVENT:  { label: "Event",  color: "#8b6cf6", bg: "#f1edff", border: "#ddd6fe", icon: PartyPopper },
+    POLICY: { label: "Policy", color: "#3d6ff5", bg: "#eaf0ff", border: "#c7dbff", icon: FileText },
     URGENT: { label: "Urgent", color: "#dc2626", bg: "#fef2f2", border: "#fecaca", icon: AlertCircle },
 }
 
 const HOLIDAY_TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
     PUBLIC:     { label: "Public",     color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
     RESTRICTED: { label: "Restricted", color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
-    COMPANY:    { label: "Company",    color: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe" },
+    COMPANY:    { label: "Company",    color: "#3d6ff5", bg: "#eaf0ff", border: "#d4e0ff" },
 }
 
 const CATEGORIES = ["NOTICE", "EVENT", "POLICY", "URGENT"]
@@ -390,7 +390,7 @@ export default function AnnouncementsPage() {
                 {/* Work Anniversaries */}
                 <div>
                     <h2 className="text-[13px] font-semibold text-[var(--text2)] uppercase tracking-[0.5px] mb-3 flex items-center gap-1.5">
-                        <Award size={14} className="text-[#7c3aed]" /> Work Anniversaries
+                        <Award size={14} className="text-[#6d4fe0]" /> Work Anniversaries
                     </h2>
                     {anniversaries.length === 0 ? (
                         <div className="rounded-[12px] border border-dashed border-[var(--border)] py-10 text-center">
@@ -406,7 +406,7 @@ export default function AnnouncementsPage() {
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img src={a.photo} alt={a.name} className="w-12 h-12 rounded-full object-cover" />
                                         ) : (
-                                            <div className="w-12 h-12 rounded-full bg-[#efe7fb] flex items-center justify-center text-[13px] font-bold text-[#7c3aed]">
+                                            <div className="w-12 h-12 rounded-full bg-[#efe7fb] flex items-center justify-center text-[13px] font-bold text-[#6d4fe0]">
                                                 {a.name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join("")}
                                             </div>
                                         )}
@@ -415,13 +415,13 @@ export default function AnnouncementsPage() {
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[13px] font-medium text-[var(--text)] truncate">{a.name}</p>
                                         <p className="text-[11px] text-[var(--text3)] truncate">
-                                            <span className="font-semibold text-[#7c3aed]">{a.years} {a.years === 1 ? "year" : "years"}</span> · {a.designation || a.department || "Employee"}
+                                            <span className="font-semibold text-[#6d4fe0]">{a.years} {a.years === 1 ? "year" : "years"}</span> · {a.designation || a.department || "Employee"}
                                         </p>
                                     </div>
                                     {a.isToday ? (
                                         <button onClick={() => congratulate(a)}
                                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-white text-[11px] font-semibold hover:opacity-90 transition-opacity shrink-0"
-                                            style={{ backgroundColor: "#7c3aed" }}>
+                                            style={{ backgroundColor: "#6d4fe0" }}>
                                             <PartyPopper size={12} /> Congrats
                                         </button>
                                     ) : (

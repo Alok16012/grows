@@ -135,13 +135,13 @@ function todayISO() {
 const PRIORITY_STYLES: Record<TaskPriority, string> = {
     URGENT: "bg-red-100 text-red-700",
     HIGH: "bg-orange-100 text-orange-700",
-    MEDIUM: "bg-blue-100 text-blue-700",
+    MEDIUM: "bg-[#e3ebff] text-[var(--accent-text)]",
     LOW: "bg-gray-100 text-gray-600",
 }
 
 const STATUS_STYLES: Record<FieldTaskStatus, string> = {
     ASSIGNED: "bg-[var(--surface2)] text-[var(--text2)]",
-    IN_PROGRESS: "bg-blue-100 text-blue-700",
+    IN_PROGRESS: "bg-[#e3ebff] text-[var(--accent-text)]",
     COMPLETED: "bg-green-100 text-green-700",
     MISSED: "bg-red-100 text-red-700",
     CANCELLED: "bg-gray-100 text-gray-500",
@@ -471,7 +471,7 @@ function TaskDrawer({
                             <button
                                 onClick={() => updateStatus("IN_PROGRESS")}
                                 disabled={saving}
-                                className="w-full h-10 rounded-[8px] bg-blue-600 text-white text-[13px] font-medium flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
+                                className="w-full h-10 rounded-[8px] bg-[var(--accent)] text-white text-[13px] font-medium flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
                             >
                                 <Play size={14} />
                                 Start Task

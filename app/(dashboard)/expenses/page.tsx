@@ -181,13 +181,13 @@ function categoryLabel(cat: ExpenseCategory): string {
 function categoryStyle(cat: ExpenseCategory): { bg: string; color: string } {
     const map: Record<ExpenseCategory, { bg: string; color: string }> = {
         // Travel
-        TRAVEL:               { bg: "#eff6ff", color: "#3b82f6" },
-        TRANSPORTATION:       { bg: "#eef2ff", color: "#6366f1" },
+        TRAVEL:               { bg: "#eaf0ff", color: "#3d6ff5" },
+        TRANSPORTATION:       { bg: "#eef2ff", color: "#8b6cf6" },
         FUEL:                 { bg: "#fefce8", color: "#ca8a04" },
-        ACCOMMODATION:        { bg: "#fdf4ff", color: "#a855f7" },
+        ACCOMMODATION:        { bg: "#fdf4ff", color: "#8b6cf6" },
         // Daily Ops
         FOOD:                 { bg: "#fff7ed", color: "#f97316" },
-        HOTEL:                { bg: "#fdf4ff", color: "#a855f7" },
+        HOTEL:                { bg: "#fdf4ff", color: "#8b6cf6" },
         MATERIAL:             { bg: "#fef3c7", color: "#b45309" },
         OFFICE_SUPPLIES:      { bg: "#f0fdfa", color: "#0d9488" },
         OFFICE_CONSUMABLES:   { bg: "#f0fdfa", color: "#0f766e" },
@@ -198,12 +198,12 @@ function categoryStyle(cat: ExpenseCategory): { bg: string; color: string } {
         // People & HR
         SALARY_WAGES:         { bg: "#f0fdf4", color: "#16a34a" },
         EMPLOYEE_ADVANCE:     { bg: "#f0fdf4", color: "#15803d" },
-        RECRUITMENT_EXPENSE:  { bg: "#f5f3ff", color: "#7c3aed" },
+        RECRUITMENT_EXPENSE:  { bg: "#f1edff", color: "#6d4fe0" },
         CANDIDATE_EXPENSE:    { bg: "#fdf2f8", color: "#db2777" },
         HR_OPERATIONS:        { bg: "#ecfdf5", color: "#059669" },
         SAFETY_PPE:           { bg: "#fef2f2", color: "#dc2626" },
         // Business / Client
-        CLIENT_PROJECT:       { bg: "#eff6ff", color: "#1d4ed8" },
+        CLIENT_PROJECT:       { bg: "#eaf0ff", color: "#2f5be0" },
         LABOUR:               { bg: "#f7fee7", color: "#65a30d" },
         INSPECTION_QUALITY:   { bg: "#f0f9ff", color: "#0284c7" },
         COMPLIANCE_AUDIT:     { bg: "#f4f4f5", color: "#52525b" },
@@ -211,26 +211,26 @@ function categoryStyle(cat: ExpenseCategory): { bg: string; color: string } {
         // Tech & Admin
         IT_ACCESSORIES:       { bg: "#eef2ff", color: "#4f46e5" },
         COURIER:              { bg: "#f0f9ff", color: "#0ea5e9" },
-        DOCUMENTATION_LEGAL:  { bg: "#f8fafc", color: "#334155" },
+        DOCUMENTATION_LEGAL:  { bg: "#f6f7fc", color: "#334155" },
         MOBILE_RECHARGE:      { bg: "#ecfeff", color: "#0891b2" },
         // Legacy
         COMMUNICATION:        { bg: "#ecfeff", color: "#0891b2" },
         MEDICAL:              { bg: "#fef2f2", color: "#ef4444" },
-        UNIFORM:              { bg: "#eef2ff", color: "#6366f1" },
+        UNIFORM:              { bg: "#eef2ff", color: "#8b6cf6" },
         TRAINING:             { bg: "#f0fdf4", color: "#22c55e" },
-        MISCELLANEOUS:        { bg: "#f9fafb", color: "#6b7280" },
-        OTHER:                { bg: "#f9fafb", color: "#6b7280" },
+        MISCELLANEOUS:        { bg: "#f6f7fc", color: "#555c72" },
+        OTHER:                { bg: "#f6f7fc", color: "#555c72" },
     }
-    return map[cat] || { bg: "#f9fafb", color: "#6b7280" }
+    return map[cat] || { bg: "#f6f7fc", color: "#555c72" }
 }
 
 function statusStyle(status: ExpenseStatus): { bg: string; color: string; label: string } {
     const map: Record<ExpenseStatus, { bg: string; color: string; label: string }> = {
-        DRAFT: { bg: "#f9fafb", color: "#6b7280", label: "Draft" },
-        SUBMITTED: { bg: "#eff6ff", color: "#3b82f6", label: "Submitted" },
+        DRAFT: { bg: "#f6f7fc", color: "#555c72", label: "Draft" },
+        SUBMITTED: { bg: "#eaf0ff", color: "#3d6ff5", label: "Submitted" },
         APPROVED: { bg: "#dcfce7", color: "#16a34a", label: "Approved" },
         REJECTED: { bg: "#fef2f2", color: "#ef4444", label: "Rejected" },
-        PAID: { bg: "#fdf4ff", color: "#a855f7", label: "Paid" },
+        PAID: { bg: "#fdf4ff", color: "#8b6cf6", label: "Paid" },
     }
     return map[status]
 }
@@ -294,7 +294,7 @@ function journeyDate(v: unknown): string {
 const isImageUrl = (u: string) => /\.(jpe?g|png|gif|webp|avif)$/i.test(u)
 
 function avatarColor(name: string): string {
-    const colors = ["#0b5cff", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#0ea5e9"]
+    const colors = ["#3d6ff5", "#0ea5a4", "#8b6cf6", "#f5a623", "#e5566b", "#0ea5e9"]
     return name ? colors[name.charCodeAt(0) % colors.length] : colors[0]
 }
 
@@ -420,7 +420,7 @@ function CategoryLine({
                 )}
                 <button type="button" onClick={onRemove} disabled={!canRemove}
                     title="Remove category"
-                    style={{ width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: canRemove ? "pointer" : "not-allowed", color: canRemove ? "#ef4444" : "#d1d5db", borderRadius: 6, flexShrink: 0 }}>
+                    style={{ width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: canRemove ? "pointer" : "not-allowed", color: canRemove ? "#ef4444" : "#d5dae8", borderRadius: 6, flexShrink: 0 }}>
                     <Trash2 size={15} />
                 </button>
             </div>
@@ -428,21 +428,21 @@ function CategoryLine({
             {/* TRAVEL km-calculator (only for travel lines) */}
             {isTravel && (
                 <div>
-                    <div style={{ background: perKmRate > 0 ? "#eff6ff" : "#fef2f2", padding: "7px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                        <div style={{ display: "flex", background: "#fff", border: "1px solid #bfdbfe", borderRadius: 8, overflow: "hidden" }}>
+                    <div style={{ background: perKmRate > 0 ? "#eaf0ff" : "#fef2f2", padding: "7px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", background: "#fff", border: "1px solid #d4e0ff", borderRadius: 8, overflow: "hidden" }}>
                             {([["2W", "2-Wheeler", Bike], ["4W", "4-Wheeler", Car]] as const).map(([vt, label, VIcon]) => (
                                 <button key={vt} type="button" onClick={() => onPatch({ vehicleType: vt })}
                                     style={{
                                         padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", border: "none",
-                                        background: line.vehicleType === vt ? "#1d4ed8" : "transparent",
-                                        color: line.vehicleType === vt ? "#fff" : "#3b82f6",
+                                        background: line.vehicleType === vt ? "#2f5be0" : "transparent",
+                                        color: line.vehicleType === vt ? "#fff" : "#3d6ff5",
                                         display: "inline-flex", alignItems: "center", gap: 4,
                                     }}>
                                     <VIcon size={14} /> {label}
                                 </button>
                             ))}
                         </div>
-                        <span style={{ fontSize: 12, color: perKmRate > 0 ? "#3b82f6" : "#dc2626", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ fontSize: 12, color: perKmRate > 0 ? "#3d6ff5" : "#dc2626", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
                             {perKmRate > 0 ? `₹${perKmRate}/km` : <><AlertTriangle size={14} /> Rate not set — ask admin</>}
                         </span>
                     </div>
@@ -452,7 +452,7 @@ function CategoryLine({
                     <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8, overflowX: "auto" }}>
                         <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, padding: "0 2px", minWidth: 520 }}>
                             {["Date", "From", "To", "KMs", "Amount", ""].map(h => (
-                                <span key={h} style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>{h}</span>
+                                <span key={h} style={{ fontSize: 10, fontWeight: 600, color: "#98a1b5", textTransform: "uppercase" }}>{h}</span>
                             ))}
                         </div>
                         {line.travelRows.map(row => {
@@ -461,22 +461,22 @@ function CategoryLine({
                                 <div key={row._id} style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr 70px 80px 28px", gap: 6, alignItems: "center", minWidth: 520 }}>
                                     <input type="date" value={row.date}
                                         onChange={e => updateRow(row._id, "date", e.target.value)}
-                                        style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 6px", fontSize: 12, outline: "none", width: "100%" }} />
+                                        style={{ height: 32, border: "1px solid #dfe3ef", borderRadius: 6, padding: "0 6px", fontSize: 12, outline: "none", width: "100%" }} />
                                     <input value={row.from} onChange={e => updateRow(row._id, "from", e.target.value)}
                                         placeholder="From" required
-                                        style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 8px", fontSize: 12, outline: "none", width: "100%" }} />
+                                        style={{ height: 32, border: "1px solid #dfe3ef", borderRadius: 6, padding: "0 8px", fontSize: 12, outline: "none", width: "100%" }} />
                                     <input value={row.to} onChange={e => updateRow(row._id, "to", e.target.value)}
                                         placeholder="To" required
-                                        style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 8px", fontSize: 12, outline: "none", width: "100%" }} />
+                                        style={{ height: 32, border: "1px solid #dfe3ef", borderRadius: 6, padding: "0 8px", fontSize: 12, outline: "none", width: "100%" }} />
                                     <input type="number" value={row.kms} onChange={e => updateRow(row._id, "kms", e.target.value)}
                                         placeholder="0" min="0" step="0.1" required
-                                        style={{ height: 32, border: "1px solid #e5e7eb", borderRadius: 6, padding: "0 6px", fontSize: 12, outline: "none", width: "100%", textAlign: "right" }} />
-                                    <span style={{ fontSize: 12, fontWeight: 700, color: amt > 0 ? "#1d4ed8" : "#9ca3af", textAlign: "right" }}>
+                                        style={{ height: 32, border: "1px solid #dfe3ef", borderRadius: 6, padding: "0 6px", fontSize: 12, outline: "none", width: "100%", textAlign: "right" }} />
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: amt > 0 ? "#2f5be0" : "#98a1b5", textAlign: "right" }}>
                                         {amt > 0 ? `₹${amt.toLocaleString("en-IN")}` : "—"}
                                     </span>
                                     <button type="button" onClick={() => removeRow(row._id)}
                                         disabled={line.travelRows.length === 1}
-                                        style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: line.travelRows.length === 1 ? "not-allowed" : "pointer", color: line.travelRows.length === 1 ? "#d1d5db" : "#ef4444", borderRadius: 5 }}>
+                                        style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: line.travelRows.length === 1 ? "not-allowed" : "pointer", color: line.travelRows.length === 1 ? "#d5dae8" : "#ef4444", borderRadius: 5 }}>
                                         <X size={13} />
                                     </button>
                                 </div>
@@ -484,13 +484,13 @@ function CategoryLine({
                         })}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <button type="button" onClick={addRow}
-                                style={{ display: "flex", alignItems: "center", gap: 5, height: 30, padding: "0 12px", background: "#eff6ff", color: "#1d4ed8", border: "1px dashed #93c5fd", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                                style={{ display: "flex", alignItems: "center", gap: 5, height: 30, padding: "0 12px", background: "#eaf0ff", color: "#2f5be0", border: "1px dashed #b9ccfb", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                                 <Plus size={13} /> Add Journey
                             </button>
                             {travelTotals.kms > 0 && (
                                 <div style={{ textAlign: "right" }}>
-                                    <span style={{ fontSize: 11, color: "#6b7280" }}>{travelTotals.kms.toFixed(1)} km  </span>
-                                    <span style={{ fontSize: 14, fontWeight: 800, color: "#1d4ed8" }}>₹{travelTotals.amount.toLocaleString("en-IN")}</span>
+                                    <span style={{ fontSize: 11, color: "#555c72" }}>{travelTotals.kms.toFixed(1)} km  </span>
+                                    <span style={{ fontSize: 14, fontWeight: 800, color: "#2f5be0" }}>₹{travelTotals.amount.toLocaleString("en-IN")}</span>
                                 </div>
                             )}
                         </div>
@@ -500,14 +500,14 @@ function CategoryLine({
 
             {/* Per-category receipt / bill */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: "1px solid var(--border)", background: "#fff" }}>
-                <Paperclip size={13} style={{ color: "#9ca3af", flexShrink: 0 }} />
+                <Paperclip size={13} style={{ color: "#98a1b5", flexShrink: 0 }} />
                 {line.receiptUrl ? (
                     <a href={line.receiptUrl} target="_blank" rel="noopener noreferrer"
                         style={{ flex: 1, fontSize: 12, fontWeight: 600, color: "var(--accent)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", textDecoration: "none" }}>
                         View receipt
                     </a>
                 ) : (
-                    <span style={{ flex: 1, fontSize: 11.5, color: "#9ca3af" }}>No receipt · JPG / PNG / PDF</span>
+                    <span style={{ flex: 1, fontSize: 11.5, color: "#98a1b5" }}>No receipt · JPG / PNG / PDF</span>
                 )}
                 <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
                     style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 700, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 6, cursor: uploading ? "default" : "pointer", color: "var(--text2)", display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
@@ -1200,7 +1200,7 @@ function ExpenseDrawer({
                         {(approvalInfo?.label || (approvalInfo?.trail?.length ?? 0) > 0) && (
                             <div className="rounded-[10px] bg-[var(--surface2)] border border-[var(--border)] p-3">
                                 {approvalInfo?.label && (
-                                    <p className="text-[12px] font-semibold text-[#7c3aed] mb-1.5 flex items-center gap-1.5"><BadgeCheck size={14} /> {approvalInfo.label}</p>
+                                    <p className="text-[12px] font-semibold text-[#6d4fe0] mb-1.5 flex items-center gap-1.5"><BadgeCheck size={14} /> {approvalInfo.label}</p>
                                 )}
                                 {(approvalInfo?.trail?.length ?? 0) > 0 && (
                                     <ul className="space-y-1">
@@ -1241,7 +1241,7 @@ function ExpenseDrawer({
                         {/* Payment info */}
                         {expense.status === "PAID" && (
                             <div className="rounded-[10px] bg-[#fdf4ff] border border-[#e9d5ff] p-3">
-                                <p className="text-[12px] font-semibold text-[#a855f7] mb-2 flex items-center gap-1.5">
+                                <p className="text-[12px] font-semibold text-[#8b6cf6] mb-2 flex items-center gap-1.5">
                                     <BadgeCheck size={14} /> Payment Details
                                 </p>
                                 <div className="grid grid-cols-2 gap-2 text-[12px]">
@@ -1460,7 +1460,7 @@ function ExpenseDrawer({
                                     {!showPayBox ? (
                                         <button
                                             onClick={() => setShowPayBox(true)}
-                                            className="w-full h-9 rounded-[8px] bg-[#8b5cf6] text-white text-[13px] font-medium hover:opacity-90 flex items-center justify-center gap-2 transition-opacity"
+                                            className="w-full h-9 rounded-[8px] bg-[#8b6cf6] text-white text-[13px] font-medium hover:opacity-90 flex items-center justify-center gap-2 transition-opacity"
                                         >
                                             <Banknote size={14} /> Mark as Paid
                                         </button>
@@ -1508,7 +1508,7 @@ function ExpenseDrawer({
                                                 <button
                                                     onClick={() => doAction("PAID", { paymentMode, transactionId, paymentDate })}
                                                     disabled={actionLoading}
-                                                    className="flex-1 h-9 rounded-[8px] bg-[#8b5cf6] text-white text-[13px] font-medium hover:opacity-90 flex items-center justify-center gap-1 transition-opacity disabled:opacity-60"
+                                                    className="flex-1 h-9 rounded-[8px] bg-[#8b6cf6] text-white text-[13px] font-medium hover:opacity-90 flex items-center justify-center gap-1 transition-opacity disabled:opacity-60"
                                                 >
                                                     {actionLoading && <Loader2 size={13} className="animate-spin" />}
                                                     Confirm Paid
@@ -1787,17 +1787,17 @@ function ExpenseRow({
 // Column config for the team summary table — these categories always show;
 // any other category used in the period gets a column of its own (summaryCols).
 const TEAM_COLS = [
-    { key: "TRAVEL",               label: "Travel",         color: "#3b82f6", bg: "#eff6ff" },
-    { key: "TRANSPORTATION",       label: "Transport",      color: "#6366f1", bg: "#eef2ff" },
+    { key: "TRAVEL",               label: "Travel",         color: "#3d6ff5", bg: "#eaf0ff" },
+    { key: "TRANSPORTATION",       label: "Transport",      color: "#8b6cf6", bg: "#eef2ff" },
     { key: "FUEL",                 label: "Fuel",           color: "#ca8a04", bg: "#fefce8" },
     { key: "FOOD",                 label: "Food",           color: "#f97316", bg: "#fff7ed" },
-    { key: "ACCOMMODATION",        label: "Stay",           color: "#a855f7", bg: "#fdf4ff" },
+    { key: "ACCOMMODATION",        label: "Stay",           color: "#8b6cf6", bg: "#fdf4ff" },
     { key: "SALARY_WAGES",         label: "Salary",         color: "#16a34a", bg: "#f0fdf4" },
     { key: "LABOUR",               label: "Labour",         color: "#65a30d", bg: "#f7fee7" },
-    { key: "CLIENT_PROJECT",       label: "Client/Proj",   color: "#1d4ed8", bg: "#eff6ff" },
+    { key: "CLIENT_PROJECT",       label: "Client/Proj",   color: "#2f5be0", bg: "#eaf0ff" },
     { key: "SAFETY_PPE",           label: "Safety/PPE",    color: "#dc2626", bg: "#fef2f2" },
     { key: "REPAIR_MAINTENANCE",   label: "Repair",         color: "#92400e", bg: "#fef3c7" },
-    { key: "MISCELLANEOUS",        label: "Misc",           color: "#6b7280", bg: "#f9fafb" },
+    { key: "MISCELLANEOUS",        label: "Misc",           color: "#555c72", bg: "#f6f7fc" },
 ]
 
 // The fixed columns plus one per extra category the API reports as used
@@ -1874,32 +1874,32 @@ function ExpenseDetailModal({ title, subtitle, items, onClose }: {
                                 </div>
                                 {/* Journey breakdown for travel expenses */}
                                 {journeys.length > 0 && (
-                                    <div style={{ margin: "0 20px 10px", background: "#eff6ff", borderRadius: 8, overflow: "hidden", border: "1px solid #bfdbfe" }}>
+                                    <div style={{ margin: "0 20px 10px", background: "#eaf0ff", borderRadius: 8, overflow: "hidden", border: "1px solid #d4e0ff" }}>
                                         {(journeys[0] as any)?.vehicleType && (
-                                            <div style={{ padding: "4px 10px", background: "#dbeafe", borderBottom: "1px solid #bfdbfe", fontSize: 11, fontWeight: 700, color: "#1e40af", display: "flex", alignItems: "center", gap: 4 }}>
+                                            <div style={{ padding: "4px 10px", background: "#e3ebff", borderBottom: "1px solid #d4e0ff", fontSize: 11, fontWeight: 700, color: "#2f5be0", display: "flex", alignItems: "center", gap: 4 }}>
                                                 {(journeys[0] as any).vehicleType === "2W" ? <><Bike size={14} /> 2-Wheeler</> : <><Car size={14} /> 4-Wheeler</>}
                                             </div>
                                         )}
-                                        <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 60px 80px", padding: "5px 10px", background: "#dbeafe", gap: 8 }}>
+                                        <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 60px 80px", padding: "5px 10px", background: "#e3ebff", gap: 8 }}>
                                             {["Date", "From", "To", "KMs", "Amount"].map(h => (
-                                                <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "#1e40af", textTransform: "uppercase" }}>{h}</span>
+                                                <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "#2f5be0", textTransform: "uppercase" }}>{h}</span>
                                             ))}
                                         </div>
                                         {journeys.map((j, ji) => (
-                                            <div key={ji} style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 60px 80px", padding: "5px 10px", gap: 8, borderTop: ji > 0 ? "1px solid #bfdbfe" : "none" }}>
-                                                <span style={{ fontSize: 12, color: "#374151" }}>{format(new Date(j.date), "dd MMM")}</span>
-                                                <span style={{ fontSize: 12, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{j.from}</span>
-                                                <span style={{ fontSize: 12, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{j.to}</span>
-                                                <span style={{ fontSize: 12, color: "#374151", textAlign: "right" }}>{j.kms}</span>
-                                                <span style={{ fontSize: 12, fontWeight: 600, color: "#1d4ed8", textAlign: "right" }}>{formatINR(j.amount)}</span>
+                                            <div key={ji} style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 60px 80px", padding: "5px 10px", gap: 8, borderTop: ji > 0 ? "1px solid #d4e0ff" : "none" }}>
+                                                <span style={{ fontSize: 12, color: "#3a4157" }}>{format(new Date(j.date), "dd MMM")}</span>
+                                                <span style={{ fontSize: 12, color: "#3a4157", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{j.from}</span>
+                                                <span style={{ fontSize: 12, color: "#3a4157", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{j.to}</span>
+                                                <span style={{ fontSize: 12, color: "#3a4157", textAlign: "right" }}>{j.kms}</span>
+                                                <span style={{ fontSize: 12, fontWeight: 600, color: "#2f5be0", textAlign: "right" }}>{formatINR(j.amount)}</span>
                                             </div>
                                         ))}
                                         {journeys.length > 1 && (
-                                            <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 60px 80px", padding: "5px 10px", gap: 8, borderTop: "1px solid #93c5fd", background: "#dbeafe" }}>
-                                                <span style={{ fontSize: 11, fontWeight: 700, color: "#1e40af" }}>Total</span>
+                                            <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 60px 80px", padding: "5px 10px", gap: 8, borderTop: "1px solid #b9ccfb", background: "#e3ebff" }}>
+                                                <span style={{ fontSize: 11, fontWeight: 700, color: "#2f5be0" }}>Total</span>
                                                 <span /><span />
-                                                <span style={{ fontSize: 11, fontWeight: 700, color: "#1e40af", textAlign: "right" }}>{journeys.reduce((s, j) => s + j.kms, 0)}</span>
-                                                <span style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8", textAlign: "right" }}>{formatINR(journeys.reduce((s, j) => s + j.amount, 0))}</span>
+                                                <span style={{ fontSize: 11, fontWeight: 700, color: "#2f5be0", textAlign: "right" }}>{journeys.reduce((s, j) => s + j.kms, 0)}</span>
+                                                <span style={{ fontSize: 12, fontWeight: 700, color: "#2f5be0", textAlign: "right" }}>{formatINR(journeys.reduce((s, j) => s + j.amount, 0))}</span>
                                             </div>
                                         )}
                                     </div>
@@ -2887,7 +2887,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                                 onClick={startReview}
                                 disabled={reviewLoading || pendingCount === 0}
                                 title={pendingCount === 0 ? "No pending expenses" : "Review pending expenses one by one"}
-                                className="h-[42px] px-4 bg-[#8b5cf6] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 inline-flex items-center justify-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="h-[42px] px-4 bg-[#8b6cf6] text-white text-[13px] font-semibold rounded-[10px] hover:opacity-90 inline-flex items-center justify-center gap-2 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {reviewLoading ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />}
                                 Review{pendingCount > 0 ? ` (${pendingCount})` : ""}
@@ -2984,7 +2984,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                                 {TabIcon && <TabIcon size={14} />}
                                 {label}
                                 {id === "team" && teamCount > 0 && (
-                                    <span style={{ background: "#7c3aed", color: "white", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 6px", lineHeight: "16px" }}>{teamCount}</span>
+                                    <span style={{ background: "#6d4fe0", color: "white", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 6px", lineHeight: "16px" }}>{teamCount}</span>
                                 )}
                                 {id === "all" && pendingCount > 0 && (
                                     <span style={{ background: "#ef4444", color: "white", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 6px", lineHeight: "16px" }}>
@@ -3003,7 +3003,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
                         {teamCount > 0 && (
                             <button role="tab" aria-selected={activeTab === "team"} onClick={() => { setActiveTab("team"); setStatusFilter("ALL") }} className={`z-tab ${activeTab === "team" ? "is-active" : ""}`}>
                                 <BadgeCheck size={14} /> Team Approvals
-                                <span style={{ background: "#7c3aed", color: "white", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 6px", lineHeight: "16px" }}>{teamCount}</span>
+                                <span style={{ background: "#6d4fe0", color: "white", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 6px", lineHeight: "16px" }}>{teamCount}</span>
                             </button>
                         )}
                     </>
@@ -3105,7 +3105,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
             {activeTab !== "analytics" && activeTab !== "employee" && <>
             {/* Accounts Summary Banner */}
             {activeTab === "accounts" && (
-                <div className="bg-gradient-to-r from-[#8b5cf6] to-[#6d28d9] rounded-[12px] p-4 mb-4 text-white">
+                <div className="bg-gradient-to-r from-[#8b6cf6] to-[#6d4fe0] rounded-[12px] p-4 mb-4 text-white">
                     <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70 mb-3">
                         Monthly Payment Sheet {monthFilter ? `— ${format(new Date(monthFilter + "-01"), "MMMM yyyy")}` : ""}
                     </p>
@@ -3230,7 +3230,7 @@ export default function ExpensesPage({ searchParams }: { searchParams?: { status
 
 // ─── Analytics Panel ──────────────────────────────────────────────────────────
 
-const CHART_COLORS = ["#6366f1", "#06b6d4", "#f59e0b", "#ef4444", "#22c55e", "#a855f7", "#f97316", "#0891b2", "#8b5cf6", "#ec4899"]
+const CHART_COLORS = ["#8b6cf6", "#06b6d4", "#f59e0b", "#ef4444", "#22c55e", "#8b6cf6", "#f97316", "#0891b2", "#8b6cf6", "#ec4899"]
 
 function ExpenseAnalytics({ expenses, loading }: { expenses: Expense[]; loading: boolean }) {
     if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--text3)]" /></div>
@@ -3276,7 +3276,7 @@ function ExpenseAnalytics({ expenses, loading }: { expenses: Expense[]; loading:
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                         <Bar dataKey="Total" fill="#e0e7ff" radius={[4, 4, 0, 0]} />
                         <Bar dataKey="Approved" fill="#fbbf24" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="Paid" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Paid" fill="#8b6cf6" radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
             </div>
@@ -3302,7 +3302,7 @@ function ExpenseAnalytics({ expenses, loading }: { expenses: Expense[]; loading:
                                 <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `₹${(v / 1000).toFixed(0)}k`} />
                                 <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={90} />
                                 <Tooltip formatter={(v: any) => [`₹${Number(v).toLocaleString("en-IN")}`, "Amount"]} />
-                                <Bar dataKey="amount" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                                <Bar dataKey="amount" fill="#8b6cf6" radius={[0, 4, 4, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     )}

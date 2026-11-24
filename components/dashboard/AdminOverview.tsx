@@ -24,11 +24,11 @@ import { NeedsSiteBanner } from "@/components/new-joiners/NeedsSiteBanner"
 type Tone = "blue" | "mint" | "rose" | "violet" | "amber" | "white"
 
 const TONES: Record<Tone, { card: string; chip: string; icon: string }> = {
-    blue:   { card: "bg-[linear-gradient(160deg,#f1f6ff_0%,#e8f0ff_100%)] border-[#d5e3ff]", chip: "bg-[#dce8ff]", icon: "text-[#1f5fff]" },
-    mint:   { card: "bg-[linear-gradient(160deg,#effcf6_0%,#e3f8ee_100%)] border-[#c8eedb]", chip: "bg-[#d3f3e3]", icon: "text-[#1f5fff]" },
-    rose:   { card: "bg-[linear-gradient(160deg,#fff4f3_0%,#ffe9e7_100%)] border-[#fbd3cf]", chip: "bg-[#ffe0dc]", icon: "text-[#1f5fff]" },
-    violet: { card: "bg-[linear-gradient(160deg,#f7f3ff_0%,#efe8ff_100%)] border-[#e2d6ff]", chip: "bg-[#e7ddff]", icon: "text-[#1f5fff]" },
-    amber:  { card: "bg-[linear-gradient(160deg,#fffaf0_0%,#fff3dc_100%)] border-[#fbe2ad]", chip: "bg-[#ffecc4]", icon: "text-[#1f5fff]" },
+    blue:   { card: "bg-[linear-gradient(160deg,#f1f6ff_0%,#e8f0ff_100%)] border-[#d5e3ff]", chip: "bg-[#dce8ff]", icon: "text-[#3d6ff5]" },
+    mint:   { card: "bg-[linear-gradient(160deg,#effcf6_0%,#e3f8ee_100%)] border-[#c8eedb]", chip: "bg-[#d3f3e3]", icon: "text-[#3d6ff5]" },
+    rose:   { card: "bg-[linear-gradient(160deg,#fff4f3_0%,#ffe9e7_100%)] border-[#fbd3cf]", chip: "bg-[#ffe0dc]", icon: "text-[#3d6ff5]" },
+    violet: { card: "bg-[linear-gradient(160deg,#f7f3ff_0%,#efe8ff_100%)] border-[#e2d6ff]", chip: "bg-[#e7ddff]", icon: "text-[#3d6ff5]" },
+    amber:  { card: "bg-[linear-gradient(160deg,#fffaf0_0%,#fff3dc_100%)] border-[#fbe2ad]", chip: "bg-[#ffecc4]", icon: "text-[#3d6ff5]" },
     white:  { card: "bg-white border-[var(--border)]", chip: "bg-[var(--accent-light)]", icon: "text-[var(--accent)]" },
 }
 
@@ -59,7 +59,7 @@ function PanelHead({ tone, icon: Icon, title, hint, sub, action }: {
 
 function HeadLink({ href, children }: { href: string; children: React.ReactNode }) {
     return (
-        <Link href={href} className="shrink-0 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#1f5fff] hover:underline mt-2.5">
+        <Link href={href} className="shrink-0 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#3d6ff5] hover:underline mt-2.5">
             {children} <ArrowRight size={14} />
         </Link>
     )
@@ -178,7 +178,7 @@ function Bars({ data, height, gap, label, tick }: {
                                 style={{ height: `${Math.max(2, (d.count / max) * 100)}%` }}
                                 className={cn(
                                     "flex-1 rounded-t-[3px] transition-all",
-                                    i === data.length - 1 ? "bg-[#1f5fff]" : "bg-[#8fb2ff] hover:bg-[#6d98ff]"
+                                    i === data.length - 1 ? "bg-[#3d6ff5]" : "bg-[#8fb2ff] hover:bg-[#6d98ff]"
                                 )}
                             />
                         ))}
@@ -193,7 +193,7 @@ function Bars({ data, height, gap, label, tick }: {
 function Meter({ pct, className }: { pct: number; className?: string }) {
     return (
         <div className={cn("h-[8px] rounded-full bg-[#dfe6f5] overflow-hidden", className)}>
-            <div className="h-full rounded-full bg-[#1f5fff] transition-all" style={{ width: `${Math.max(pct > 0 ? 2 : 0, Math.min(100, pct))}%` }} />
+            <div className="h-full rounded-full bg-[#3d6ff5] transition-all" style={{ width: `${Math.max(pct > 0 ? 2 : 0, Math.min(100, pct))}%` }} />
         </div>
     )
 }
@@ -251,14 +251,14 @@ function RecruitmentPanel() {
                             <div className="relative">
                                 <select
                                     value={month} onChange={e => setMonth(e.target.value)} aria-label="Recruitment period"
-                                    className="appearance-none h-10 pl-3.5 pr-9 rounded-[10px] border border-[var(--border2)] bg-white text-[13px] text-[var(--text)] outline-none focus:ring-2 focus:ring-[#1f5fff]/25"
+                                    className="appearance-none h-10 pl-3.5 pr-9 rounded-[10px] border border-[var(--border2)] bg-white text-[13px] text-[var(--text)] outline-none focus:ring-2 focus:ring-[#3d6ff5]/25"
                                 >
                                     <option value="ALL">All time</option>
                                     {monthOptions.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
                                 </select>
                                 <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text2)]" />
                             </div>
-                            <Link href="/recruitment" className="hidden sm:inline-flex items-center gap-1.5 text-[13px] font-medium text-[#1f5fff] hover:underline">
+                            <Link href="/recruitment" className="hidden sm:inline-flex items-center gap-1.5 text-[13px] font-medium text-[#3d6ff5] hover:underline">
                                 View all <ArrowRight size={14} />
                             </Link>
                         </div>
@@ -324,14 +324,14 @@ function RecruitmentPanel() {
 // ─── Employee expense summary ────────────────────────────────────────────────
 
 const EXP_COLS = [
-    { key: "TRAVEL",          label: "Travel",   color: "#3b82f6" },
+    { key: "TRAVEL",          label: "Travel",   color: "#3d6ff5" },
     { key: "FUEL",            label: "Fuel",     color: "#ca8a04" },
     { key: "FOOD",            label: "Food",     color: "#f97316" },
-    { key: "HOTEL",           label: "Hotel",    color: "#a855f7" },
+    { key: "HOTEL",           label: "Hotel",    color: "#8b6cf6" },
     { key: "MATERIAL",        label: "Material", color: "#b45309" },
     { key: "MOBILE_RECHARGE", label: "Mobile",   color: "#0891b2" },
     { key: "OFFICE_SUPPLIES", label: "Office",   color: "#0d9488" },
-    { key: "OTHER",           label: "Other",    color: "#6b7280" },
+    { key: "OTHER",           label: "Other",    color: "#555c72" },
 ]
 
 const fmtINR = (n: number) => (n > 0 ? "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 }) : "—")
@@ -356,13 +356,13 @@ function ExpensePanel() {
                             <div className="relative">
                                 <select
                                     value={month} onChange={e => setMonth(e.target.value)} aria-label="Expense month"
-                                    className="appearance-none h-10 pl-3.5 pr-9 rounded-[10px] border border-[var(--border2)] bg-white text-[13px] text-[var(--text)] outline-none focus:ring-2 focus:ring-[#1f5fff]/25"
+                                    className="appearance-none h-10 pl-3.5 pr-9 rounded-[10px] border border-[var(--border2)] bg-white text-[13px] text-[var(--text)] outline-none focus:ring-2 focus:ring-[#3d6ff5]/25"
                                 >
                                     {monthOptions.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
                                 </select>
                                 <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text2)]" />
                             </div>
-                            <Link href="/expenses" className="hidden sm:inline-flex items-center gap-1.5 text-[13px] font-medium text-[#1f5fff] hover:underline">
+                            <Link href="/expenses" className="hidden sm:inline-flex items-center gap-1.5 text-[13px] font-medium text-[#3d6ff5] hover:underline">
                                 View all <ArrowRight size={14} />
                             </Link>
                         </div>
@@ -428,9 +428,9 @@ const RANGES = [7, 14, 30] as const
 
 const QUICK_ACTIONS = [
     { href: "/approvals", icon: ClipboardCheck, label: "Approve requests", sub: "Pending approvals", color: "#d97706", bg: "#fef3c7" },
-    { href: "/attendance", icon: Clock, label: "Mark attendance", sub: "Take attendance", color: "#1f5fff", bg: "#e3ecff" },
+    { href: "/attendance", icon: Clock, label: "Mark attendance", sub: "Take attendance", color: "#3d6ff5", bg: "#e3ecff" },
     { href: "/employees", icon: UserPlus, label: "Add employee", sub: "Onboard new hire", color: "#0f766e", bg: "#d9f5ec" },
-    { href: "/projects/create", icon: Folder, label: "Create project", sub: "Start new project", color: "#7c3aed", bg: "#efe8ff" },
+    { href: "/projects/create", icon: Folder, label: "Create project", sub: "Start new project", color: "#6d4fe0", bg: "#efe8ff" },
     { href: "/assignments", icon: ClipboardList, label: "Manage assignments", sub: "Assign inspections", color: "#0891b2", bg: "#dff5fb" },
     { href: "/documents/send", icon: Send, label: "Send document", sub: "Issue letters", color: "#b45309", bg: "#fdeccf" },
     { href: "/reports", icon: BarChart2, label: "View reports", sub: "Analytics & reports", color: "#0d9488", bg: "#d6f3ef" },
@@ -482,7 +482,7 @@ export function AdminOverview({ stats }: { stats: any }) {
     const pbs = stats.projectsByStatus || {}
     const projSlices: DonutSlice[] = [
         { label: "Active", value: pbs.ACTIVE ?? 0, color: "#16a34a" },
-        { label: "Planning", value: pbs.PLANNING ?? 0, color: "#2f6bff" },
+        { label: "Planning", value: pbs.PLANNING ?? 0, color: "#3d6ff5" },
         { label: "On hold", value: pbs.ON_HOLD ?? 0, color: "#f59e0b" },
         { label: "Completed", value: pbs.COMPLETED ?? 0, color: "#9333ea" },
     ]
@@ -491,7 +491,7 @@ export function AdminOverview({ stats }: { stats: any }) {
     const alertItems = [
         attNotMarkedYet ? { dot: "bg-[#f59e0b]", title: "Attendance not marked", text: `Not marked yet for ${attNotMarked.toLocaleString("en-IN")} of ${attExpected.toLocaleString("en-IN")} employees today.`, href: "/attendance" } : null,
         lowAttendance ? { dot: "bg-[#f59e0b]", title: "Low attendance today", text: `Only ${attPctLabel} attendance across all sites.`, href: "/attendance" } : null,
-        inspToday > 0 ? { dot: "bg-[#1f5fff]", title: `${inspToday} inspection${inspToday === 1 ? "" : "s"} submitted today`, text: "Keep an eye on completion rates.", href: "/approvals?date=today" } : null,
+        inspToday > 0 ? { dot: "bg-[#3d6ff5]", title: `${inspToday} inspection${inspToday === 1 ? "" : "s"} submitted today`, text: "Keep an eye on completion rates.", href: "/approvals?date=today" } : null,
         approvals.total > 0 ? { dot: "bg-[#9333ea]", title: `${approvals.total} approval${approvals.total === 1 ? "" : "s"} waiting`, text: "Leaves, expenses and inspections pending review.", href: "/approvals" } : null,
         alerts.lowAttendanceSites > 0 ? { dot: "bg-[#ef3b3b]", title: "Low attendance sites", text: `${alerts.lowAttendanceSites} site(s) are below 80% attendance today.`, href: "/attendance" } : null,
         alerts.docExpiries > 0 ? { dot: "bg-[#f59e0b]", title: "Document expiries", text: `${alerts.docExpiries} labour card(s) expire in the next 30 days.`, href: "/employees/master" } : null,
@@ -527,7 +527,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                     <div className="relative">
                         <select
                             value={range} onChange={e => setRange(Number(e.target.value) as typeof range)} aria-label="Date range"
-                            className="appearance-none h-12 pl-4 pr-10 rounded-[12px] border border-[var(--border2)] bg-white text-[14.5px] text-[var(--text)] outline-none focus:ring-2 focus:ring-[#1f5fff]/25 cursor-pointer"
+                            className="appearance-none h-12 pl-4 pr-10 rounded-[12px] border border-[var(--border2)] bg-white text-[14.5px] text-[var(--text)] outline-none focus:ring-2 focus:ring-[#3d6ff5]/25 cursor-pointer"
                         >
                             {RANGES.map(r => <option key={r} value={r}>Last {r} days</option>)}
                         </select>
@@ -541,7 +541,7 @@ export function AdminOverview({ stats }: { stats: any }) {
 
             {/* ── KPI tiles ── */}
             <div className="hidden md:grid grid-cols-2 xl:grid-cols-4 gap-4">
-                <KpiTile href="/employees" gradient="linear-gradient(135deg,#2f6bff 0%,#1240d8 100%)" icon={Users} label="Active employees"
+                <KpiTile href="/employees" gradient="linear-gradient(135deg,#3d6ff5 0%,#2f5be0 100%)" icon={Users} label="Active employees"
                     value={(stats.activeEmployees ?? 0).toLocaleString("en-IN")}>
                     {(stats.newEmployees30d ?? 0) > 0 ? (
                         <span className="inline-flex items-center gap-1 font-semibold text-[#15803d]">
@@ -577,7 +577,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                     </span>
                 </KpiTile>
 
-                <KpiTile href="/approvals?date=today" gradient="linear-gradient(135deg,#8b3cf6 0%,#5b21b6 100%)" icon={FileCheck} label="Inspections today"
+                <KpiTile href="/approvals?date=today" gradient="linear-gradient(135deg,#8b6cf6 0%,#6d4fe0 100%)" icon={FileCheck} label="Inspections today"
                     value={String(inspToday)}>
                     {inspDelta === null ? (
                         <span className="text-[var(--text2)] tabular-nums">{inspToday.toLocaleString("en-IN")} today · {inspYesterday.toLocaleString("en-IN")} yesterday</span>
@@ -604,7 +604,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                             <>Today&apos;s attendance is {attPctLabel}, which is <b className="font-semibold">{belowUsual ? "lower than usual" : "below 75%"}</b>. Review attendance to identify any issues.</>
                         )}
                     </p>
-                    <Link href="/attendance" className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[9px] border border-[var(--border2)] bg-white text-[12.5px] font-medium text-[var(--text)] hover:border-[#1f5fff] transition-colors">
+                    <Link href="/attendance" className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[9px] border border-[var(--border2)] bg-white text-[12.5px] font-medium text-[var(--text)] hover:border-[#3d6ff5] transition-colors">
                         {attNotMarkedYet ? "Mark attendance" : "View attendance"} <ChevronRight size={15} />
                     </Link>
                 </div>
@@ -683,7 +683,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                             {topSites.map(s => (
                                 <div key={s.siteId ?? s.name} className="grid grid-cols-[1.5fr_0.65fr_0.65fr_0.8fr_1.4fr] gap-2 items-center py-3 border-b border-[#d6f2e4] last:border-0">
                                     <span title={`${s.name} · ${s.expected} expected`} className="font-semibold text-[var(--text)] truncate">{s.name}</span>
-                                    <span className="text-center font-semibold text-[#1f5fff] tabular-nums">{s.present}</span>
+                                    <span className="text-center font-semibold text-[#3d6ff5] tabular-nums">{s.present}</span>
                                     <span className={cn("text-center tabular-nums", s.absent > 0 ? "font-semibold text-[#dc2626]" : "text-[var(--text2)]")}>{s.absent}</span>
                                     <span className={cn("text-center tabular-nums", (s.notMarked ?? 0) > 0 ? "font-semibold text-[#b45309]" : "text-[var(--text2)]")}>{s.notMarked ?? 0}</span>
                                     <span className="flex items-center gap-3 justify-end">
@@ -786,7 +786,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                                 </div>
                             ))}
                         </div>
-                        <Link href={p.href} className="mt-auto inline-flex items-center gap-1.5 text-[13px] font-medium text-[#1f5fff] hover:underline">
+                        <Link href={p.href} className="mt-auto inline-flex items-center gap-1.5 text-[13px] font-medium text-[#3d6ff5] hover:underline">
                             {p.link} <ArrowRight size={14} />
                         </Link>
                     </Panel>

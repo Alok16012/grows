@@ -13,7 +13,7 @@ type Emp = { id: string; employeeId: string; firstName: string; lastName: string
 type Level = { employeeId: string; skillId: string; level: number; source: string; assessedAt: string }
 
 const LEVELS = ["Not trained", "Theory done", "Under supervision", "Independent", "Can train others"]
-const TONE = ["bg-[var(--surface2)] text-[var(--text3)]", "bg-[#fef3c7] text-[#92400e]", "bg-[#dbeafe] text-[#1e40af]", "bg-[#dcfce7] text-[#166534]", "bg-[#166534] text-white"]
+const TONE = ["bg-[var(--surface2)] text-[var(--text3)]", "bg-[#fef3c7] text-[#92400e]", "bg-[#e3ebff] text-[#2f5be0]", "bg-[#dcfce7] text-[#166534]", "bg-[#166534] text-white"]
 const CATS = ["PROCESS", "PART", "CUSTOMER", "SAFETY"]
 const input = "h-9 rounded-[9px] border border-[var(--border)] bg-white px-2.5 text-[13px] outline-none focus:border-[var(--accent)]"
 const btn = "inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-[9px] text-[13px] font-medium disabled:opacity-50"

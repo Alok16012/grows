@@ -33,7 +33,7 @@ function show(v: unknown) {
     return String(v)
 }
 
-const PALETTE = ["#2f6bff", "#14b8a6", "#f59e0b", "#8b5cf6", "#ef4444", "#0ea5e9", "#22c55e", "#64748b"]
+const PALETTE = ["#3d6ff5", "#14b8a6", "#f59e0b", "#8b6cf6", "#ef4444", "#0ea5e9", "#22c55e", "#64748b"]
 
 export function ReportsTab() {
     const onError = useApiError()
@@ -150,7 +150,7 @@ function MonthlyChart() {
                                     <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                                     <Tooltip cursor={{ fill: "rgba(47,107,255,0.06)" }} />
-                                    <Bar dataKey="value" name="Units" fill="#2f6bff" radius={[6, 6, 0, 0]} />
+                                    <Bar dataKey="value" name="Units" fill="#3d6ff5" radius={[6, 6, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>

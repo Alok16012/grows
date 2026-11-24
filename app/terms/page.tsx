@@ -371,7 +371,7 @@ export default function TermsPage() {
 
                     <Section id="contact">
                         <p>For privacy questions, correction requests or grievances, contact:</p>
-                        <div className="rounded-[12px] border border-slate-200 bg-[#f8fafc] px-4 py-3 text-[14px] space-y-1">
+                        <div className="rounded-[12px] border border-slate-200 bg-[#f6f7fc] px-4 py-3 text-[14px] space-y-1">
                             <p><b>{org}</b></p>
                             {g.name
                                 ? <p>Grievance Officer: {g.name}{g.designation ? `, ${g.designation}` : ""}</p>

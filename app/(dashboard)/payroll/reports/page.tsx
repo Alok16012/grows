@@ -399,9 +399,9 @@ export default function ReportsDownloadsPage() {
                     </div>
 
                     {/* Info box */}
-                    <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-[8px] px-3 py-2.5">
-                        <Info size={13} className="text-blue-500 mt-0.5 shrink-0" />
-                        <p className="text-[12px] text-blue-700">
+                    <div className="flex items-start gap-2 bg-[var(--accent-light)] border border-[#e3ebff] rounded-[8px] px-3 py-2.5">
+                        <Info size={13} className="text-[var(--accent)] mt-0.5 shrink-0" />
+                        <p className="text-[12px] text-[var(--accent-text)]">
                             Includes: Employee Details, Earnings, Deductions, Net Pay and Site Summary.
                         </p>
                     </div>
@@ -452,23 +452,23 @@ export default function ReportsDownloadsPage() {
                 <div className="bg-white border border-[var(--border)] rounded-[14px] p-5 flex flex-col gap-4">
                     <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="h-12 w-12 rounded-[12px] bg-blue-50 flex items-center justify-center shrink-0">
-                                <Building2 size={24} className="text-blue-600" />
+                            <div className="h-12 w-12 rounded-[12px] bg-[var(--accent-light)] flex items-center justify-center shrink-0">
+                                <Building2 size={24} className="text-[var(--accent)]" />
                             </div>
                             <div>
                                 <h2 className="text-[15px] font-semibold text-[var(--text)]">BANK NEFT FILE</h2>
                                 <p className="text-[12px] text-[var(--text3)] mt-0.5">Download bank transfer file for salary payment.</p>
                             </div>
                         </div>
-                        <span className="text-[11px] font-semibold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full shrink-0">
+                        <span className="text-[11px] font-semibold bg-[#e3ebff] text-[var(--accent-text)] px-2.5 py-1 rounded-full shrink-0">
                             Excel / CSV
                         </span>
                     </div>
 
                     {/* Info box */}
-                    <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-[8px] px-3 py-2.5">
-                        <Info size={13} className="text-blue-500 mt-0.5 shrink-0" />
-                        <p className="text-[12px] text-blue-700">
+                    <div className="flex items-start gap-2 bg-[var(--accent-light)] border border-[#e3ebff] rounded-[8px] px-3 py-2.5">
+                        <Info size={13} className="text-[var(--accent)] mt-0.5 shrink-0" />
+                        <p className="text-[12px] text-[var(--accent-text)]">
                             Includes: Account Number, IFSC, Employee Name, Net Pay and Transfer Amount.
                         </p>
                     </div>
@@ -476,7 +476,7 @@ export default function ReportsDownloadsPage() {
                     <button
                         onClick={() => handleDownloadBank()}
                         disabled={downloadingBank}
-                        className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-[10px] text-[13px] font-medium px-4 py-3 transition-all mt-auto"
+                        className="flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white rounded-[10px] text-[13px] font-medium px-4 py-3 transition-all mt-auto"
                     >
                         {downloadingBank
                             ? <Loader2 size={15} className="animate-spin" />
@@ -516,7 +516,7 @@ export default function ReportsDownloadsPage() {
                                             <span className="flex items-center gap-1.5 text-[var(--text)]">
                                                 {item.reportType === "Wage Sheet"
                                                     ? <FileText size={13} className="text-emerald-600" />
-                                                    : <Building2 size={13} className="text-blue-600" />
+                                                    : <Building2 size={13} className="text-[var(--accent)]" />
                                                 }
                                                 {item.reportType}
                                             </span>
@@ -544,9 +544,9 @@ export default function ReportsDownloadsPage() {
             </div>
 
             {/* Note Box */}
-            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-[10px] px-4 py-3">
-                <Info size={14} className="text-blue-500 mt-0.5 shrink-0" />
-                <p className="text-[12px] text-blue-700">
+            <div className="flex items-start gap-2 bg-[var(--accent-light)] border border-[#e3ebff] rounded-[10px] px-4 py-3">
+                <Info size={14} className="text-[var(--accent)] mt-0.5 shrink-0" />
+                <p className="text-[12px] text-[var(--accent-text)]">
                     <strong>Note:</strong> Reports will be generated based on the processed payroll data. Please verify the payroll before downloading.
                 </p>
             </div>

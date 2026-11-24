@@ -12,14 +12,14 @@ type Section = typeof SECTIONS[number]
 const tag = (label: string, color: string) => ({ label, color })
 
 const EARNINGS_ROWS = [
-    { col: "BASIC", rule: "Manually entered per employee in salary setup", call: "Same value", type: tag("MANUAL", "#2563eb"), notes: "Foundation for all proration and deduction calculations" },
-    { col: "DA", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Dearness Allowance — applied only for OR compliance" },
-    { col: "HRA", rule: "Manually entered — NO auto-calculation", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "House Rent Allowance — was (Basic+DA)×5% earlier, now fully manual" },
-    { col: "Washing", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Excluded from ESIC wage base" },
-    { col: "Conveyance", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Transport allowance. Excluded from ESIC wage base" },
-    { col: "LWW", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Leave With Wages" },
-    { col: "Bonus", rule: "Manually entered — NO auto-calculation", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Per Payment of Bonus Act. Was (Basic+DA)×8.33% earlier, now fully manual. Included in the ESIC wage base." },
-    { col: "Other Allowance", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#2563eb"), notes: "Any additional allowance" },
+    { col: "BASIC", rule: "Manually entered per employee in salary setup", call: "Same value", type: tag("MANUAL", "#3d6ff5"), notes: "Foundation for all proration and deduction calculations" },
+    { col: "DA", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#3d6ff5"), notes: "Dearness Allowance — applied only for OR compliance" },
+    { col: "HRA", rule: "Manually entered — NO auto-calculation", call: "₹0", type: tag("MANUAL", "#3d6ff5"), notes: "House Rent Allowance — was (Basic+DA)×5% earlier, now fully manual" },
+    { col: "Washing", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#3d6ff5"), notes: "Excluded from ESIC wage base" },
+    { col: "Conveyance", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#3d6ff5"), notes: "Transport allowance. Excluded from ESIC wage base" },
+    { col: "LWW", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#3d6ff5"), notes: "Leave With Wages" },
+    { col: "Bonus", rule: "Manually entered — NO auto-calculation", call: "₹0", type: tag("MANUAL", "#3d6ff5"), notes: "Per Payment of Bonus Act. Was (Basic+DA)×8.33% earlier, now fully manual. Included in the ESIC wage base." },
+    { col: "Other Allowance", rule: "Manually entered per employee", call: "₹0", type: tag("MANUAL", "#3d6ff5"), notes: "Any additional allowance" },
 ]
 
 const ATTENDANCE_ROWS = [
@@ -101,7 +101,7 @@ const IMPORT_ATT = [
 
 const th = "px-3 py-2 text-left text-[11px] font-semibold text-[var(--text3)] uppercase tracking-wider border-b border-[var(--border)]"
 const td = "px-3 py-2.5 text-[12px] text-[var(--text)] border-b border-[var(--border)]"
-const tdMono = "px-3 py-2.5 text-[11.5px] font-mono text-[#1e40af] border-b border-[var(--border)] bg-[#f8faff]"
+const tdMono = "px-3 py-2.5 text-[11.5px] font-mono text-[#2f5be0] border-b border-[var(--border)] bg-[#f8faff]"
 
 export default function RuleBookPage() {
     const router = useRouter()
@@ -201,10 +201,10 @@ export default function RuleBookPage() {
                     {active === "Calculated Earnings" && (
                         <Section title="Calculated Earnings (Auto — Prorated)" icon={<Calculator size={16} />}
                             desc="These are calculated automatically when payroll is processed. The proration formula multiplies first then divides — this matches Excel exactly and avoids floating-point drift.">
-                            <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 8, alignItems: "flex-start" }}>
-                                <Info size={14} style={{ color: "#2563eb", marginTop: 1, flexShrink: 0 }} />
-                                <div style={{ fontSize: 12, color: "#1e40af" }}>
-                                    <strong>Proration Rule:</strong> <code style={{ background: "#dbeafe", padding: "1px 6px", borderRadius: 4 }}>ROUND(component × WorkedDays / MonthDays)</code>
+                            <div style={{ background: "#eaf0ff", border: "1px solid #d4e0ff", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                                <Info size={14} style={{ color: "#3d6ff5", marginTop: 1, flexShrink: 0 }} />
+                                <div style={{ fontSize: 12, color: "#2f5be0" }}>
+                                    <strong>Proration Rule:</strong> <code style={{ background: "#e3ebff", padding: "1px 6px", borderRadius: 4 }}>ROUND(component × WorkedDays / MonthDays)</code>
                                     &nbsp;— multiply FIRST, then divide. This is the Excel-exact formula verified against VARROC PUNE wage sheet.
                                 </div>
                             </div>
@@ -348,11 +348,11 @@ export default function RuleBookPage() {
                                     {IMPORT_SAL.map(r => (
                                         <tr key={r.col} style={{ background: "var(--surface)" }}>
                                             <td className={td}>
-                                                <span style={{ fontWeight: r.col.includes("✦") ? 700 : 400, color: r.col.includes("✦") ? "#2563eb" : "inherit" }}>{r.col}</span>
+                                                <span style={{ fontWeight: r.col.includes("✦") ? 700 : 400, color: r.col.includes("✦") ? "#3d6ff5" : "inherit" }}>{r.col}</span>
                                             </td>
                                             <td className={tdMono}>{r.field}</td>
                                             <td className={td} style={{ color: "var(--text3)", fontSize: 11 }}>{r.type}</td>
-                                            <td className={td} style={{ color: r.notes.includes("Manual") ? "#2563eb" : "var(--text3)", fontSize: 11, fontWeight: r.notes.includes("Manual") ? 600 : 400 }}>{r.notes}</td>
+                                            <td className={td} style={{ color: r.notes.includes("Manual") ? "#3d6ff5" : "var(--text3)", fontSize: 11, fontWeight: r.notes.includes("Manual") ? 600 : 400 }}>{r.notes}</td>
                                         </tr>
                                     ))}
                                 </tbody>

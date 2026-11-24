@@ -32,7 +32,7 @@ const btn = "h-9 px-4 rounded-[9px] bg-[var(--accent)] text-white text-[13px] fo
 const btn2 = "h-9 px-4 rounded-[9px] border border-[var(--border)] bg-white text-[13px] font-semibold text-[var(--text2)] disabled:opacity-50 inline-flex items-center gap-1.5"
 const day = (s: string | null) => s ? new Date(s.length === 10 ? `${s}T00:00:00` : s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
 const TONE: Record<LetterStatus, string> = {
-    OVERDUE: "bg-red-50 text-red-700", DUE: "bg-amber-50 text-amber-800", WAITING: "bg-blue-50 text-blue-700",
+    OVERDUE: "bg-red-50 text-red-700", DUE: "bg-amber-50 text-amber-800", WAITING: "bg-[var(--accent-light)] text-[var(--accent-text)]",
     SENT: "bg-green-50 text-green-700", ACKNOWLEDGED: "bg-emerald-100 text-emerald-800", UPCOMING: "bg-gray-100 text-gray-600", SKIPPED: "bg-gray-100 text-gray-500",
 }
 const ORDER: LetterStatus[] = ["OVERDUE", "DUE", "WAITING", "SENT", "ACKNOWLEDGED", "UPCOMING", "SKIPPED"]

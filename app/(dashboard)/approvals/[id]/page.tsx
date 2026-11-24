@@ -134,7 +134,7 @@ export default function ReviewInspectionPage() {
         const rect = canvas.getBoundingClientRect()
         const x = "touches" in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left
         const y = "touches" in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top
-        ctx.lineTo(x, y); ctx.strokeStyle = "#0b5cff"; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.stroke()
+        ctx.lineTo(x, y); ctx.strokeStyle = "#3d6ff5"; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.stroke()
         setHasSig(true)
     }
     const stopDraw = () => { isDrawingRef.current = false }
@@ -201,7 +201,7 @@ export default function ReviewInspectionPage() {
         const byLabel = (re: RegExp) => list.find(r => re.test(label(r)))
         const accepted = list.find(r => r.field?.reportRole === "ACCEPTED") ?? byLabel(/^ACCEPTED\s*(QTY|QUANTITY)$/)
         const qty = [
-            { key: "insp", label: "Inspected", resp: bySlot("INSPECTED"), pct: undefined as any, bg: "#f8fafc", border: "#e2e8f0", fg: "#0f172a" },
+            { key: "insp", label: "Inspected", resp: bySlot("INSPECTED"), pct: undefined as any, bg: "#f6f7fc", border: "#e2e8f0", fg: "#0f172a" },
             { key: "acc", label: "Accepted", resp: accepted, pct: byLabel(/^ACCEPT(ED|ANCE)\s*%$/), bg: "#f0fdf4", border: "#bbf7d0", fg: "#15803d" },
             { key: "rw", label: "Rework", resp: bySlot("REWORK"), pct: byLabel(/^REWORK\s*%$/), bg: "#fff7ed", border: "#fed7aa", fg: "#c2410c" },
             { key: "rj", label: "Rejected", resp: bySlot("REJECTED"), pct: byLabel(/^REJECT(ED|ION)\s*%$/), bg: "#fef2f2", border: "#fecaca", fg: "#b91c1c" },
@@ -374,13 +374,13 @@ export default function ReviewInspectionPage() {
                         {inspection.status === "approved" && (
                             <>
                                 <button onClick={handleShare} disabled={sharing}
-                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[var(--border)] rounded-[9px] text-[12.5px] text-[var(--accent)] font-medium hover:bg-[#f0faf6] hover:border-[#0b5cff]/30 transition-colors shadow-sm">
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[var(--border)] rounded-[9px] text-[12.5px] text-[var(--accent)] font-medium hover:bg-[#f0faf6] hover:border-[#3d6ff5]/30 transition-colors shadow-sm">
                                     {sharing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
                                     {shareToken ? "Copy Link" : "Share Report"}
                                 </button>
                                 {canAny(session, ["approvals.manage", "assignments.edit"]) && (
                                     <button onClick={() => setSendOpen(true)}
-                                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#0b5cff] border border-[#0b5cff] rounded-[9px] text-[12.5px] text-white font-medium hover:bg-[#0847c7] transition-colors shadow-sm">
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#3d6ff5] border border-[#3d6ff5] rounded-[9px] text-[12.5px] text-white font-medium hover:bg-[#2f5be0] transition-colors shadow-sm">
                                         <Send className="h-3.5 w-3.5" /> Send to customer
                                     </button>
                                 )}
@@ -409,15 +409,15 @@ export default function ReviewInspectionPage() {
                     {/* GPS */}
                     {gps && (
                         <div className="bg-white border border-[var(--border)] rounded-[12px] px-4 py-3 flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                                <MapPin className="h-4 w-4 text-blue-500" />
+                            <div className="w-8 h-8 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0">
+                                <MapPin className="h-4 w-4 text-[var(--accent)]" />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-[10px] text-[var(--text3)] uppercase tracking-[0.5px] mb-0.5">GPS Location Captured</p>
                                 <p className="text-[13px] text-[var(--text)] font-medium tabular-nums">{gps.lat.toFixed(6)}, {gps.lng.toFixed(6)}</p>
                             </div>
                             <a href={`https://maps.google.com?q=${gps.lat},${gps.lng}`} target="_blank" rel="noopener noreferrer"
-                                className="shrink-0 inline-flex items-center gap-1 text-[12px] text-blue-600 hover:text-blue-700 font-medium">
+                                className="shrink-0 inline-flex items-center gap-1 text-[12px] text-[var(--accent)] hover:text-[var(--accent-text)] font-medium">
                                 <ExternalLink className="h-3 w-3" /> Open Maps
                             </a>
                         </div>
@@ -663,7 +663,7 @@ export default function ReviewInspectionPage() {
                                         </button>
                                         {session?.user?.role === "ADMIN" && (
                                             <Link href={`/inspection/${inspection.assignment?.id}/form`}
-                                                className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-[10px] py-[11px] text-[13px] font-semibold transition-colors">
+                                                className="w-full flex items-center justify-center gap-2 bg-[var(--accent-light)] hover:bg-[#e3ebff] text-[var(--accent-text)] border border-[#d4e0ff] rounded-[10px] py-[11px] text-[13px] font-semibold transition-colors">
                                                 <ExternalLink className="h-4 w-4" /> Edit Form (Admin)
                                             </Link>
                                         )}
@@ -717,7 +717,7 @@ export default function ReviewInspectionPage() {
 
                                     {session?.user?.role === "ADMIN" && (
                                         <Link href={`/inspection/${inspection.assignment?.id}/form`}
-                                            className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-[10px] py-[11px] text-[13px] font-semibold transition-colors">
+                                            className="w-full flex items-center justify-center gap-2 bg-[var(--accent-light)] hover:bg-[#e3ebff] text-[var(--accent-text)] border border-[#d4e0ff] rounded-[10px] py-[11px] text-[13px] font-semibold transition-colors">
                                             <ExternalLink className="h-4 w-4" /> Edit Form (Admin)
                                         </Link>
                                     )}
