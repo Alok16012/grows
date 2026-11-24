@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { guard, employeeScope } from "@/lib/access"
-import { buildEmployeeWhere, employeeFiltersFromParams } from "@/lib/employee-filter"
+import { buildEmployeeWhere, employeeFiltersFromParams, parsePayrollMonth } from "@/lib/employee-filter"
 
 // Employee pickers (apply leave for, start an exit, raise a ticket for, enrol,
 // send a letter to, issue an asset to, the attendance roster…). Returns who
@@ -45,9 +45,22 @@ export async function GET(req: Request) {
         const limitParam = parseInt(searchParams.get("limit") ?? "")
         const take = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 5000) : 5000
 
+        // For a payroll month, someone who left during it has no active posting
+        // any more (exit closes it) — give their last posting that ran into the
+        // month, so the attendance sheet still puts them at their site.
+        const pm = parsePayrollMonth(searchParams.get("payrollMonth"))
+        const select = pm ? {
+            ...OPTION_SELECT,
+            deployments: {
+                ...OPTION_SELECT.deployments,
+                where: { OR: [{ isActive: true }, { endDate: { gte: new Date(Date.UTC(pm.year, pm.month - 1, 1)) } }] },
+                orderBy: [{ isActive: "desc" as const }, { startDate: "desc" as const }],
+            },
+        } : OPTION_SELECT
+
         const employees = await prisma.employee.findMany({
             where,
-            select: OPTION_SELECT,
+            select,
             orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
             take,
         })

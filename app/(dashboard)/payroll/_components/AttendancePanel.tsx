@@ -2,7 +2,6 @@
 import { payrollYears, payrollMonths, currentPayrollMonth, currentPayrollYear } from "./payroll-years"
 import { useState, useRef, useCallback, useEffect } from "react"
 import { fetchEmployeeOptions } from "@/lib/fetch-all-employees"
-import { monthEndKey } from "@/lib/employee-filter"
 // xlsx is lazy-loaded — only needed when a sheet is actually read or written.
 // Eager import adds ~430KB to this page's initial bundle.
 const loadXLSX = () => import("xlsx")
@@ -64,13 +63,14 @@ export default function AttendancePanel({ onClose, onDone, initialMonth, initial
     const [missingStaff, setMissingStaff] = useState<string[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    // The template lists who had joined by the end of the chosen month. A slow
+    // The template lists who was on the rolls that month — joined by its end,
+    // including anyone who left during it (they are paid for days worked). A slow
     // answer for a site that's no longer selected is dropped.
     useEffect(() => {
         if (!siteId) { setSiteEmployees([]); return }
         let cancelled = false
         setSiteEmpLoading(true)
-        fetchEmployeeOptions<Employee>({ siteId, status: "ACTIVE", joinedBy: monthEndKey(month, year) })
+        fetchEmployeeOptions<Employee>({ siteId, payrollMonth: `${year}-${String(month).padStart(2, "0")}` })
             .then(d => { if (!cancelled) setSiteEmployees(d.employees) })
             .catch(() => { if (!cancelled) setSiteEmployees([]) })
             .finally(() => { if (!cancelled) setSiteEmpLoading(false) })
@@ -145,7 +145,7 @@ export default function AttendancePanel({ onClose, onDone, initialMonth, initial
     const STATE_STYLE: Record<RowState, { icon: React.ReactNode; bg: string; noteColor: string }> = {
         ok:    { icon: <CheckCircle2 size={14} style={{ color:"#16a34a" }} />, bg: "var(--surface)", noteColor: "var(--text3)" },
         warn:  { icon: <AlertTriangle size={14} style={{ color:"#d97706" }} />, bg: "#fffbeb",       noteColor: "#a16207" },
-        skip:  { icon: <MinusCircle size={14} style={{ color:"#9ca3af" }} />,   bg: "var(--surface2)", noteColor: "var(--text3)" },
+        skip:  { icon: <MinusCircle size={14} style={{ color:"#98a1b5" }} />,   bg: "var(--surface2)", noteColor: "var(--text3)" },
         error: { icon: <XCircle size={14} style={{ color:"#dc2626" }} />,       bg: "#fff5f5",       noteColor: "#dc2626" },
     }
 
@@ -315,9 +315,9 @@ export default function AttendancePanel({ onClose, onDone, initialMonth, initial
                     </div>
                     <div style={{ display:"flex", gap:10, marginBottom:14, flexWrap:"wrap" }}>
                         {[
-                            { label:"Rows in file",      value:matched.length, color:"#6b7280", bg:"var(--surface2)", border:"var(--border)" },
+                            { label:"Rows in file",      value:matched.length, color:"#555c72", bg:"var(--surface2)", border:"var(--border)" },
                             { label:"Ready to process",  value:readyCount,     color:"#15803d", bg:"#dcfce7",         border:"#86efac" },
-                            { label:"Skipped",           value:skipCount,      color:"#6b7280", bg:"var(--surface2)", border:"var(--border)" },
+                            { label:"Skipped",           value:skipCount,      color:"#555c72", bg:"var(--surface2)", border:"var(--border)" },
                             { label:"Errors",            value:errorCount,     color:"#dc2626", bg:"#fee2e2",         border:"#fca5a5" },
                         ].map(s=>(
                             <div key={s.label} style={{ padding:"8px 16px", borderRadius:8, background:s.bg, border:`1px solid ${s.border}`, display:"flex", alignItems:"center", gap:8 }}>

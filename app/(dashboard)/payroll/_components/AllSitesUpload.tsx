@@ -12,7 +12,6 @@ import {
 import { toast } from "sonner"
 import { payrollYears, payrollMonths } from "./payroll-years"
 import { fetchEmployeeOptions } from "@/lib/fetch-all-employees"
-import { monthEndKey } from "@/lib/employee-filter"
 import { compareSiteNames } from "@/lib/site-sort"
 import type { PayrollRules } from "@/lib/payroll-rules"
 import {
@@ -35,7 +34,7 @@ const td: React.CSSProperties = { padding:"7px 10px" }
 const STATE_STYLE: Record<RowState, { icon: React.ReactNode; bg: string; noteColor: string }> = {
     ok:    { icon: <CheckCircle2 size={14} style={{ color:"#16a34a" }} />, bg: "var(--surface)",  noteColor: "var(--text3)" },
     warn:  { icon: <AlertTriangle size={14} style={{ color:"#d97706" }} />, bg: "#fffbeb",        noteColor: "#a16207" },
-    skip:  { icon: <MinusCircle size={14} style={{ color:"#9ca3af" }} />,   bg: "var(--surface2)", noteColor: "var(--text3)" },
+    skip:  { icon: <MinusCircle size={14} style={{ color:"#98a1b5" }} />,   bg: "var(--surface2)", noteColor: "var(--text3)" },
     error: { icon: <XCircle size={14} style={{ color:"#dc2626" }} />,       bg: "#fff5f5",        noteColor: "#dc2626" },
 }
 
@@ -124,11 +123,12 @@ export default function AllSitesUpload({ month, year, setMonth, setYear, rules, 
     }
     useEffect(() => { loadSites().catch(() => { /* retried when validating */ }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Who goes in the template: active staff who had joined by month end.
+    // Who goes in the template: everyone on the rolls that month — joined by
+    // its end, including anyone who left during it (paid for days worked).
     useEffect(() => {
         let cancelled = false
         setStaffLoading(true)
-        fetchEmployeeOptions<Employee>({ status: "ACTIVE", joinedBy: monthEndKey(month, year) })
+        fetchEmployeeOptions<Employee>({ payrollMonth: `${year}-${String(month).padStart(2, "0")}` })
             .then(d => { if (!cancelled) setStaff(d.employees) })
             .catch(() => { if (!cancelled) setStaff([]) })
             .finally(() => { if (!cancelled) setStaffLoading(false) })
@@ -345,10 +345,10 @@ export default function AllSitesUpload({ month, year, setMonth, setYear, rules, 
                     </div>
                     <div style={{ display:"flex", gap:10, marginBottom:14, flexWrap:"wrap" }}>
                         {[
-                            { label:"Rows in file",     value:rows.length,       color:"#6b7280", bg:"var(--surface2)", border:"var(--border)" },
+                            { label:"Rows in file",     value:rows.length,       color:"#555c72", bg:"var(--surface2)", border:"var(--border)" },
                             { label:"Ready to process", value:readyCount,        color:"#15803d", bg:"#dcfce7",         border:"#86efac" },
-                            { label:"Sites",            value:sitesToRun.length, color:"#1d4ed8", bg:"#eff6ff",         border:"#bfdbfe" },
-                            { label:"Skipped",          value:skipCount,         color:"#6b7280", bg:"var(--surface2)", border:"var(--border)" },
+                            { label:"Sites",            value:sitesToRun.length, color:"#2f5be0", bg:"#eaf0ff",         border:"#d4e0ff" },
+                            { label:"Skipped",          value:skipCount,         color:"#555c72", bg:"var(--surface2)", border:"var(--border)" },
                             { label:"Errors",           value:errorCount,        color:"#dc2626", bg:"#fee2e2",         border:"#fca5a5" },
                         ].map(s => (
                             <div key={s.label} style={{ padding:"8px 16px", borderRadius:8, background:s.bg, border:`1px solid ${s.border}`, display:"flex", alignItems:"center", gap:8 }}>
