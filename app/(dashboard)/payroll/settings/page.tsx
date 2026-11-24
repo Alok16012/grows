@@ -271,6 +271,11 @@ export default function PayrollSettingsPage() {
             {/* Dated versions + change control */}
             <ChangeControlPanel versions={versions} window={window_} viewing={viewing} onView={viewVersion} onChanged={() => loadRules(viewing)} isAdmin={isAdmin} />
 
+            {/* Payslips to employees — near the top so it is easy to find; saves on its own (not a dated rule). */}
+            <div id="payslips" style={{ ...cardStyle, scrollMarginTop: 90 }}>
+                <PayslipSendSettings />
+            </div>
+
             {/* Scope note */}
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "10px 14px", borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1e40af", lineHeight: 1.55 }}>
                 <Info size={14} style={{ marginTop: 2, flexShrink: 0 }} />
@@ -593,11 +598,6 @@ export default function PayrollSettingsPage() {
                         <NumField label="Notice pay divisor (days)" value={rules.fnf.noticeDivisor} onChange={n => up("fnf", { noticeDivisor: n })} />
                     </div>
                     <p style={cardHint}>Default service rule: 4 years 240 days = 1,700 days (Payment of Gratuity Act, as courts read 5 years).</p>
-                </div>
-
-                {/* ── Payslips to employees (saves on its own; not a dated rule) ── */}
-                <div style={cardStyle}>
-                    <PayslipSendSettings />
                 </div>
 
                 {/* ── Establishment codes ── */}

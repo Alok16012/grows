@@ -11,7 +11,7 @@ import dynamic from "next/dynamic"
 import {
     Loader2, RefreshCw, FileSpreadsheet, ShieldCheck, Upload, IndianRupee,
     Clock, Trash2, TrendingUp, Settings2, Lock, Unlock, CheckCircle2, ChevronRight,
-    ChevronLeft, SlidersHorizontal, CalendarRange, CalendarPlus, Users, Wallet, Pencil, BadgeCheck, Scale,
+    ChevronLeft, SlidersHorizontal, CalendarRange, CalendarPlus, Users, Wallet, Pencil, BadgeCheck, Scale, Send,
 } from "lucide-react"
 import { can } from "@/lib/can"
 import { StatCard, statGridClass } from "@/components/StatCard"
@@ -465,6 +465,11 @@ export default function PayrollPage() {
                     <button onClick={() => router.push("/payroll/reports/writer")} style={quietBtn} title="Reports — Report Writer, FNF settlement, Advance">
                         <FileSpreadsheet size={15} /> <span className="hidden 2xl:inline">Reports</span>
                     </button>
+                    {canManage && (
+                        <button onClick={() => router.push("/payroll/settings#payslips")} style={quietBtn} title="Payslips to employees — manual or automatic, whole site or chosen employees">
+                            <Send size={15} /> <span className="hidden 2xl:inline">Payslip sending</span>
+                        </button>
+                    )}
                     {canManage && (
                         <button onClick={() => router.push("/payroll/settings")} style={quietBtn} title="PF / ESIC / PT rates, slabs and defaults">
                             <SlidersHorizontal size={15} /> <span className="hidden 2xl:inline">Rules</span>

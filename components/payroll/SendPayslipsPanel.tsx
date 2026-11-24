@@ -39,7 +39,21 @@ export function SendPayslipsPanel({ month, year, focusSiteId }: { month: number;
     }, [month, year])
     useEffect(() => { load(); setSel(new Set()); setSite(null); setEmps(null); setESel(new Set()) }, [load])
     useEffect(() => { const t = setTimeout(() => { if (q.trim()) { setSite(null); loadEmps(null, q) } else if (!site) setEmps(null) }, 350); return () => clearTimeout(t) }, [q, loadEmps, site])
-    if (!d || !d.sites.length) return null
+    if (!d) return null
+    // No payslips for this month yet: still show the bar, so the sending settings are always reachable.
+    if (!d.sites.length) return (
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: 12, fontSize: 12.5 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <Send size={14} style={{ color: "var(--accent)" }} /><b>Payslips to employees</b>
+                    <span style={{ padding: "2px 8px", borderRadius: 99, background: "var(--accent-light)", color: "var(--accent)", fontSize: 11, fontWeight: 600 }}>{d.mode === "manual" ? "Manual" : d.mode === "onLock" ? "Automatic on lock" : "Automatic on paid"}</span>
+                    <span style={{ color: "var(--text3)" }}>No payslips for {label} yet — process payroll first.</span>
+                </div>
+                {d.canSend && <button onClick={() => setCfg(c => !c)} style={btnG} aria-label="How sending works"><Settings2 size={12} /> Settings</button>}
+            </div>
+            {cfg && d.canSend && <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}><PayslipSendSettings compact onChanged={load} /></div>}
+        </div>
+    )
     const manualish = d.mode !== "onLock" && !d.alwaysVisible
     const notSent = d.sites.filter(s => s.ready > 0 && !s.sent)
     const sentCount = d.sites.filter(s => s.sent).length
