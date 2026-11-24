@@ -614,6 +614,53 @@ function sendSignLink(name: string, phone: string | null | undefined, token: str
     toast.success("Sign link copied — WhatsApp opened")
 }
 
+type UnfinishedForm = { id: string; employeeId: string; firstName: string; middleName: string | null; lastName: string; designation: string | null; phone: string | null; onboardingToken: string | null; createdAt: string; policiesLeft: number | null }
+
+/**
+ * Join forms the applicant saved but never submitted (joining policies not
+ * signed). They are NOT in the Onboarding list — a form only arrives here once
+ * documents and policies are all done. HR can nudge the applicant from here.
+ */
+function UnfinishedForms() {
+    const [rows, setRows] = useState<UnfinishedForm[] | null>(null)
+    const [open, setOpen] = useState(false)
+    useEffect(() => {
+        fetch("/api/onboarding/unfinished").then(r => r.ok ? r.json() : []).then(d => setRows(Array.isArray(d) ? d : [])).catch(() => setRows([]))
+    }, [])
+    if (!rows?.length) return null
+    return (
+        <div style={{ borderRadius: 10, background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", fontSize: 13 }}>
+            <button onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 14px", background: "none", border: "none", color: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
+                <AlertCircle size={15} /> {rows.length} join form{rows.length === 1 ? "" : "s"} not submitted — the applicant left before signing the joining policies. Not counted below. {open ? "Hide" : "Show"} →
+            </button>
+            {open && (
+                <div style={{ padding: "0 14px 12px", display: "grid", gap: 6 }}>
+                    {rows.map(r => {
+                        const name = [r.firstName, r.middleName, r.lastName].filter(Boolean).join(" ")
+                        return (
+                            <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 10px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>
+                                <div style={{ flex: 1, minWidth: 180 }}>
+                                    <div style={{ fontWeight: 700 }}>{name}</div>
+                                    <div style={{ fontSize: 11.5, color: "var(--text3)" }}>
+                                        {r.designation || "—"} · {r.phone || "no mobile"} · saved {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}
+                                        {r.policiesLeft ? ` · ${r.policiesLeft} polic${r.policiesLeft === 1 ? "y" : "ies"} to sign` : ""}
+                                    </div>
+                                </div>
+                                {r.onboardingToken && (
+                                    <button onClick={() => sendSignLink(name, r.phone, r.onboardingToken!)}
+                                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "1px solid #fcd34d", background: "#fef3c7", color: "#92400e", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                                        <Send size={13} /> Send sign link
+                                    </button>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+        </div>
+    )
+}
+
 function PageArrow({ disabled, onClick, children }: { disabled: boolean; onClick: () => void; children: React.ReactNode }) {
     return (
         <button onClick={onClick} disabled={disabled}
@@ -947,6 +994,8 @@ export default function OnboardingPage() {
                     <CheckCircle2 size={15} /> {apprCount} employee update{apprCount === 1 ? "" : "s"} waiting for approval — open Approvals →
                 </Link>
             )}
+
+            <UnfinishedForms />
 
             <div style={{ display: "contents" }}>
             {/* KPI cards */}

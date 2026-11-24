@@ -472,13 +472,26 @@ export default function JoinPage() {
     // ── Save (Documents) and Submit (Policies) ────────────────────────────────
 
     /** Last step: every Onboarding policy must be signed (the server checked each signature). */
-    function finish() {
-        if (!result) return
+    async function finish() {
+        if (!result || !created) return
         if (policyProgress?.loading) return
         if (policyProgress && !policyProgress.allSigned) {
             const left = policyProgress.total - policyProgress.signed
             setStepError(`Sign ${left} more polic${left === 1 ? "y" : "ies"} to submit — ${policyProgress.signed} of ${policyProgress.total} signed`)
             return
+        }
+        // The server decides: the form reaches HR only when every required
+        // document is on file and every joining policy is signed.
+        setLoading(true)
+        try {
+            const res = await fetch("/api/join/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: created.token }) })
+            const j = await res.json().catch(() => ({}))
+            if (!res.ok) { setStepError(j.error || "Could not submit. Please try again."); return }
+        } catch {
+            setStepError("Network error. Check your connection and tap Submit again.")
+            return
+        } finally {
+            setLoading(false)
         }
         setStepError("")
         setSubmitted(true)
@@ -1260,7 +1273,7 @@ export default function JoinPage() {
                                 {loading ? <><Loader2 size={14} className="animate-spin" /> {T("Saving…")}</> : <>{T("Save & continue")} <ChevronRight size={15} /></>}
                             </button>
                         ) : isLast ? (
-                            <button onClick={finish} disabled={!policyProgress || policyProgress.loading || !policyProgress.allSigned}
+                            <button onClick={finish} disabled={loading || !policyProgress || policyProgress.loading || !policyProgress.allSigned}
                                 title={policyProgress && !policyProgress.allSigned ? "Sign every policy first" : undefined}
                                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 22px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: policyProgress?.allSigned && !policyProgress.loading ? "pointer" : "not-allowed", opacity: policyProgress?.allSigned && !policyProgress.loading ? 1 : 0.5 }}>
                                 <CheckCircle2 size={14} /> {T("Submit")}

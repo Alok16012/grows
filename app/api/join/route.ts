@@ -11,7 +11,7 @@ import {
     normalizePhone, normalizeUpper, digitsOnly,
 } from "@/lib/validation"
 import crypto from "crypto"
-import { getJoinSettings, findJoinMatch, alertBlockedJoin, alertNewJoiner, joinPoliciesPending, DUPLICATE_MESSAGE } from "@/lib/join-server"
+import { getJoinSettings, findJoinMatch, alertBlockedJoin, completeJoinForm, DUPLICATE_MESSAGE } from "@/lib/join-server"
 import { findLink, linkState, bumpLink } from "@/lib/join-links"
 import { JOIN_OPTIONAL_FIELDS, JOIN_DOCS, type JoinDoc } from "@/lib/join-settings"
 import { isPhotoDoc } from "@/lib/employee-photo"
@@ -70,23 +70,6 @@ export async function GET(req: Request) {
         return NextResponse.json({ sites: [], hrUsers: [], referrer: null, designations: [] }, { status: 200 })
     }
 }
-
-const DEFAULT_TASKS = [
-    { title: "Collect Aadhar Card",           category: "Documents",   order: 1 },
-    { title: "Collect PAN Card",              category: "Documents",   order: 2 },
-    { title: "Collect Bank Details",          category: "Documents",   order: 3 },
-    { title: "Collect Passport Photo",        category: "Documents",   order: 4 },
-    { title: "Sign Offer Letter",             category: "Documents",   order: 5 },
-    { title: "Sign NDA / Agreement",          category: "Documents",   order: 6 },
-    { title: "Issue ID Card",                 category: "Welcome Kit", order: 7 },
-    { title: "Issue Uniform",                 category: "Welcome Kit", order: 8 },
-    { title: "Site/Location Briefing",        category: "Orientation", order: 9 },
-    { title: "Safety Training",               category: "Training",    order: 10 },
-    { title: "Role & Responsibility Briefing",category: "Orientation", order: 11 },
-    { title: "Add to Attendance System",      category: "IT Setup",    order: 12 },
-    { title: "PF Registration",               category: "Compliance",  order: 13 },
-    { title: "ESI Registration",              category: "Compliance",  order: 14 },
-]
 
 // Public route — no auth required
 // POST /api/join — creates an Employee (ONBOARDING status) + OnboardingRecord from external form
@@ -348,38 +331,20 @@ export async function POST(req: Request) {
             if (posted) recordSiteChange({ action: "deployment.assign", employeeId: employee.id, siteId, startDate: posted.startDate, source: "Join link", req })
         }
 
-        // Create onboarding record with default tasks
-        await prisma.onboardingRecord.create({
-            data: {
-                employeeId: employee.id,
-                status: "IN_PROGRESS",
-                startedAt: new Date(),
-                tasks: {
-                    create: DEFAULT_TASKS.map(t => ({
-                        employeeId: employee.id,
-                        title: t.title,
-                        category: t.category,
-                        order: t.order,
-                        status: "PENDING" as const,
-                        isRequired: true,
-                    })),
-                },
-            },
-        })
-
         if (link) await bumpLink(link.id, "submits")
-        // The joining policies are signed on the next screen. Tell HR only once
-        // they are (the token sign route sends the alert then) — otherwise an
-        // applicant who closes the page at the Policies step looks complete.
-        const policiesLeft = await joinPoliciesPending(employee.id, employee.designation).catch(() => 0)
-        if (!policiesLeft) await alertNewJoiner({ name: [firstName.trim(), middleName?.trim(), lastName.trim()].filter(Boolean).join(" "), designation, siteId, hrId }, joinSettings).catch(e => console.error("[JOIN_ALERT_NEW]", e))
+        // Not submitted yet: the joining policies are signed on the next screen.
+        // The form reaches HR (Onboarding record + alert) only once they are —
+        // straight away when no policy applies to this role.
+        const completion = await completeJoinForm(employee.id).catch(e => { console.error("[JOIN_COMPLETE]", e); return null })
 
         return NextResponse.json({
             success: true,
             employeeId,
             onboardingToken,
             employeeDbId: employee.id,
-            message: "Onboarding form submitted successfully",
+            complete: !!completion?.ok,
+            policiesLeft: completion?.policiesLeft ?? null,
+            message: "Details saved — sign the joining policies to submit",
         })
     } catch (error: any) {
         console.error("[JOIN_POST]", error)

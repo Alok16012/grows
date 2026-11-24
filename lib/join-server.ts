@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma"
 import { findEmployeeDuplicates } from "@/lib/employee-dedupe"
 import { notifyApprovers } from "@/lib/hr-notify"
 import { signoffReady, statusFor } from "@/lib/policy-signoff"
-import { sanitizeJoinSettings, JOIN_DUP_FIELDS, type JoinSettings } from "@/lib/join-settings"
+import { sanitizeJoinSettings, JOIN_DUP_FIELDS, JOIN_DOCS, type JoinSettings } from "@/lib/join-settings"
 
 const KEY = "joinSettings"
 export const ONBOARDING_APPROVERS = ["onboarding.approve"]
@@ -61,7 +61,8 @@ export async function findJoinMatch(b: { phone?: string; email?: string; aadharN
         if (u) hits.set(u.id, [...(hits.get(u.id) ?? []), "UAN"])
     }
     if (!hits.size) return null
-    const emps = await prisma.employee.findMany({ where: { id: { in: Array.from(hits.keys()) } }, select: { id: true, employeeId: true, firstName: true, lastName: true, status: true, dateOfLeaving: true } })
+    // An unfinished join form never reached HR — let the applicant start again.
+    const emps = await prisma.employee.findMany({ where: { id: { in: Array.from(hits.keys()) }, NOT: UNFINISHED_JOIN_WHERE }, select: { id: true, employeeId: true, firstName: true, lastName: true, status: true, dateOfLeaving: true } })
     // Prefer an ex-employee (rejoin), else whoever matched most fields.
     emps.sort((a, b) => Number(LEFT.has(String(b.status))) - Number(LEFT.has(String(a.status))) || (hits.get(b.id)!.length - hits.get(a.id)!.length))
     const e = emps[0]
@@ -128,20 +129,71 @@ export async function joinPoliciesPending(employeeId: string, designation: strin
     return list.filter(p => p.status !== "SIGNED").length
 }
 
-/** Last joining policy signed on the join/onboarding link → now tell HR the form is in. */
-export async function alertJoinerCompleted(employeeId: string) {
+/** Old task list every join form started with (the checklist template now drives the real checks). */
+const DEFAULT_TASKS = [
+    { title: "Collect Aadhar Card",           category: "Documents",   order: 1 },
+    { title: "Collect PAN Card",              category: "Documents",   order: 2 },
+    { title: "Collect Bank Details",          category: "Documents",   order: 3 },
+    { title: "Collect Passport Photo",        category: "Documents",   order: 4 },
+    { title: "Sign Offer Letter",             category: "Documents",   order: 5 },
+    { title: "Sign NDA / Agreement",          category: "Documents",   order: 6 },
+    { title: "Issue ID Card",                 category: "Welcome Kit", order: 7 },
+    { title: "Issue Uniform",                 category: "Welcome Kit", order: 8 },
+    { title: "Site/Location Briefing",        category: "Orientation", order: 9 },
+    { title: "Safety Training",               category: "Training",    order: 10 },
+    { title: "Role & Responsibility Briefing",category: "Orientation", order: 11 },
+    { title: "Add to Attendance System",      category: "IT Setup",    order: 12 },
+    { title: "PF Registration",               category: "Compliance",  order: 13 },
+    { title: "ESI Registration",              category: "Compliance",  order: 14 },
+]
+
+/**
+ * A self-registered joiner whose form is not finished: saved on the Documents
+ * step (PENDING-xxxx code, ONBOARDING) but no OnboardingRecord yet. HR does not
+ * see these in Onboarding; they only list under "Unfinished join forms".
+ */
+export const UNFINISHED_JOIN_WHERE = { status: "ONBOARDING" as const, employeeId: { startsWith: "PENDING-" }, onboardingRecord: { is: null } }
+
+export type JoinCompletion = { ok: boolean; already?: boolean; missingDocs: string[]; policiesLeft: number }
+
+/**
+ * Submit a join form: only when every required document is on file and every
+ * joining policy is signed. Then — and only then — the OnboardingRecord is
+ * created (so the form reaches HR in Onboarding) and HR is alerted. Safe to
+ * call repeatedly: the second call finds the record and does nothing.
+ */
+export async function completeJoinForm(employeeId: string): Promise<JoinCompletion> {
     const emp = await prisma.employee.findUnique({
         where: { id: employeeId },
-        select: { firstName: true, middleName: true, lastName: true, designation: true, managerId: true, status: true, employeeId: true,
+        select: { id: true, firstName: true, middleName: true, lastName: true, designation: true, managerId: true, status: true, employeeId: true,
+            onboardingRecord: { select: { id: true } },
+            documents: { select: { type: true } },
             deployments: { where: { isActive: true }, select: { siteId: true }, take: 1 } },
     })
-    // Only self-registered joiners still waiting for approval (PENDING-xxxx code).
-    if (!emp || emp.status !== "ONBOARDING" || !emp.employeeId.startsWith("PENDING-")) return
-    if (await joinPoliciesPending(employeeId, emp.designation)) return
+    if (!emp) return { ok: false, missingDocs: [], policiesLeft: 0 }
+    if (emp.onboardingRecord) return { ok: true, already: true, missingDocs: [], policiesLeft: 0 }
+    const s = await getJoinSettings()
+    const have = new Set(emp.documents.map(d => String(d.type).toUpperCase()))
+    const missingDocs = s.form.docs.filter(t => !have.has(t)).map(t => JOIN_DOCS[t])
+    const policiesLeft = await joinPoliciesPending(emp.id, emp.designation)
+    if (missingDocs.length || policiesLeft) return { ok: false, missingDocs, policiesLeft }
+    try {
+        await prisma.onboardingRecord.create({
+            data: {
+                employeeId: emp.id, status: "IN_PROGRESS", startedAt: new Date(),
+                tasks: { create: DEFAULT_TASKS.map(t => ({ employeeId: emp.id, title: t.title, category: t.category, order: t.order, status: "PENDING" as const, isRequired: true })) },
+            },
+        })
+    } catch (e) {
+        // Two signatures landing at once: the other call already created it.
+        if ((e as { code?: string })?.code === "P2002") return { ok: true, already: true, missingDocs: [], policiesLeft: 0 }
+        throw e
+    }
     await alertNewJoiner({
         name: [emp.firstName, emp.middleName, emp.lastName].filter(Boolean).join(" "),
         designation: emp.designation, siteId: emp.deployments[0]?.siteId ?? null, hrId: emp.managerId,
-    }, await getJoinSettings())
+    }, s).catch(e => console.error("[JOIN_ALERT_NEW]", e))
+    return { ok: true, missingDocs: [], policiesLeft: 0 }
 }
 
 /** Daily: forms waiting for approval longer than the setting → one reminder to approvers. */
