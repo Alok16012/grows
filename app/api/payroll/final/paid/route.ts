@@ -1,3 +1,4 @@
+import { notifyAutoRelease } from "@/lib/payslip-release"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -49,6 +50,7 @@ export async function POST(req: Request) {
             return { paid, stillDraft, runPaid }
         })
 
+        await notifyAutoRelease("paid", toPay, Number(month), Number(year))
         const monthLabel = new Date(Date.UTC(Number(year), Number(month) - 1, 1)).toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" })
         const commQueued = await commNotify("salary_credited",
             employeeRecipients(toPay.map(p => p.employeeId), new Map(toPay.map(p => [p.employeeId, { amount: fmtInr(p.netSalary) }]))),

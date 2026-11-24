@@ -1,3 +1,4 @@
+import { notifyAutoRelease } from "@/lib/payslip-release"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -31,6 +32,9 @@ export async function POST(req: Request) {
                 ...(siteIds?.length ? { siteId: { in: siteIds } } : {})
             }
 
+        // Who is being locked — for the automatic "payslip ready" note (Payslips to employees setting).
+        const toLock = await prisma.payroll.findMany({ where, select: { employeeId: true } })
+
         // Wrap both updates in a transaction so we never end up with payrolls
         // locked but the run still DRAFT (or vice-versa) on a partial failure.
         const { updated, runLocked } = await prisma.$transaction(async tx => {
@@ -60,6 +64,7 @@ export async function POST(req: Request) {
         })
 
         if (updated.count > 0) {
+            await notifyAutoRelease("lock", toLock, Number(month), Number(year))
             const sites = await prisma.payroll.findMany({ where: { month, year, status: "PROCESSED", processedBy: session.user.id }, distinct: ["siteId"], select: { siteId: true } })
             auditLater({
                 actorId: session.user.id, actorName: session.user.name ?? null, action: "payroll.lock", targetType: "Payroll",

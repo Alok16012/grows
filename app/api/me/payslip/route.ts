@@ -35,6 +35,6 @@ export async function GET(req: Request) {
         }
     })
 
-    const payslips = all.filter(p => isVisible({ ...p, status: String(p.status) }, release)).slice(0, limit).map(({ siteId: _s, ...p }) => p)
+    const payslips = all.filter(p => isVisible({ ...p, status: String(p.status), employeeId: emp.id }, release)).slice(0, limit).map(({ siteId: _s, ...p }) => p)
     return NextResponse.json({ employee: emp, payslips })
 }

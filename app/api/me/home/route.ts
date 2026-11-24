@@ -44,7 +44,7 @@ export async function GET(req: Request) {
         emp ? safe((async () => {
             const release = await getRelease()
             const rows = await prisma.payroll.findMany({ where: { employeeId: emp.id, status: { not: "DRAFT" } }, orderBy: [{ year: "desc" }, { month: "desc" }], take: 8, select: { month: true, year: true, status: true, siteId: true, netSalary: true, paidAt: true } })
-            const p = rows.find(r => isVisible({ ...r, status: String(r.status) }, release))
+            const p = rows.find(r => isVisible({ ...r, status: String(r.status), employeeId: emp.id }, release))
             return p ? { month: p.month, year: p.year, net: p.netSalary, paid: !!p.paidAt } : null
         })(), null) : null,
         emp ? safe((async () => {

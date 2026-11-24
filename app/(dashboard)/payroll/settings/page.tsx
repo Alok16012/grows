@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import EffectiveMonthPicker, { type EffectiveChoice } from "@/components/payroll/EffectiveMonthPicker"
 import ChangeControlPanel from "./ChangeControlPanel"
 import OtSiteRules from "./OtSiteRules"
+import { PayslipSendSettings } from "@/components/payroll/PayslipSendSettings"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -592,6 +593,11 @@ export default function PayrollSettingsPage() {
                         <NumField label="Notice pay divisor (days)" value={rules.fnf.noticeDivisor} onChange={n => up("fnf", { noticeDivisor: n })} />
                     </div>
                     <p style={cardHint}>Default service rule: 4 years 240 days = 1,700 days (Payment of Gratuity Act, as courts read 5 years).</p>
+                </div>
+
+                {/* ── Payslips to employees (saves on its own; not a dated rule) ── */}
+                <div style={cardStyle}>
+                    <PayslipSendSettings />
                 </div>
 
                 {/* ── Establishment codes ── */}
