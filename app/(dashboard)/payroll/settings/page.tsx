@@ -3,7 +3,6 @@ import { useEffect, useState } from "react"
 import EffectiveMonthPicker, { type EffectiveChoice } from "@/components/payroll/EffectiveMonthPicker"
 import ChangeControlPanel from "./ChangeControlPanel"
 import OtSiteRules from "./OtSiteRules"
-import { PayslipSendSettings } from "@/components/payroll/PayslipSendSettings"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -270,11 +269,6 @@ export default function PayrollSettingsPage() {
 
             {/* Dated versions + change control */}
             <ChangeControlPanel versions={versions} window={window_} viewing={viewing} onView={viewVersion} onChanged={() => loadRules(viewing)} isAdmin={isAdmin} />
-
-            {/* Payslips to employees — near the top so it is easy to find; saves on its own (not a dated rule). */}
-            <div id="payslips" style={{ ...cardStyle, scrollMarginTop: 90 }}>
-                <PayslipSendSettings />
-            </div>
 
             {/* Scope note */}
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "10px 14px", borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, color: "#1e40af", lineHeight: 1.55 }}>

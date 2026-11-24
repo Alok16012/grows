@@ -3,7 +3,7 @@
 // Payroll → Salary slips → Payslips to employees.
 //   • Send all ready sites, one site, or chosen sites
 //   • Open a site (or search) to send / take back chosen employees
-//   • ⚙ how sending works (manual / automatic on lock / on paid) — same as Payroll → Settings
+//   • Sending options: manual, or automatic on lock / on paid (kept here, in the payslip tab)
 // A payslip shows in the employee's My Profile (and the app) once it reaches them.
 // In-app only — never WhatsApp.
 import { useCallback, useEffect, useState } from "react"
@@ -49,7 +49,7 @@ export function SendPayslipsPanel({ month, year, focusSiteId }: { month: number;
                     <span style={{ padding: "2px 8px", borderRadius: 99, background: "var(--accent-light)", color: "var(--accent)", fontSize: 11, fontWeight: 600 }}>{d.mode === "manual" ? "Manual" : d.mode === "onLock" ? "Automatic on lock" : "Automatic on paid"}</span>
                     <span style={{ color: "var(--text3)" }}>No payslips for {label} yet — process payroll first.</span>
                 </div>
-                {d.canSend && <button onClick={() => setCfg(c => !c)} style={btnG} aria-label="How sending works"><Settings2 size={12} /> Settings</button>}
+                {d.canSend && <button onClick={() => setCfg(c => !c)} style={btnG} aria-label="How sending works"><Settings2 size={12} /> Sending options</button>}
             </div>
             {cfg && d.canSend && <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}><PayslipSendSettings compact onChanged={load} /></div>}
         </div>
@@ -97,7 +97,7 @@ export function SendPayslipsPanel({ month, year, focusSiteId }: { month: number;
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {d.canSend && manualish && notSent.length > 0 && <button disabled={busy} onClick={() => sendSites(notSent.map(s => s.siteId))} style={btnP}>{busy ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />} Send all ready sites ({notSent.length})</button>}
                     <button onClick={() => setOpen(o => !o)} style={btnG}>{open ? "Hide" : "By site / employee"}</button>
-                    {d.canSend && <button onClick={() => setCfg(c => !c)} style={btnG} aria-label="How sending works"><Settings2 size={12} /> Settings</button>}
+                    {d.canSend && <button onClick={() => setCfg(c => !c)} style={btnG} aria-label="How sending works"><Settings2 size={12} /> Sending options</button>}
                 </div>
             </div>
             {d.warnings && d.warnings.length > 0 && manualish && (

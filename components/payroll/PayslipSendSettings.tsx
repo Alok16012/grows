@@ -1,6 +1,6 @@
 "use client"
 
-// Payroll → Settings → Payslips to employees (also opened from Salary slips).
+// Payslips to employees → Sending options (in Payroll → Pay & slips and Salary slips).
 // When a payslip appears in the employee's My Profile and the app: sent by HR
 // by hand (whole site or chosen employees), or automatically on lock / paid.
 // Saves straight away (it isn't a dated salary rule). Never WhatsApp.

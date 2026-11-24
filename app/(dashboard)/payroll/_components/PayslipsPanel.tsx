@@ -7,6 +7,7 @@ import { can } from "@/lib/can"
 import { Loader2, Search, Printer, Eye, CheckCircle2, RefreshCw, MapPin, Building2, Clock, FileText, IndianRupee, X } from "lucide-react"
 import { printHTML } from "@/lib/print-html"
 import PayslipViewerModal from "./PayslipViewerModal"
+import { SendPayslipsPanel } from "@/components/payroll/SendPayslipsPanel"
 
 const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 
@@ -236,6 +237,9 @@ ${autoPrint?"<script>window.onload=()=>window.print()</script>":""}</body></html
                     <RefreshCw size={12} style={{ color:"var(--text3)" }} />
                 </button>
             </div>
+
+            {/* Send payslips to employees — whole site or chosen employees; ⚙ manual / automatic. */}
+            <SendPayslipsPanel month={month} year={year} focusSiteId={selSiteId || undefined} />
 
             {/* Two-panel — the site rail stacks above the list on mobile */}
             <div className="flex flex-col md:flex-row items-stretch md:items-start" style={{ gap:12 }}>
