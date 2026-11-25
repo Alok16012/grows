@@ -510,7 +510,7 @@ export default function InspectionDashboard() {
                             <div key={s.id} className={cn("p-4 border-b border-[var(--border)] last:border-b-0 flex flex-wrap items-center justify-between gap-2 transition-colors",
                                 isSentBack(s) ? "bg-[#fff7ed] border-l-4 border-l-[#f97316] hover:bg-[#ffedd5]" : "hover:bg-[var(--surface2)]")}>
                                 <div className="min-w-0">
-                                    <p className="text-[13px] font-medium text-[var(--text)] mb-1">{s.assignment.project.name}</p>
+                                    <p className="text-[13px] font-medium text-[var(--text)] mb-1">{s.assignment.project.name}{s.partNo ? <span className="text-[var(--text3)] font-normal"> · Part {s.partNo}</span> : null}</p>
                                     <div className="flex items-center gap-1.5 text-[12px] text-[var(--text3)]">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <circle cx="12" cy="12" r="10" />
@@ -539,7 +539,7 @@ export default function InspectionDashboard() {
                                         read-only once submitted, so "Resume" on a pending,
                                         approved or rejected row promised an edit that the
                                         server would refuse. */}
-                                    <Link href={`/inspection/${s.assignmentId}/form`} className="text-[12.5px] font-medium text-[var(--accent)] hover:underline">
+                                    <Link href={`/inspection/${s.assignmentId}/form?report=${s.id}`} className="text-[12.5px] font-medium text-[var(--accent)] hover:underline">
                                         {isSentBack(s) ? "Correct & resubmit" : s.status === "draft" ? "Complete Inspection" : "View"} →
                                     </Link>
                                 </div>

@@ -42,6 +42,9 @@ export default function InspectionFormPage() {
     // part of a multi-part assignment. Opening the form without it just shows the
     // part already on file, so a plain visit never creates a duplicate report.
     const wantsNewPart = searchParams.get("newPart") === "1"
+    // `?report=<id>` opens that exact report (from the workspace list) rather
+    // than the newest part, so its status here matches the list.
+    const reportId = searchParams.get("report")
 
     const [assignment, setAssignment] = useState<any>(null)
     const [templates, setTemplates] = useState<any[]>([])
@@ -179,7 +182,7 @@ export default function InspectionFormPage() {
             const targetProjectId = currentAss.projectId || currentAss.project?.id
             const [tempRes, inspRes] = await Promise.all([
                 fetch(`/api/form-templates?projectId=${targetProjectId}`),
-                fetch(`/api/inspections?assignmentId=${assignmentId}`)
+                fetch(`/api/inspections?assignmentId=${assignmentId}${reportId && !wantsNewPart ? `&inspectionId=${encodeURIComponent(reportId)}` : ""}`)
             ])
 
             const tempData = await tempRes.json()
