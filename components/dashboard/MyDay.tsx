@@ -249,13 +249,16 @@ const Legend = ({ items }: { items: { label: string; color: string; value?: numb
     </div>
 )
 function AttendanceRing({ m }: { m: MeHome["month"] }) {
-    const total = m.present + m.absent + m.leave
+    // Out of every working day so far — days nobody marked count against the %,
+    // so 4 marked days of 20 no longer shows 100%.
+    const unmarked = m.unmarked ?? 0
+    const total = m.present + m.absent + m.leave + unmarked
     const pct = total ? Math.round((m.present / total) * 100) : 0
     return (
         <div className={card}>
             <p className="text-[16px] font-semibold text-[var(--text)] mb-3">My attendance <span className="text-[12px] font-normal text-[var(--text3)]">this month</span></p>
-            <Ring center={total ? `${pct}%` : "—"} sub={total ? "present" : "no days yet"} parts={[{ value: m.present, color: "#22c55e" }, { value: m.leave, color: "#8b6cf6" }, { value: m.absent, color: "#f43f5e" }]} />
-            <Legend items={[{ label: "Present", color: "#22c55e", value: m.present }, { label: "Leave", color: "#8b6cf6", value: m.leave }, { label: "Absent", color: "#f43f5e", value: m.absent }]} />
+            <Ring center={total ? `${pct}%` : "—"} sub={total ? `present · ${total} working day${total === 1 ? "" : "s"}` : "no days yet"} parts={[{ value: m.present, color: "#22c55e" }, { value: m.leave, color: "#8b6cf6" }, { value: m.absent, color: "#f43f5e" }, { value: unmarked, color: "#d5dae8" }]} />
+            <Legend items={[{ label: "Present", color: "#22c55e", value: m.present }, { label: "Leave", color: "#8b6cf6", value: m.leave }, { label: "Absent", color: "#f43f5e", value: m.absent }, ...(unmarked ? [{ label: "Not marked", color: "#c3c9d9", value: unmarked }] : [])]} />
         </div>
     )
 }
@@ -278,7 +281,7 @@ function LeaveRing({ leave }: { leave: MeHome["leave"] }) {
     )
 }
 function PerformanceCard({ d, grow }: { d: MeHome; grow?: boolean }) {
-    const total = d.month.present + d.month.absent + d.month.leave
+    const total = d.month.present + d.month.absent + d.month.leave + (d.month.unmarked ?? 0)
     const att = total ? Math.round((d.month.present / total) * 100) : null
     const rows = [
         { label: "Attendance this month", value: att === null ? "—" : `${att}%`, pct: att ?? 0, color: "#22c55e" },

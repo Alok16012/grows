@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getApiSession } from "@/lib/apiSession"
 import { checkAccess } from "@/lib/permissions"
+import { buildRegister } from "@/lib/attendance-register"
+import { toDateKey } from "@/lib/leave-policy"
 import { getRelease, isVisible } from "@/lib/payslip-release"
 import { getLeavePolicy, getLeaveBalances } from "@/lib/leave-policy-server"
 import { audienceWhere } from "@/lib/audience"
@@ -80,9 +82,26 @@ export async function GET(req: Request) {
         safe(prisma.workTask.count({ where: { assigneeId: userId, status: "DONE", updatedAt: { gte: monthStart } } }), 0),
     ])
 
+    // This month's attendance from the same register HR sees. Working days with
+    // no record are counted as "not marked" (they used to be ignored, so 4 marked
+    // days of 20 showed 100%); they are not called absent, because most staff's
+    // attendance arrives later through the payroll upload. Weekly offs, holidays,
+    // days before joining and today (until it is over) don't count. Falls back to
+    // the plain counts if the register fails.
+    const monthAttendance = emp ? await safe((async () => {
+        const reg = await buildRegister({ year: ist.getUTCFullYear(), month: ist.getUTCMonth() + 1, employeeIds: [emp.id] })
+        const row = reg.rows[0]
+        if (!row) return null
+        const t = row.totals
+        const todayKey = toDateKey(istDateOnly(now))
+        const todayUnmarked = reg.days.findIndex(d => d.key === todayKey)
+        const notYet = todayUnmarked >= 0 && row.cells[todayUnmarked]?.code === "-" ? 1 : 0
+        return { present: t.present + t.halfDay * 0.5, leave: t.leave, absent: t.absent + t.halfDay * 0.5, unmarked: Math.max(0, t.unmarked - notYet) }
+    })(), null) : null
+
     return NextResponse.json({
         employee: emp ? { firstName: emp.firstName, name: [emp.firstName, emp.lastName].filter(Boolean).join(" "), photo, code: emp.employeeId, designation: emp.designation, site: emp.deployments[0]?.site?.name ?? null } : null,
-        today, month: { present: presentDays, leave: leaveDays, absent: absentDays },
+        today, month: monthAttendance ?? { present: presentDays, leave: leaveDays, absent: absentDays },
         leave, payslip,
         tasks: { myOpen, myOverdue, awaitingMine, doneThisMonth: tasksDoneMonth },
         newJoiners: newJoiners === null ? null : newJoiners.map(j => ({ name: [j.firstName, j.lastName].filter(Boolean).join(" "), designation: j.designation, site: j.deployments[0]?.site?.name ?? null, date: j.dateOfJoining })),

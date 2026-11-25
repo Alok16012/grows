@@ -42,7 +42,7 @@ type Stats = {
 type Me = {
     employee: { firstName: string; code: string | null; designation: string | null; site: string | null } | null
     today: { checkIn: string | null; checkOut: string | null; status: string; workingHrs: number | null } | null
-    month: { present: number; leave: number; absent: number }
+    month: { present: number; leave: number; absent: number; unmarked?: number }
     leave: { total: number; items: { code: string; name: string; available: number; color: string }[] } | null
     payslip: { month: number; year: number; net: number; paid: boolean } | null
     tasks: { myOpen: number; myOverdue: number; awaitingMine: number }
@@ -231,7 +231,7 @@ export function MobileHome() {
                         <Link href="/attendance" style={{ ...card, padding: 14, display: "block" }}>
                             <Mini icon={CalendarCheck} color="#15803d" tint="#dcfce7" label="This month" />
                             <p style={big}>{fmt(me.month.present)} present</p>
-                            <p style={small}>{me.month.leave} leave · {me.month.absent} absent</p>
+                            <p style={small}>{me.month.leave} leave · {me.month.absent} absent{me.month.unmarked ? ` · ${me.month.unmarked} not marked` : ""}</p>
                         </Link>
                         <Link href="/tasks" style={{ ...card, padding: 14, display: "block" }}>
                             <Mini icon={ListChecks} color={me.tasks.myOverdue ? "#dc2626" : "#3d6ff5"} tint={me.tasks.myOverdue ? "#fef2f2" : "#eaf0ff"} label="My tasks" />

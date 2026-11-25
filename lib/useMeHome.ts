@@ -7,7 +7,8 @@ import { useCallback, useEffect, useState } from "react"
 export type MeHome = {
     employee: { firstName: string; name?: string; photo?: string | null; code: string; designation: string | null; site: string | null } | null
     today: { checkIn: string | null; checkOut: string | null; status: string | null; workingHrs: number | null } | null
-    month: { present: number; leave: number; absent: number }
+    /** unmarked: working days so far with no attendance record (not counted as absent). */
+    month: { present: number; leave: number; absent: number; unmarked?: number }
     leave: { total: number; items: { code: string; name: string; available: number; color?: string | null }[] } | null
     tasks: { myOpen: number; myOverdue: number; awaitingMine: number; doneThisMonth?: number }
     holiday: { name: string; date: string } | null
