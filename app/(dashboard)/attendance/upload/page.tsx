@@ -49,10 +49,10 @@ const TEMPLATE_COLS = [
     "LWF","CANTEEN DAYS","CANTEEN AMOUNT","PENALTY","ADVANCE","PRODUCTION INCENTIVE"
 ]
 const TEMPLATE_SAMPLE = [
-    ["EMP-0001","Rahul Kumar",   26, 26, 2, 150, 10, 24, "",   50,  1000, 0],
-    ["EMP-0002","Priya Sharma",  26, 25, 0, 0,   10, 20, "",   0,   0,    500],
+    ["EMP-0001","Rahul Kumar",   26, 0, 0, 150, 10, 24, "",   50,  1000, 0],
+    ["EMP-0002","Priya Sharma",  26, 0, 0, 0,   10, 20, "",   0,   0,    500],
     // Canteen amount filled in: 1500 is charged and the 26 days are ignored.
-    ["EMP-0003","Amit Singh",    26, 26, 1, 200, 10, 26, 1500, 100, 500,  0],
+    ["EMP-0003","Amit Singh",    26, 0, 0, 200, 10, 26, 1500, 100, 500,  0],
 ]
 
 async function downloadTemplate(siteName: string, employees: Employee[]) {
@@ -61,7 +61,7 @@ async function downloadTemplate(siteName: string, employees: Employee[]) {
     const sheetName = `${siteName.slice(0, 20)} Attendance`
     const header = [`SITE: ${siteName}`, "", "", "", "", "", "", "", "", ""]
     const empRows = employees.length > 0
-        ? employees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 26, 0, 0, 10, 0, "", 0, 0, 0])
+        ? employees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 0, 0, 0, 10, 0, "", 0, 0, 0])
         : TEMPLATE_SAMPLE
     const wsData = [header, TEMPLATE_COLS, ...empRows]
     const ws = XLSX.utils.aoa_to_sheet(wsData)
@@ -203,7 +203,7 @@ export default function AttendanceUploadPage() {
                 // did not work at all) into a full month's pay. Same rule as
                 // the hub's AttendancePanel.
                 monthDays:     (() => { const v = pick(row, "MONTH DAYS", "MONTHDAYS", "TOTAL DAYS", "WORKING DAYS IN MONTH"); return v !== undefined && v !== null && v !== "" ? Number(v) : DEFAULT_MONTH_DAYS })(),
-                days:          (() => { const v = pick(row, "DAYS WORKED", "DAYS", "PRESENT DAYS", "WORKED DAYS", "PRESENT", "PAID DAYS", "ATT DAYS", "ATTENDANCE"); return v !== undefined && v !== null && v !== "" ? Number(v) : DEFAULT_MONTH_DAYS })(),
+                days:          (() => { const v = pick(row, "DAYS WORKED", "DAYS", "PRESENT DAYS", "WORKED DAYS", "PRESENT", "PAID DAYS", "ATT DAYS", "ATTENDANCE"); return v !== undefined && v !== null && v !== "" ? Number(v) : 0 })(), // blank = none worked
                 otDays:        Number(pick(row, "OT DAYS", "OTDAYS", "OVERTIME", "OT") ?? 0) || 0,
                 otherDeduction:Number(pick(row, "OTHER DEDUCTION", "OTHER DED", "OTH DED") ?? 0) || 0,
                 lwf:           Number(pick(row, "LWF", "LABOUR WELFARE FUND") ?? 0) || 0,
@@ -388,7 +388,7 @@ export default function AttendanceUploadPage() {
                         </thead>
                         <tbody>
                             {(siteEmployees.length > 0
-                                ? siteEmployees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 26, 0, 0, 10, 0, 0, 0, 0])
+                                ? siteEmployees.map(e => [e.employeeId, `${e.firstName} ${e.lastName}`, 26, 0, 0, 0, 10, 0, 0, 0, 0])
                                 : TEMPLATE_SAMPLE
                             ).map((row, i, arr) => (
                                 <tr key={i} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border)" : "none" }}>

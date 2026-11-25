@@ -39,11 +39,13 @@ export type Employee = {
 
 export const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 export const TEMPLATE_COLS = ["Employee ID","Employee Name","MONTH DAYS","DAYS","OT DAYS","OTHER DEDUCTION","LWF","CANTEEN DAYS","CANTEEN AMOUNT","PENALTY","ADVANCE","PRODUCTION INCENTIVE"]
+// DAYS and OT DAYS start at 0 in every template (example rows included): HR
+// types the days actually worked, and a row left untouched pays nothing.
 export const TEMPLATE_SAMPLE = [
-    ["EMP-0001","Rahul Kumar",   26,26,2,150,6,24,"",  50,1000,0],
-    ["EMP-0002","Priya Sharma",  26,25,0,0,  6,20,"",  0,0,  500],
+    ["EMP-0001","Rahul Kumar",   26,0,0,150,6,24,"",  50,1000,0],
+    ["EMP-0002","Priya Sharma",  26,0,0,0,  6,20,"",  0,0,  500],
     // Canteen amount filled in: 1500 is charged and the 26 days are ignored.
-    ["EMP-0003","Amit Singh",    26,26,1,200,6,26,1500,100,500,0],
+    ["EMP-0003","Amit Singh",    26,0,0,200,6,26,1500,100,500,0],
 ]
 
 const isEmpty = (v: unknown) => v === null || v === undefined || String(v).trim() === ""
@@ -68,7 +70,8 @@ export const idKey = (id: string) => id.trim().toUpperCase()
 export function templateRows(employees: Employee[], rules: PayrollRules): (string | number)[][] {
     const md  = rules.defaults.monthDays
     const lwf = rules.lwf.employeeDefault
-    return employees.map(e => [e.employeeId,`${e.firstName} ${e.lastName}`,md,md,0,0,lwf,0,"",0,0,0])
+    // DAYS and OT DAYS = 0: a row nobody filled in pays nothing, not a full month.
+    return employees.map(e => [e.employeeId,`${e.firstName} ${e.lastName}`,md,0,0,0,lwf,0,"",0,0,0])
 }
 
 const norm = (v: unknown) => String(v).trim().toUpperCase().replace(/\s+/g," ")
@@ -106,7 +109,8 @@ export function parseAttendanceRows(rawRows: unknown[][], rules: PayrollRules): 
             rawSite:       String(pick(row,"SITE","SITE NAME")??"").trim(),
             rawSiteCode:   String(pick(row,"SITE CODE","SITECODE")??"").trim(),
             monthDays:     numCell(pick(row,"MONTH DAYS","MONTHDAYS","TOTAL DAYS","WORKING DAYS IN MONTH"), md),
-            days:          numCell(pick(row,"DAYS WORKED","DAYS","PRESENT DAYS","WORKED DAYS","PRESENT","PAID DAYS","ATT DAYS","ATTENDANCE"), md),
+            // Blank DAYS = none worked (not a full month), same as the template's 0.
+            days:          numCell(pick(row,"DAYS WORKED","DAYS","PRESENT DAYS","WORKED DAYS","PRESENT","PAID DAYS","ATT DAYS","ATTENDANCE"), 0),
             otDays:        numCell(pick(row,"OT DAYS","OTDAYS","OVERTIME","OT"), 0),
             otherDeduction:numCell(pick(row,"OTHER DEDUCTION","OTHER DED","OTH DED"), 0),
             lwf:           numCell(pick(row,"LWF","LABOUR WELFARE FUND"), 0),
