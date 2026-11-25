@@ -1148,7 +1148,11 @@ export default function AssignmentsPage() {
                                     instead of pushing the row wide. The table keeps a floor
                                     width and the wrapper scrolls when narrower; Actions is
                                     pinned on the right only while it scrolls. */}
-                                <table className="w-full table-fixed min-w-[1080px]" style={{ fontSize: 12.5 }}>
+                                {/* Actions is only as wide as what this page shows: the wide
+                                    "Create assignment" button appears only on project rows with no
+                                    assignment yet. A fixed 185px column, pinned while the table
+                                    scrolls, sat as an empty white block over Type / Start Date. */}
+                                <table className="w-full table-fixed min-w-[960px]" style={{ fontSize: 12.5 }}>
                                     <colgroup>
                                         <col style={{ width: 150 }} />
                                         <col />
@@ -1156,7 +1160,7 @@ export default function AssignmentsPage() {
                                         <col style={{ width: 150 }} />
                                         <col style={{ width: 175 }} />
                                         <col style={{ width: 110 }} />
-                                        <col style={{ width: canManageAssignments ? 185 : 80 }} />
+                                        <col style={{ width: canManageAssignments && pageRows.some(x => rowView(x).virtual) ? 185 : 96 }} />
                                     </colgroup>
                                     <thead>
                                         <tr className="bg-[var(--surface2)]/60 text-[11px] text-[var(--text3)] uppercase tracking-wide">
