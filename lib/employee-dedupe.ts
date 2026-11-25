@@ -1,11 +1,13 @@
 import prisma from "@/lib/prisma"
 
-// Duplicate detection for employees. A new (or edited) employee must not reuse
-// an existing employee's Aadhaar, PAN, mobile number, or email. Values are
+// Duplicate detection for employees — STRICT: a new (or edited) employee must
+// not reuse an existing employee's Aadhaar, PAN, mobile number, email, bank
+// account or UAN, on any path (HR form, imports, join form, onboarding link,
+// self-service, recruitment), and approval can never override a match. Values are
 // normalized before comparison so trivial formatting differences (spaces in
 // Aadhaar, +91 on the phone, email casing) still count as a match.
 
-export type DupField = "aadhar" | "pan" | "phone" | "email" | "bankAccount"
+export type DupField = "aadhar" | "pan" | "phone" | "email" | "bankAccount" | "uan"
 
 export interface DuplicateConflict {
     field: DupField
@@ -26,6 +28,7 @@ interface DupInput {
     phone?: string | null
     email?: string | null
     bankAccountNumber?: string | null
+    uan?: string | null
 }
 
 const noSpace = (s?: string | null) => (s || "").replace(/\s+/g, "")
@@ -40,7 +43,7 @@ type EmployeeHit = { id: string; employeeId: string; firstName: string; lastName
 // normalised in SQL with regexp_replace. The column name is a literal from the
 // two call sites below, never user input; the value is parameterised.
 async function findByNormalizedDigits(
-    column: "aadharNumber" | "bankAccountNumber",
+    column: "aadharNumber" | "bankAccountNumber" | "uan",
     digits: string,
     excludeId?: string,
 ): Promise<EmployeeHit | null> {
@@ -69,6 +72,7 @@ export async function findEmployeeDuplicates(input: DupInput, excludeId?: string
     const phone = last10(input.phone)
     const email = (input.email || "").trim().toLowerCase()
     const bankAccount = noSpace(input.bankAccountNumber)
+    const uan = onlyDigits(input.uan)
 
     const notSelf = excludeId ? { NOT: { id: excludeId } } : {}
     const select = { id: true, employeeId: true, firstName: true, lastName: true } as const
@@ -116,8 +120,21 @@ export async function findEmployeeDuplicates(input: DupInput, excludeId?: string
         if (hit) conflicts.push({ field: "bankAccount", label: "bank account number", value: bankAccount, employee: { id: hit.id, employeeId: hit.employeeId, name: fullName(hit) } })
     }
 
+    // UAN — 12 digits, formatting stripped on both sides.
+    if (uan.length === 12) {
+        const hit = await findByNormalizedDigits("uan", uan, excludeId)
+        if (hit) conflicts.push({ field: "uan", label: "UAN", value: uan, employee: { id: hit.id, employeeId: hit.employeeId, name: fullName(hit) } })
+    }
+
     return conflicts
 }
+
+/** The ID fields present on a record or a change set, for findEmployeeDuplicates. */
+export function dupInputFrom(v: Record<string, unknown>): DupInput {
+    const s = (k: string) => (typeof v[k] === "string" ? (v[k] as string) : undefined)
+    return { aadharNumber: s("aadharNumber"), panNumber: s("panNumber"), phone: s("phone"), email: s("email"), bankAccountNumber: s("bankAccountNumber"), uan: s("uan") }
+}
+export const DUP_FIELD_KEYS = ["aadharNumber", "panNumber", "phone", "email", "bankAccountNumber", "uan"] as const
 
 // Build a human-readable message from conflicts, e.g.
 // "An employee already exists with this Aadhaar number (Ramesh K · EMP-0012)."

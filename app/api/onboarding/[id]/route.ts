@@ -142,6 +142,11 @@ export async function PUT(
             const gate = await approvalGate(onboardingRecord.employeeId)
             // Missing KYC documents are never bypassed unless the setting allows it.
             const docsBlock = gate.docMissing.length > 0 && !gate.docsBypass
+            // Duplicate Aadhaar / PAN / mobile / email / bank / UAN: never approved anyway.
+            if (gate.dupBlock) {
+                return NextResponse.json({ error: "Duplicate employee", reasons: gate.reasons, canForce: false,
+                    message: `Cannot approve — ${gate.reasons.join("; ")}. Duplicate details can't be approved: correct them, or use the existing employee (rejoin) instead.` }, { status: 409 })
+            }
             if (gate.reasons.length && !body.force) {
                 const isAdmin = (session.user as any)?.role === "ADMIN"
                 const canForce = !docsBlock && (gate.override === "approvers" || (gate.override === "admins" && isAdmin))

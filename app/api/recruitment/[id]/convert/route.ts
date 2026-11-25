@@ -111,6 +111,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             phone: formPhone?.trim() || lead.phone,
             email: formEmail?.trim() || lead.email,
             bankAccountNumber,
+            uan,
         })
         if (dupConflicts.length > 0) {
             return NextResponse.json({ error: duplicateMessage(dupConflicts), conflicts: dupConflicts }, { status: 409 })

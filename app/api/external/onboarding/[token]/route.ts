@@ -1,3 +1,4 @@
+import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getHrContacts } from "@/lib/hr-contacts"
@@ -142,6 +143,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
                 pending: pendingPolicies,
             }, { status: 409 })
         }
+
+        // STRICT duplicate rule: these details must not belong to another employee.
+        const dups = await findEmployeeDuplicates({ aadharNumber, panNumber, bankAccountNumber, uan, phone: (body as any)?.phone, email: (body as any)?.email }, existing.id)
+        if (dups.length) return new NextResponse(`${duplicateMessage(dups)} Please check your details or contact HR.`, { status: 409 })
 
         // 1. Update Employee Record
         const updatedEmployee = await prisma.employee.update({

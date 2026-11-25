@@ -39,7 +39,7 @@ const VALIDATORS: Record<string, (v: string) => FieldError> = {
     dateOfBirth: validateDateOfBirth,
 }
 
-const DUP_KEYS = ["aadharNumber", "panNumber", "phone", "email", "bankAccountNumber"] as const
+const DUP_KEYS = ["aadharNumber", "panNumber", "phone", "email", "bankAccountNumber", "uan"] as const
 
 /** One value in its stored form, so a sheet value and a DB value compare like for like. */
 function normalize(field: BulkField, raw: string): string {
@@ -225,6 +225,7 @@ export async function POST(req: Request) {
                 phone: changes.phone,
                 email: changes.email,
                 bankAccountNumber: changes.bankAccountNumber,
+                uan: changes.uan,
             }, emp.id)
             if (conflicts.length > 0) { fail(r, duplicateMessage(conflicts)); continue }
         }

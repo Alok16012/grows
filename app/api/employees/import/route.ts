@@ -152,13 +152,14 @@ export async function POST(req: Request) {
         // matches "ABCDE1234F". Legacy rows may still hold unnormalised values,
         // which is why the whole table is normalised here instead of queried.
         const idDocs = await prisma.employee.findMany({
-            select: { phone: true, aadharNumber: true, panNumber: true, email: true, bankAccountNumber: true },
+            select: { phone: true, aadharNumber: true, panNumber: true, email: true, bankAccountNumber: true, uan: true },
         })
         const existingPhones = new Set(idDocs.map(e => normalizePhone(e.phone)).filter(Boolean))
         const existingAadhar = new Set(idDocs.map(e => digitsOnly(e.aadharNumber)).filter(v => v.length >= 12))
         const existingPan    = new Set(idDocs.map(e => normalizeUpper(e.panNumber)).filter(v => v.length >= 10))
         const existingEmail  = new Set(idDocs.map(e => (e.email || "").trim().toLowerCase()).filter(Boolean))
         const existingBank   = new Set(idDocs.map(e => (e.bankAccountNumber || "").replace(/\s+/g, "")).filter(v => v.length >= 5))
+        const existingUan    = new Set(idDocs.map(e => digitsOnly(e.uan)).filter(v => v.length === 12))
 
         type RowResult = { skip: boolean; rowNum: number; reason?: string; warning?: string }
 
@@ -218,6 +219,11 @@ export async function POST(req: Request) {
             if (bankN.length >= 5) {
                 if (existingBank.has(bankN)) return { skip: true, rowNum, reason: `Duplicate: bank account ${bankN} already exists` }
                 existingBank.add(bankN)
+            }
+            const uanN = digitsOnly(str(row.uan))
+            if (uanN.length === 12) {
+                if (existingUan.has(uanN)) return { skip: true, rowNum, reason: `Duplicate: UAN ${uanN} already exists` }
+                existingUan.add(uanN)
             }
             if (phone) existingPhones.add(phone) // reserve to catch in-file phone dupes
             if (!phone) {

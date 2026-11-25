@@ -1,3 +1,4 @@
+import { findEmployeeDuplicates, duplicateMessage, dupInputFrom } from "@/lib/employee-dedupe"
 import { NextResponse } from "next/server"
 import { holdForApproval, createChangeRequest, pendingSelfChanges, isDocChange } from "@/lib/employee-change"
 import prisma from "@/lib/prisma"
@@ -126,6 +127,9 @@ export async function PATCH(req: Request) {
 
     // Employee's own changes go to Onboarding → Approvals instead of changing at
     // once (all fields, or the People → Change requests list — settings).
+    // STRICT duplicate rule: an ID that belongs to another employee is refused.
+    const dups = await findEmployeeDuplicates(dupInputFrom(data), emp.id)
+    if (dups.length) return NextResponse.json({ error: duplicateMessage(dups), conflicts: dups }, { status: 409 })
     const { data: writeNow, held } = await holdForApproval(emp, data, { source: "SELF", isAdmin: false })
     if (held.length) await createChangeRequest({ employeeId: emp.id, requestedBy: session.user.id, requesterName: session.user.name ?? "Employee", source: "SELF", changes: held, reason: typeof body?.changeReason === "string" ? body.changeReason.slice(0, 300) : null })
 

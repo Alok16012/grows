@@ -180,8 +180,8 @@ export async function PUT(
 
         // Block edits that would collide with ANOTHER employee's Aadhaar / PAN /
         // mobile / email / bank account (self is excluded). Only check fields present.
-        if (aadharNumber !== undefined || panNumber !== undefined || phone !== undefined || email !== undefined || bankAccountNumber !== undefined) {
-            const conflicts = await findEmployeeDuplicates({ aadharNumber, panNumber, phone, email, bankAccountNumber }, params.id)
+        if (aadharNumber !== undefined || panNumber !== undefined || phone !== undefined || email !== undefined || bankAccountNumber !== undefined || uan !== undefined) {
+            const conflicts = await findEmployeeDuplicates({ aadharNumber, panNumber, phone, email, bankAccountNumber, uan }, params.id)
             if (conflicts.length > 0) {
                 return NextResponse.json({ error: duplicateMessage(conflicts), conflicts }, { status: 409 })
             }

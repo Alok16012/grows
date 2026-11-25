@@ -153,16 +153,20 @@ export async function approvalGate(employeeId: string, now = new Date()) {
     const reasons: string[] = []
     const docMissing = (c?.blocking ?? []).filter(b => b.auto?.startsWith("DOC_")).map(b => b.title)
     if (c?.blocking.length) reasons.push(`still open: ${c.blocking.map(b => b.title).join(", ")}`)
-    const e = await prisma.employee.findUnique({ where: { id: employeeId }, select: { aadharNumber: true, panNumber: true, bankAccountNumber: true, phone: true, dateOfJoining: true } })
-    if (e && s.blockDuplicates) {
-        const dups = await findEmployeeDuplicates({ aadharNumber: e.aadharNumber, panNumber: e.panNumber, bankAccountNumber: e.bankAccountNumber, phone: e.phone }, employeeId)
+    const e = await prisma.employee.findUnique({ where: { id: employeeId }, select: { aadharNumber: true, panNumber: true, bankAccountNumber: true, phone: true, email: true, uan: true, dateOfJoining: true } })
+    // STRICT: duplicate IDs are always checked and can never be approved anyway
+    // (dupBlock) — whatever the checklist's "block duplicates" / override settings.
+    let dupBlock = false
+    if (e) {
+        const dups = await findEmployeeDuplicates({ aadharNumber: e.aadharNumber, panNumber: e.panNumber, bankAccountNumber: e.bankAccountNumber, phone: e.phone, email: e.email, uan: e.uan }, employeeId)
+        dupBlock = dups.length > 0
         if (dups.length) reasons.push(`same ${Array.from(new Set(dups.map(d => d.label))).join(", ")} as ${Array.from(new Set(dups.map(d => `${d.employee.name} (${d.employee.employeeId})`))).join(", ")}`)
     }
     if (e?.dateOfJoining && s.oldJoiningDays > 0) {
         const days = Math.floor((now.getTime() - e.dateOfJoining.getTime()) / 86_400_000)
         if (days > s.oldJoiningDays) reasons.push(`joining date is ${days} days ago — check it is right`)
     }
-    return { reasons, docMissing, docsBypass: s.docsBypass, override: s.override, checklist: c ?? null }
+    return { reasons, docMissing, docsBypass: s.docsBypass, override: s.override, dupBlock, checklist: c ?? null }
 }
 
 export type BoardCard = {

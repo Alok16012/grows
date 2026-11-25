@@ -46,20 +46,16 @@ export type JoinMatch = {
  * Aadhaar / PAN / bank / UAN as the settings say. Returns the first person matched.
  */
 export async function findJoinMatch(b: { phone?: string; email?: string; aadharNumber?: string; panNumber?: string; bankAccountNumber?: string; uan?: string }, s: JoinSettings): Promise<JoinMatch | null> {
-    const on = new Set(s.duplicates.fields)
+    // STRICT: every ID is always checked (mobile, email, Aadhaar, PAN, bank, UAN),
+    // whatever the Join link settings say. `s` is kept for the rejoin alert.
+    void s
     const conflicts = await findEmployeeDuplicates({
         phone: b.phone, email: b.email,
-        aadharNumber: on.has("aadhar") ? b.aadharNumber : undefined,
-        panNumber: on.has("pan") ? b.panNumber : undefined,
-        bankAccountNumber: on.has("bankAccount") ? b.bankAccountNumber : undefined,
+        aadharNumber: b.aadharNumber, panNumber: b.panNumber,
+        bankAccountNumber: b.bankAccountNumber, uan: b.uan,
     })
     const hits = new Map<string, string[]>()
     for (const c of conflicts) hits.set(c.employee.id, [...(hits.get(c.employee.id) ?? []), c.field === "phone" ? "Mobile" : c.field === "email" ? "Email" : JOIN_DUP_FIELDS[c.field as keyof typeof JOIN_DUP_FIELDS] ?? c.label])
-    const uan = String(b.uan ?? "").replace(/\D/g, "")
-    if (on.has("uan") && uan.length === 12) {
-        const u = await prisma.employee.findFirst({ where: { uan: { contains: uan } }, select: { id: true } })
-        if (u) hits.set(u.id, [...(hits.get(u.id) ?? []), "UAN"])
-    }
     if (!hits.size) return null
     // An unfinished join form never reached HR — let the applicant start again.
     const emps = await prisma.employee.findMany({ where: { id: { in: Array.from(hits.keys()) }, NOT: UNFINISHED_JOIN_WHERE }, select: { id: true, employeeId: true, firstName: true, lastName: true, status: true, dateOfLeaving: true } })

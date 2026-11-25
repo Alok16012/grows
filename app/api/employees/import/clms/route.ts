@@ -9,6 +9,7 @@ import { validateDateOfBirth, validateJoiningAge } from "@/lib/validation"
 import { getChecklistSettings } from "@/lib/onboarding-checklist-server"
 import { applyAutoRoleSafe } from "@/lib/auto-role-server"
 import { recordSiteChange, actorOf } from "@/lib/site-history"
+import { findEmployeeDuplicates, duplicateMessage } from "@/lib/employee-dedupe"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,20 @@ export async function POST(req: Request) {
             ?? validateJoiningAge(parseDate(row["BirthDate"]), parseDate(row["ContractFrom"]))
         if (ageError) {
             errors.push({ row: rowNum, reason: ageError })
+            skipped++
+            continue
+        }
+
+        // STRICT duplicate rule: skip a row whose mobile / email / Aadhaar / PAN /
+        // bank / UAN is already on another employee — or on an earlier row of this
+        // file (rows are created one by one, so the database check catches those).
+        const dups = await findEmployeeDuplicates({
+            phone, email: str(row["PersonalEmailID"]),
+            aadharNumber: str(row["AadharCardNo"]), panNumber: str(row["PanNo"]), uan: str(row["UAN"]),
+            bankAccountNumber: str(row["Account No "]) ?? str(row["AccountNo"]) ?? str(row["AccountNumber"]),
+        })
+        if (dups.length) {
+            errors.push({ row: rowNum, reason: duplicateMessage(dups) })
             skipped++
             continue
         }

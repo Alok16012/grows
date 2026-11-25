@@ -1,3 +1,4 @@
+import { findEmployeeDuplicates, duplicateMessage, dupInputFrom } from "@/lib/employee-dedupe"
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -112,6 +113,9 @@ export async function PATCH(req: Request) {
         }
 
         // Held for Onboarding → Approvals (settings: People → Change requests).
+        // STRICT duplicate rule: an ID that belongs to another employee is refused.
+        const dups = await findEmployeeDuplicates(dupInputFrom(data), employee.id)
+        if (dups.length) return NextResponse.json({ error: duplicateMessage(dups), conflicts: dups }, { status: 409 })
         const { data: writeNow, held } = await holdForApproval(employee, data, { source: "SELF", isAdmin: false })
         if (held.length) await createChangeRequest({ employeeId: employee.id, requestedBy: session.user.id, requesterName: session.user.name ?? "Employee", source: "SELF", changes: held })
         const updated = Object.keys(writeNow).length ? await prisma.employee.update({ where: { id: employee.id }, data: writeNow }) : employee

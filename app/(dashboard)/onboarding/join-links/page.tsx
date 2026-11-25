@@ -197,8 +197,7 @@ function Settings() {
             </div>
             <div className={card}>
                 <p className="text-[13px] font-semibold">Already registered?</p>
-                <p className="text-[12px] text-[var(--text3)]">Mobile and email are always checked. Also block a form whose number matches an employee already on record:</p>
-                <div className="flex flex-wrap gap-x-5 gap-y-1">{(Object.keys(JOIN_DUP_FIELDS) as JoinDupField[]).map(k => <label key={k} className="flex items-center gap-2 text-[13px]"><input type="checkbox" disabled={!canEdit} checked={s.duplicates.fields.includes(k)} onChange={e => dup(k, e.target.checked)} /> {JOIN_DUP_FIELDS[k]}</label>)}</div>
+                <p className="text-[12px] text-[var(--text3)]">Strict rule, always on: a form is blocked when its mobile, email, Aadhaar, PAN, bank account or UAN already belongs to an employee — on every way of adding employees (join form, HR form, imports, onboarding link, self-service), and a duplicate can never be approved.</p>
                 <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" disabled={!canEdit} checked={s.duplicates.rejoinAlert} onChange={e => setS(x => x && ({ ...x, duplicates: { ...x.duplicates, rejoinAlert: e.target.checked } }))} /> If it matches someone who has left, alert HR and add a <b>Rejoin request</b> to the recruiter&apos;s pipeline</label>
                 <p className="text-[11.5px] text-[var(--text3)]">The candidate only sees “already registered — HR will contact you”; nothing about the other record is shown.</p>
             </div>
