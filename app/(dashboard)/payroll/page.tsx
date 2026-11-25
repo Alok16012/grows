@@ -91,6 +91,18 @@ const STEPS = [
     },
 ]
 
+/** The payroll month HR last picked, kept in this browser until they pick another. */
+const PERIOD_KEY = "payroll:selectedPeriod"
+function readSavedPeriod(): { month: number; year: number } | null {
+    try {
+        const v = JSON.parse(localStorage.getItem(PERIOD_KEY) || "null")
+        return v && Number.isInteger(v.month) && v.month >= 1 && v.month <= 12 && Number.isInteger(v.year) && v.year > 2000 ? { month: v.month, year: v.year } : null
+    } catch { return null }
+}
+function savePeriod(p: { month: number; year: number }) {
+    try { localStorage.setItem(PERIOD_KEY, JSON.stringify({ month: p.month, year: p.year })) } catch { /* private mode */ }
+}
+
 export default function PayrollPage() {
     const { data: session } = useSession()
     const router = useRouter()
@@ -169,11 +181,15 @@ export default function PayrollPage() {
     // is never opened. Not once a panel is open: the panels are keyed on the
     // month, so switching it under an open Upload Attendance panel rebuilt it
     // and silently dropped the site and month the user had just picked.
+    // The month HR picks is kept (in this browser) and the page reopens on it —
+    // it no longer jumps to the newest month on its own. Change it in the picker.
     const panelOpenedRef = useRef(false)
     useEffect(() => {
         if (periodPicked) return
         fetchRuns().then(list => {
-            if (!panelOpenedRef.current) setPeriod(latestPayrollPeriod(list, calendarMonth))
+            const newest = latestPayrollPeriod(list, calendarMonth)
+            const saved = readSavedPeriod()
+            if (!panelOpenedRef.current) setPeriod(saved ? clampPeriod(saved, newest) : newest)
             setPeriodPicked(true)
         })
     }, [periodPicked, fetchRuns, calendarMonth])
@@ -187,7 +203,7 @@ export default function PayrollPage() {
         if (monthKey(period) > monthKey(latest)) setPeriod(clampPeriod(period, latest))
     }, [runsLoaded, periodPicked, period, latest])
 
-    const choosePeriod = (p: PanelPeriod) => { setPeriod(clampPeriod(p, latest)); setPeriodPicked(true); setActivePanel(null) }
+    const choosePeriod = (p: PanelPeriod) => { const c = clampPeriod(p, latest); setPeriod(c); savePeriod(c); setPeriodPicked(true); setActivePanel(null) }
     const openPanel = (panel: Panel) => { panelOpenedRef.current = true; setActivePanel(panel) }
     const closePanel = () => { setActivePanel(null); refresh() }
 
@@ -325,7 +341,7 @@ export default function PayrollPage() {
             const d = await res.json()
             toast.success(`${labelOf(next)} created — ${d.onRolls} employees on the rolls`)
             await fetchRuns()
-            setPeriod(next); setPeriodPicked(true); setActivePanel(null)
+            setPeriod(next); savePeriod(next); setPeriodPicked(true); setActivePanel(null)
         } catch { toast.error("Could not create the month") }
         finally { setCreating(false) }
     }
