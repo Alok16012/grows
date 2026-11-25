@@ -7,10 +7,12 @@ import { OpenFromQuery } from "@/components/OpenFromQuery"
 import { MyDetailsWizard } from "@/components/profile/MyDetailsWizard"
 import { StatCard, statGridClass } from "@/components/StatCard"
 import { PolicySignStep } from "@/components/PolicySignStep"
+import { printHTML } from "@/lib/print-html"
+import { slipPageHTML } from "@/lib/payslip-html"
 import {
     User, Phone, Mail, Save, Loader2, Upload, FileText,
     CheckCircle2, Clock, XCircle, AlertCircle, ChevronDown,
-    IndianRupee, Shield, ClipboardList, X, Printer, BookOpen, Download,
+    IndianRupee, Shield, X, Printer, BookOpen, Download,
     UserCircle2, MapPin, CreditCard, Contact, Camera, LogIn, LogOut, Package, FileSignature, BadgeCheck
 } from "lucide-react"
 import { ResignationCard } from "@/components/ResignationCard"
@@ -345,96 +347,6 @@ function DocsTab() {
     )
 }
 
-// ─── Tab: My Onboarding ───────────────────────────────────────────────────────
-function OnboardingTab() {
-    const [data, setData] = useState<any>(null)
-    const [loading, setLoading] = useState(true)
-
-    useEffect(() => {
-        fetch("/api/me/onboarding").then(r => r.json()).then(setData).finally(() => setLoading(false))
-    }, [])
-
-    if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-[var(--accent)]" /></div>
-    if (!data?.onboardingRecord) return (
-        <div className="text-center py-12 text-[var(--text3)]">
-            <ClipboardList size={36} className="mx-auto mb-3 opacity-30" />
-            <p className="text-[14px]">Onboarding not started yet.</p>
-        </div>
-    )
-
-    const record = data.onboardingRecord
-    const tasks: any[] = record.tasks ?? []
-    const completed = tasks.filter(t => t.status === "COMPLETED").length
-    const pct = tasks.length ? Math.round((completed / tasks.length) * 100) : 0
-
-    // Group tasks by category
-    const grouped = tasks.reduce((acc: Record<string, any[]>, t) => {
-        acc[t.category] = [...(acc[t.category] ?? []), t]
-        return acc
-    }, {})
-
-    const statusColors: Record<string, string> = {
-        NOT_STARTED: "bg-gray-100 text-gray-600",
-        IN_PROGRESS: "bg-[#e3ebff] text-[var(--accent-text)]",
-        COMPLETED: "bg-green-100 text-green-700",
-        ON_HOLD: "bg-amber-100 text-amber-700",
-    }
-
-    return (
-        <div className="space-y-4">
-            {/* Progress */}
-            <div className="bg-white border border-[var(--border)] rounded-xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                    <div>
-                        <p className="text-[14px] font-semibold text-[var(--text)]">Onboarding Progress</p>
-                        <p className="text-[12px] text-[var(--text3)] mt-0.5">{completed} of {tasks.length} tasks completed</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${statusColors[record.status] ?? "bg-gray-100 text-gray-600"}`}>
-                        {record.status.replace("_", " ")}
-                    </span>
-                </div>
-                <div className="w-full h-2 bg-[var(--surface)] rounded-full overflow-hidden">
-                    <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${pct}%` }} />
-                </div>
-                <p className="text-right text-[12px] text-[var(--accent)] font-semibold mt-1">{pct}%</p>
-            </div>
-
-            {/* Tasks by category */}
-            {Object.entries(grouped).map(([cat, catTasks]) => (
-                <div key={cat} className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
-                    <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
-                        <p className="text-[13px] font-semibold text-[var(--text)]">{cat}</p>
-                        <p className="text-[11px] text-[var(--text3)]">
-                            {catTasks.filter(t => t.status === "COMPLETED").length}/{catTasks.length}
-                        </p>
-                    </div>
-                    <div className="divide-y divide-[var(--border)]">
-                        {catTasks.map((task: any) => (
-                            <div key={task.id} className="px-4 py-3 flex items-start gap-3">
-                                {taskStatusIcon(task.status)}
-                                <div className="flex-1 min-w-0">
-                                    <p className={`text-[13px] ${task.status === "COMPLETED" ? "line-through text-[var(--text3)]" : "text-[var(--text)]"}`}>
-                                        {task.title}
-                                    </p>
-                                    {task.description && <p className="text-[11px] text-[var(--text3)] mt-0.5">{task.description}</p>}
-                                    {task.dueDate && (
-                                        <p className="text-[11px] text-amber-600 mt-0.5">
-                                            Due: {new Date(task.dueDate).toLocaleDateString("en-IN")}
-                                        </p>
-                                    )}
-                                </div>
-                                {task.isRequired && task.status !== "COMPLETED" && (
-                                    <span className="text-[10px] text-red-500 font-medium shrink-0">Required</span>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ))}
-        </div>
-    )
-}
-
 // ─── Tab: My Payslip ─────────────────────────────────────────────────────────
 function PayslipTab() {
     const [data, setData] = useState<{ employee: any; payslips: any[] } | null>(null)
@@ -471,107 +383,23 @@ function PayslipTab() {
                 ))}
             </div>
 
+            {/* The official salary slip — the same document HR sees and prints in
+                Payroll → Salary slips (lib/payslip-html). */}
             {p && (
                 <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
-                    {/* Header */}
-                    <div className="bg-[var(--accent)] text-white px-6 py-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <p className="text-[18px] font-bold">{data.employee.firstName} {data.employee.lastName}</p>
-                                <p className="text-[12px] opacity-80 mt-0.5">{data.employee.employeeId} · {data.employee.designation}</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[13px] opacity-80">Pay Period</p>
-                                <p className="text-[16px] font-bold">{MONTHS[p.month - 1]} {p.year}</p>
-                            </div>
-                        </div>
-                        <div className="mt-4 text-center">
-                            <p className="text-[12px] opacity-80">Net Salary</p>
-                            <p className="text-[32px] font-bold">₹{Math.round(p.netSalary).toLocaleString("en-IN")}</p>
-                        </div>
-                    </div>
-
-                    <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {/* Earnings */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-[var(--border)]">
                         <div>
-                            <p className="text-[12px] font-semibold text-[var(--text3)] uppercase tracking-wide mb-3">Earnings</p>
-                            <div className="space-y-2">
-                                {[
-                                    ["Basic", p.basicSalary],
-                                    ["DA", p.da],
-                                    ["HRA", p.hra],
-                                    ["Washing", p.washing],
-                                    ["Bonus", p.bonus],
-                                    ["OT Pay", p.overtimePay],
-                                ].filter(([, v]) => Number(v) > 0).map(([label, val]) => (
-                                    <div key={label as string} className="flex justify-between text-[13px]">
-                                        <span className="text-[var(--text3)]">{label}</span>
-                                        <span className="font-medium">₹{Math.round(val as number).toLocaleString("en-IN")}</span>
-                                    </div>
-                                ))}
-                                <div className="flex justify-between text-[13px] border-t border-[var(--border)] pt-2 font-semibold">
-                                    <span>Gross Earnings</span>
-                                    <span className="text-[var(--accent)]">₹{Math.round(p.grossSalary).toLocaleString("en-IN")}</span>
-                                </div>
-                            </div>
+                            <p className="text-[14px] font-semibold text-[var(--text)]">{MONTHS[p.month - 1]} {p.year} salary slip</p>
+                            <p className="text-[12px] text-[var(--text3)]">Net pay ₹{Math.round(p.netSalary).toLocaleString("en-IN")}</p>
                         </div>
-
-                        {/* Deductions */}
-                        <div>
-                            <p className="text-[12px] font-semibold text-[var(--text3)] uppercase tracking-wide mb-3">Deductions</p>
-                            <div className="space-y-2">
-                                {[
-                                    ["PF (Employee)", p.pfEmployee],
-                                    ["ESIC (0.75%)", p.esiEmployee],
-                                    ["Professional Tax", p.pt],
-                                    ["Canteen", p.canteen],
-                                    ["Penalty", p.penalty],
-                                    ["Advance", p.advance],
-                                    ["Other", p.otherDeductions],
-                                ].filter(([, v]) => Number(v) > 0).map(([label, val]) => (
-                                    <div key={label as string} className="flex justify-between text-[13px]">
-                                        <span className="text-[var(--text3)]">{label}</span>
-                                        <span className="text-red-600">-₹{Math.round(val as number).toLocaleString("en-IN")}</span>
-                                    </div>
-                                ))}
-                                <div className="flex justify-between text-[13px] border-t border-[var(--border)] pt-2 font-semibold">
-                                    <span>Total Deductions</span>
-                                    <span className="text-red-600">-₹{Math.round(p.totalDeductions).toLocaleString("en-IN")}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Attendance + Net */}
-                    <div className="border-t border-[var(--border)] px-5 py-4 bg-[var(--surface)] grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                        {[
-                            ["Working Days", p.workingDays],
-                            ["Days Present", p.presentDays],
-                            ["LOP Days", p.workingDays - p.presentDays],
-                            ["OT Days", p.otDays],
-                        ].map(([label, val]) => (
-                            <div key={label as string}>
-                                <p className="text-[11px] text-[var(--text3)]">{label}</p>
-                                <p className="text-[18px] font-bold text-[var(--text)]">{val}</p>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* CTC row */}
-                    <div className="border-t border-[var(--border)] px-5 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[12px] text-[var(--text3)]">
-                        <span>Employer PF: <b className="text-[var(--text)]">₹{p.pfEmployer}</b></span>
-                        <span>Employer ESIC: <b className="text-[var(--text)]">₹{p.esiEmployer}</b></span>
-                        <span>CTC: <b className="text-purple-700">₹{Math.round(p.ctc).toLocaleString("en-IN")}</b></span>
-                    </div>
-
-                    {/* Download / Print */}
-                    <div className="border-t border-[var(--border)] px-5 py-3 flex justify-end gap-2">
-                        <button
-                            onClick={() => window.print()}
-                            className="flex items-center gap-1.5 px-4 py-2 border border-[var(--border)] rounded-lg text-[12px] font-medium text-[var(--text)] hover:bg-[var(--surface)] transition-colors"
-                        >
-                            <Printer size={14} /> Print Salary Slip
+                        <button onClick={() => printHTML(slipPageHTML([{ ...p, employee: data.employee }]))}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)]">
+                            <Printer size={14} /> Print / Save as PDF
                         </button>
+                    </div>
+                    <div className="overflow-x-auto bg-white">
+                        <iframe title={`Salary slip ${MONTHS[p.month - 1]} ${p.year}`} srcDoc={slipPageHTML([{ ...p, employee: data.employee }], false)}
+                            className="block w-full min-w-[760px] border-0" style={{ height: 820 }} />
                     </div>
                 </div>
             )}
@@ -995,7 +823,7 @@ function ChangePasswordCard() {
     )
 }
 
-const TAB_KEYS = ["details", "onboarding", "documents", "policies", "attendance", "payslip", "letters", "assets"]
+const TAB_KEYS = ["payslip", "attendance", "details", "documents", "letters", "policies", "assets"]
 
 export default function ProfilePage() {
     const { data: session, update } = useSession()
@@ -1088,16 +916,17 @@ export default function ProfilePage() {
     const tab = isEmployee ? activeTab : "profile"
 
     const tabs = [
-        // Standard self-service order: who I am → joining → my papers → work → pay → items.
+        // By how often employees need them: pay and attendance first, then their
+        // own records and papers. (The joining "Onboarding" tab is gone — joining
+        // is finished on the join form / onboarding link, and HR tracks it.)
         { key: "profile",    label: "Profile",     icon: User },
         ...(isEmployee ? [
-            { key: "details",    label: "My Details",  icon: BadgeCheck },
-            { key: "onboarding", label: "Onboarding",  icon: ClipboardList },
-            { key: "documents",  label: "Documents",   icon: FileText },
-            { key: "policies",   label: "Policies",    icon: FileSignature },
-            { key: "attendance", label: "Attendance",  icon: Clock },
             { key: "payslip",    label: "Payslips",    icon: IndianRupee },
+            { key: "attendance", label: "Attendance",  icon: Clock },
+            { key: "details",    label: "My Details",  icon: BadgeCheck },
+            { key: "documents",  label: "Documents",   icon: FileText },
             { key: "letters",    label: "Letters",     icon: BookOpen },
+            { key: "policies",   label: "Policies",    icon: FileSignature },
             { key: "assets",     label: "Assets",      icon: Package },
         ] : [])
     ] as { key: typeof activeTab; label: string; icon: any }[]
@@ -1199,7 +1028,6 @@ export default function ProfilePage() {
             {tab === "attendance" && <AttendanceTab />}
             {tab === "documents"  && <DocsTab />}
             {tab === "letters"    && <LettersTab />}
-            {tab === "onboarding" && <OnboardingTab />}
             {tab === "payslip"    && <PayslipTab />}
             {tab === "assets"     && <AssetsTab />}
             {tab === "policies"   && (
