@@ -421,7 +421,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
 
     if (collapsedRail) {
         return (
-            <div className="flex h-full w-full flex-col items-center overflow-hidden text-[var(--text)] bg-white border-r border-[var(--border)]">
+            <div className="app-sidebar flex h-full w-full flex-col items-center overflow-hidden text-[var(--text)] bg-[var(--sidebar-bg)] border-r border-[var(--border)]">
                 <div className="flex h-[72px] items-center shrink-0">
                     <Link href="/" title={COMPANY.name} className="h-10 w-10 rounded-[12px] flex items-center justify-center text-[var(--accent)] bg-[var(--accent-light)]">
                         <img src="/logo-mark.png" alt="" aria-hidden="true" className="w-[26px] h-[26px] object-contain" />
@@ -490,7 +490,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
                         role="menu"
                         aria-label={flyoutCategory.title}
                         style={{ top: flyout.top, left: flyout.left }}
-                        className="fixed z-[60] w-[240px] max-h-[calc(100vh-16px)] overflow-y-auto [scrollbar-width:thin] rounded-[14px] p-2 text-[var(--text)] bg-white ring-1 ring-[var(--border)] shadow-[0_18px_40px_rgba(40,48,100,0.14)] animate-in fade-in slide-in-from-left-1 duration-150"
+                        className="sidebar-flyout fixed z-[60] w-[240px] max-h-[calc(100vh-16px)] overflow-y-auto [scrollbar-width:thin] rounded-[14px] p-2 text-[var(--text)] bg-white ring-1 ring-[var(--border)] shadow-[0_18px_40px_rgba(40,48,100,0.14)] animate-in fade-in slide-in-from-left-1 duration-150"
                     >
                         <p className="px-2.5 pt-1.5 pb-2 text-[10.5px] font-bold tracking-[1px] uppercase text-[var(--accent)]">{flyoutCategory.title}</p>
                         <div className="flex flex-col gap-0.5">
@@ -545,7 +545,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
         // "Royal sapphire": a deep sapphire rail, white type, the open page as a
         // white pill and each category's icon in a soft tile. Colours are local
         // to the sidebar; page tokens are untouched.
-        <div className="flex h-full w-full flex-col overflow-hidden rounded-r-[24px] md:rounded-none text-[var(--text)] bg-white border-r border-[var(--border)]">
+        <div className="app-sidebar flex h-full w-full flex-col overflow-hidden rounded-r-[24px] md:rounded-none text-[var(--text)] bg-[var(--sidebar-bg)] border-r border-[var(--border)]">
 
             {/* ── Logo / Header ── */}
             <div className="flex h-[72px] items-center justify-between px-5 shrink-0">
@@ -604,7 +604,7 @@ export function Sidebar({ onMobileClose, collapsedRail = false, onToggleRail }: 
             </div>
 
             {/* ── Navigation ── */}
-            <nav aria-label="Main" className="flex-1 overflow-y-auto pt-1 pb-3 px-2 [scrollbar-width:thin] [scrollbar-color:transparent_transparent] hover:[scrollbar-color:rgba(255,255,255,0.22)_transparent] focus-within:[scrollbar-color:rgba(255,255,255,0.22)_transparent]">
+            <nav aria-label="Main" className="sidebar-scroll flex-1 overflow-y-auto pt-1 pb-3 px-2">
                 {q && shown.length === 0 && (
                     <p className="px-3 py-6 text-[13px] text-[var(--text3)]">No module matches “{query.trim()}”.</p>
                 )}

@@ -448,3 +448,17 @@
    running text sits on the text's middle instead of its baseline. Inside flex
    rows vertical-align has no effect, so flex layouts keep their own alignment. */
 svg.lucide { flex-shrink: 0; vertical-align: -0.15em; }
+
+/* SIDEBAR — soft blue-grey menu, set apart from the lavender page and the white
+   cards. Inside it, the hover/tile surface and the selected pill are white, so
+   the chosen module reads as a white pill with blue text. */
+:root { --sidebar-bg: #eef1f8; }
+.app-sidebar { --surface2: rgba(255, 255, 255, 0.72); --accent-light: #ffffff; --border: #dfe3ef; }
+/* The module list's scrollbar: always visible (it was white on white), thin. */
+.sidebar-scroll { scrollbar-width: thin; scrollbar-color: #c3c9d9 transparent; }
+.sidebar-scroll:hover { scrollbar-color: #9aa3ba transparent; }
+.sidebar-scroll::-webkit-scrollbar { width: 6px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: #c3c9d9; border-radius: 6px; }
+.sidebar-scroll:hover::-webkit-scrollbar-thumb { background: #9aa3ba; }
+.app-sidebar .sidebar-flyout { --surface2: #f6f7fc; --accent-light: #eaf0ff; --border: #eceef6; }
