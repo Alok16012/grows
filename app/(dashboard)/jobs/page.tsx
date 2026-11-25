@@ -312,6 +312,18 @@ export default function JobsPage() {
                                         className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-[9px] border border-[var(--border)] text-[12.5px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">
                                         <Eye size={14} /> View
                                     </button>
+                                    {/* Refer straight from the card — opens Jobs & Refer with this job's form. */}
+                                    {effectiveJobStatus(job) === "PUBLISHED" ? (
+                                        <button onClick={e => goTo(e, `/refer?job=${job.id}`)}
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-[9px] bg-[var(--accent)] text-[12.5px] font-semibold text-white hover:bg-[var(--accent-hover)]">
+                                            <UserPlus size={14} /> Refer
+                                        </button>
+                                    ) : (
+                                        <button disabled onClick={e => e.stopPropagation()} title="This job is closed — referrals are only for open jobs"
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-[9px] border border-[var(--border)] text-[12.5px] font-semibold text-[var(--text3)] opacity-60 cursor-not-allowed">
+                                            <UserPlus size={14} /> Refer
+                                        </button>
+                                    )}
                                     {canEdit && (
                                         <button onClick={e => goTo(e, `/jobs/new?id=${job.id}`)}
                                             className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-[9px] border border-[var(--border)] text-[12.5px] font-semibold text-[var(--text2)] hover:bg-[var(--surface2)]">

@@ -25,6 +25,18 @@ export default function ReferPage() {
     const [settings, setSettings] = useState(false)
     const load = useCallback(() => { fetch("/api/refer").then(r => r.json()).then(setD).catch(() => toast.error("Couldn't load")) }, [])
     useEffect(() => { load() }, [load])
+    // Opened from a job card's Refer button (/refer?job=<id>): open that job's form.
+    const [jobParamDone, setJobParamDone] = useState(false)
+    useEffect(() => {
+        if (!d || jobParamDone) return
+        setJobParamDone(true)
+        const id = new URLSearchParams(window.location.search).get("job")
+        if (!id) return
+        const j = d.jobs?.find((x: any) => x.id === id)
+        if (!j) { toast.error("This job isn't open for referrals right now"); return }
+        if (!d.settings?.enabled) { toast.error("Referrals are switched off right now"); return }
+        setReferFor(j)
+    }, [d, jobParamDone])
     if (!d) return <div className="p-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-[var(--text3)]" /></div>
     const s = d.settings
     const linkFor = (jobId: string) => `${window.location.origin}/apply/job/${jobId}?ref=${d.me}`
