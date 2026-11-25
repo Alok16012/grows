@@ -1,58 +1,52 @@
 /**
- * Prints an HTML string by injecting it into the current page with @media print CSS.
- * This avoids popups, iframes, and any browser security restrictions — window.print()
- * is called directly on the current page in response to user gesture.
+ * Prints a complete HTML document (payslips, wage sheets, compliance masters)
+ * from a hidden iframe, so only that document's own styles apply.
+ *
+ * It used to be pasted into the app page under @media print rules. The app's
+ * styles and the document's (`*{margin:0}`, `body{…}`, class names like `.info`
+ * or `.head`) then mixed both ways, and the page's own layout could clip or
+ * hide it — printed slips came out broken. An iframe keeps them apart.
  */
 export function printHTML(html: string) {
-    const parsed = new DOMParser().parseFromString(html, "text/html")
+    // The documents carry an auto-print <script> for when they are opened on
+    // their own; here we print ourselves, so drop it (no second dialog).
+    const doc = html.replace(/<script[\s\S]*?<\/script>/gi, "")
 
-    const styleContent = Array.from(parsed.querySelectorAll("style"))
-        .map(s => s.textContent ?? "")
-        .join("\n")
+    document.getElementById("__cims_print_frame__")?.remove()
+    const frame = document.createElement("iframe")
+    frame.id = "__cims_print_frame__"
+    frame.setAttribute("aria-hidden", "true")
+    // Off-screen but laid out at A4-ish width, so it renders like the page it prints.
+    frame.style.cssText = "position:fixed;left:-10000px;top:0;width:800px;height:1100px;border:0;opacity:0;pointer-events:none"
+    // srcdoc inherits this page's address, so "/logo.png" still resolves.
+    frame.srcdoc = doc
 
-    const container = document.createElement("div")
-    container.id = "__cims_print_root__"
-    container.innerHTML = parsed.body.innerHTML
+    const cleanup = () => setTimeout(() => frame.remove(), 1000)
 
-    const style = document.createElement("style")
-    style.id = "__cims_print_styles__"
-    style.textContent = `
-        @media screen { #__cims_print_root__ { display: none !important; } }
-        @media print {
-            body > *:not(#__cims_print_root__) { display: none !important; visibility: hidden !important; }
-            #__cims_print_root__ { display: block !important; visibility: visible !important; }
-        }
-        ${styleContent}
-    `
+    frame.onload = () => {
+        const win = frame.contentWindow
+        const d = frame.contentDocument
+        if (!win || !d) { cleanup(); return }
 
-    document.head.appendChild(style)
-    document.body.appendChild(container)
+        // Wait for images (the letterhead logo), or the first print of the day
+        // shows an empty box. A timeout means a broken image never blocks printing.
+        const pending = Array.from(d.images)
+            .filter(img => !img.complete)
+            .map(img => new Promise<void>(resolve => {
+                img.addEventListener("load", () => resolve(), { once: true })
+                img.addEventListener("error", () => resolve(), { once: true })
+            }))
+        const ready = pending.length
+            ? Promise.race([Promise.all(pending), new Promise(r => setTimeout(r, 2000))])
+            : Promise.resolve()
 
-    const cleanup = () => {
-        document.getElementById("__cims_print_styles__")?.remove()
-        document.getElementById("__cims_print_root__")?.remove()
-        window.removeEventListener("afterprint", cleanup)
+        ready.then(() => {
+            win.addEventListener("afterprint", cleanup, { once: true })
+            win.focus()
+            win.print()
+            // Some browsers never fire afterprint for an iframe; remove it later anyway.
+            setTimeout(() => frame.remove(), 60_000)
+        })
     }
-    window.addEventListener("afterprint", cleanup)
-
-    // Wait for images (the payslip letterhead logo) to finish loading, or the
-    // print dialog opens on an empty box the first time — 80ms isn't enough to
-    // fetch and decode one on a cold cache. Races a timeout so a slow or broken
-    // image can never stop someone printing.
-    const pending = Array.from(container.querySelectorAll("img"))
-        .filter(img => !img.complete)
-        .map(img => new Promise<void>(resolve => {
-            img.addEventListener("load", () => resolve(), { once: true })
-            img.addEventListener("error", () => resolve(), { once: true })
-        }))
-
-    const loaded = pending.length
-        ? Promise.race([
-            Promise.all(pending),
-            new Promise(resolve => setTimeout(resolve, 2000)),
-        ])
-        : Promise.resolve()
-
-    // Small delay so the DOM settles before print dialog opens
-    loaded.then(() => setTimeout(() => window.print(), 80))
+    document.body.appendChild(frame)
 }

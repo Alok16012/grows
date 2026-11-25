@@ -7,9 +7,15 @@ export async function GET(req: Request) {
     const session = await getApiSession(req)
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
+    // The employee's master details that the official salary slip prints
+    // (lib/payslip-html) — the same slip HR sees in Payroll → Salary slips.
     const emp = await prisma.employee.findFirst({
         where: { userId: session.user.id },
-        select: { id: true, firstName: true, lastName: true, employeeId: true, designation: true }
+        select: {
+            id: true, firstName: true, lastName: true, employeeId: true, designation: true,
+            uan: true, pfNumber: true, esiNumber: true, dateOfBirth: true, dateOfJoining: true,
+            deployments: { where: { isActive: true }, select: { site: { select: { name: true } } }, take: 1 },
+        },
     })
     if (!emp) return NextResponse.json([])
 
@@ -24,9 +30,10 @@ export async function GET(req: Request) {
         take: Math.min(60, limit + 6),
         select: {
             id: true, month: true, year: true, status: true, siteId: true,
-            basicSalary: true, da: true, hra: true, washing: true,
-            bonus: true, overtimePay: true, grossSalary: true,
-            pfEmployee: true, esiEmployee: true, pt: true,
+            basicSalary: true, da: true, hra: true, washing: true, conveyance: true, lwwEarned: true,
+            bonus: true, overtimePay: true, overtimeHrs: true, allowances: true, productionIncentive: true,
+            grossSalary: true,
+            pfEmployee: true, esiEmployee: true, pt: true, lwf: true, tds: true,
             canteen: true, penalty: true, advance: true,
             otherDeductions: true, totalDeductions: true,
             netSalary: true, workingDays: true, presentDays: true,
@@ -35,6 +42,14 @@ export async function GET(req: Request) {
         }
     })
 
-    const payslips = all.filter(p => isVisible({ ...p, status: String(p.status), employeeId: emp.id }, release)).slice(0, limit).map(({ siteId: _s, ...p }) => p)
-    return NextResponse.json({ employee: emp, payslips })
+    // The site each month was paid at, for the slip's SITE line.
+    const siteIds = Array.from(new Set(all.map(p => p.siteId).filter(Boolean) as string[]))
+    const siteName = new Map((siteIds.length ? await prisma.site.findMany({ where: { id: { in: siteIds } }, select: { id: true, name: true } }) : []).map(s => [s.id, s.name]))
+
+    const payslips = all
+        .filter(p => isVisible({ ...p, status: String(p.status), employeeId: emp.id }, release))
+        .slice(0, limit)
+        .map(({ siteId, ...p }) => ({ ...p, siteName: siteId ? siteName.get(siteId) ?? null : null }))
+    const { id: _id, ...employee } = emp
+    return NextResponse.json({ employee, payslips })
 }

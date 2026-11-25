@@ -8,26 +8,12 @@ import { toast } from "sonner"
 import { can } from "@/lib/can"
 import { Loader2, Search, Printer, Eye, CheckCircle2, RefreshCw, ChevronRight, MapPin, Building2, Clock, FileText, IndianRupee } from "lucide-react"
 import { printHTML } from "@/lib/print-html"
+import { slipPageHTML } from "@/lib/payslip-html"
 import { SendPayslipsPanel } from "@/components/payroll/SendPayslipsPanel"
 import PayslipViewerModal from "../_components/PayslipViewerModal"
 
 const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 
-function numToWords(n: number): string {
-    if (n === 0) return "Zero Only"
-    const ones = ["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"]
-    const tens = ["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"]
-    const toW = (num: number): string => {
-        if (num === 0) return ""
-        if (num < 20) return ones[num] + " "
-        if (num < 100) return tens[Math.floor(num/10)] + (num%10 ? " " + ones[num%10] : "") + " "
-        if (num < 1000) return ones[Math.floor(num/100)] + " Hundred " + toW(num%100)
-        if (num < 100000) return toW(Math.floor(num/1000)) + "Thousand " + toW(num%1000)
-        if (num < 10000000) return toW(Math.floor(num/100000)) + "Lakh " + toW(num%100000)
-        return toW(Math.floor(num/10000000)) + "Crore " + toW(num%10000000)
-    }
-    return "Rupees " + toW(n).trim().replace(/\s+/g," ") + " Only"
-}
 
 type Site = { id: string; name: string; code?: string }
 type SiteStatus = { siteId: string | null; processedCount: number }
@@ -120,104 +106,6 @@ function SalarySlipsInner() {
         finally { setActLoad(null) }
     }
 
-    const buildSlipHTML = (p: PayrollRecord) => {
-        const site = p.employee.deployments?.[0]?.site?.name ?? ""
-        const wDays = p.workingDays ?? 26
-        const pDays = p.presentDays ?? wDays
-        // Full-month rate = back-calculate from earned amounts
-        const rate = (amt: number) => pDays > 0 ? Math.round(amt * wDays / pDays) : amt
-        const r = (n: number) => Math.round(n).toLocaleString("en-IN")
-        // Employee master dates arrive as ISO strings; a missing or unparseable
-        // one prints blank rather than "Invalid Date".
-        const dt = (v: string | null | undefined) => {
-            const t = v ? new Date(v) : null
-            return t && !isNaN(t.getTime()) ? t.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""
-        }
-        const earnings = [
-            { label: "Basic",                  fullRate: rate(p.basicSalary), amt: p.basicSalary },
-            { label: "DA",                      fullRate: rate(p.da),          amt: p.da },
-            { label: "HRA",                     fullRate: rate(p.hra),         amt: p.hra },
-            { label: "Educational Allowance",   fullRate: 0,                   amt: 0 },
-            { label: "Conveyance Allow.",       fullRate: rate(p.conveyance),  amt: p.conveyance },
-            { label: "Medical Allowance",       fullRate: 0,                   amt: 0 },
-            { label: "Other Allowance",         fullRate: rate(p.allowances || 0), amt: p.allowances || 0 },
-            { label: "Washing Allowance",       fullRate: rate(p.washing),     amt: p.washing },
-            { label: "Leave with Wages",        fullRate: rate(p.lwwEarned),   amt: p.lwwEarned },
-            { label: "Bonus",                   fullRate: rate(p.bonus),       amt: p.bonus },
-            { label: "O.T.",                    fullRate: 0,                   amt: p.overtimePay },
-            { label: "Performance Allow.",      fullRate: 0,                   amt: p.productionIncentive || 0 },
-            { label: "COVID All + Incentives",  fullRate: 0,                   amt: 0 },
-        ]
-        // Full-month total of the Salary Rate column, to sit beside the earned
-        // gross. The rate column had a total-row cell but nothing in it.
-        const grossRate = earnings.reduce((s, e) => s + e.fullRate, 0)
-        const deductions = [
-            { label: "PF",               amt: p.pfEmployee },
-            { label: "VPF",              amt: 0 },
-            { label: "P.Tax",            amt: p.pt },
-            { label: "ESI",              amt: p.esiEmployee },
-            { label: "Salary Advance",   amt: p.advance },
-            { label: "TDS",              amt: p.tds || 0 },
-            { label: "Other Deduction",  amt: p.otherDeductions },
-            { label: "Canteen Ded",      amt: p.canteen },
-            { label: "MLWF",             amt: p.lwf },
-            { label: "Loan Deduction",   amt: 0 },
-        ]
-        return `
-<div class="slip">
-  <div class="co-header">
-    <img class="co-logo" src="/logo.png" alt=""/>
-    <h1>GROWUS AUTO INDIA PRIVATE LIMITED</h1>
-    <p>BR1, 3<sup>rd</sup> FLOOR, B WING, JAI GANESH VISION, 336, Near, Akurdi Chowk, AKURDI, PUNE, 411035.</p>
-  </div>
-  <div class="site-row"><b>SITE: ${site.toUpperCase()}</b><br/><b>ADDRESS:</b></div>
-  <table class="main">
-    <thead><tr><th colspan="5" class="month-hdr">PAYSLIPS FOR THE MONTH ${MONTHS_LONG[p.month-1].toUpperCase()} ${p.year}</th></tr></thead>
-    <tbody>
-      <tr class="info-row">
-        <td colspan="3" class="info-cell">
-          <table class="info"><tbody>
-            <tr><td class="il">Employee Name</td><td class="iv"><b>${p.employee.firstName} ${p.employee.lastName}</b></td><td class="il">Designation</td><td class="iv">${p.employee.designation ?? "."}</td></tr>
-            <tr><td class="il">Employee Number</td><td class="iv">${p.employee.employeeId}</td><td class="il">Date Of Joining</td><td class="iv">${dt(p.employee.dateOfJoining)}</td></tr>
-            <tr><td class="il">Date of Birth</td><td class="iv">${dt(p.employee.dateOfBirth)}</td><td class="il">Days Paid</td><td class="iv"><b>${pDays}</b></td></tr>
-            <tr><td class="il">UAN No.</td><td class="iv">${p.employee.uan ?? ""}</td><td class="il">OT Hrs</td><td class="iv">${p.overtimeHrs ?? 0}</td></tr>
-            <tr><td class="il">PF No.</td><td class="iv">${p.employee.pfNumber ?? ""}</td><td class="il">Location</td><td class="iv">PUNE</td></tr>
-            <tr><td class="il">ESIC No.</td><td class="iv">${p.employee.esiNumber ?? ""}</td><td class="il"></td><td class="iv"></td></tr>
-          </tbody></table>
-        </td>
-      </tr>
-      <tr class="col-hdr">
-        <th class="e-col">Earnings</th><th colspan="2" class="e-col" style="border-right:2px solid #888"></th>
-        <th colspan="2" class="d-col">Deductions</th>
-      </tr>
-      <tr class="sub-hdr">
-        <th>Particulars</th><th class="num">Salary Rate</th><th class="num" style="border-right:2px solid #888">Salary Amt (Rs.)</th>
-        <th></th><th class="num">Amount (Rs.)</th>
-      </tr>
-      ${earnings.map((e, i) => {
-          const d = deductions[i]
-          return `<tr>
-            <td>${e.label}</td><td class="num it">${e.fullRate > 0 ? r(e.fullRate) : ""}</td><td class="num it" style="border-right:2px solid #888">${e.amt > 0 ? r(e.amt) : "0"}</td>
-            <td class="dlabel">${d?.label ?? ""}</td><td class="num">${d && d.amt > 0 ? r(d.amt) : "0"}</td>
-          </tr>`
-      }).join("")}
-      <tr class="total-row">
-        <td><b>Gross Earnings (A)</b></td><td></td><td class="num" style="border-right:2px solid #888"><b>${r(p.grossSalary)}</b></td>
-        <td><b>Total Deduction</b></td><td class="num"><b>${r(p.totalDeductions)}</b></td>
-      </tr>
-      <tr class="net-row">
-        <td colspan="2"><b>Net Pay (A) - (B)</b></td><td class="num" style="border-right:2px solid #888"><b>${r(p.netSalary)}</b></td>
-        <td><b>(B)</b></td><td></td>
-      </tr>
-      <tr><td colspan="5" class="words">Amount in words: <b><i>${numToWords(Math.round(p.netSalary))}</i></b></td></tr>
-    </tbody>
-  </table>
-  <div class="footer-row">
-    <span>Place: Pune</span>
-  </div>
-  <div class="comp-gen">This is a Computer Generated Slip and does not require signature</div>
-</div>`
-    }
 
     const printSlip = (p: PayrollRecord) => printHTML(slipPageHTML([p]))
 
@@ -226,46 +114,6 @@ function SalarySlipsInner() {
         printHTML(slipPageHTML(filtered))
     }
 
-    // `autoPrint` off builds the same document for on-screen preview: the
-    // script below is what makes a printed copy open the dialog by itself.
-    const slipPageHTML = (records: PayrollRecord[], autoPrint = true) => `<!DOCTYPE html><html><head>
-<meta charset="UTF-8"/>
-<title>Salary Slips</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;}
-  .slip{width:720px;margin:20px auto;padding:0 0 24px 0;page-break-after:always;}
-  .slip:last-child{page-break-after:avoid;}
-  .co-header{text-align:center;padding:10px 4px 6px;border-bottom:1px solid #333;position:relative;min-height:58px;}.co-logo{position:absolute;left:6px;top:4px;height:50px;width:auto;}
-  .co-header h1{font-size:15px;font-style:italic;font-weight:900;letter-spacing:.3px;}
-  .co-header p{font-size:10px;font-style:italic;margin-top:3px;}
-  .site-row{padding:6px 4px;font-size:11px;}
-  .main{width:100%;border-collapse:collapse;border:1px solid #555;}
-  .main td,.main th{border:1px solid #aaa;padding:3px 6px;font-size:10.5px;}
-  .month-hdr{text-align:center;font-size:12px;font-weight:900;background:#eceef6;padding:5px;}
-  .info-cell{padding:0!important;border:none!important;}
-  .info{width:100%;border-collapse:collapse;}
-  .info td{border:1px solid #aaa;padding:3px 6px;font-size:10px;}
-  .il{color:#333;width:20%;font-weight:600;} .iv{width:30%;font-style:italic;}
-  .col-hdr th{background:#e8e8e8;font-weight:700;font-size:11px;text-align:center;}
-  .sub-hdr th{background:#f5f5f5;font-weight:700;font-size:10px;}
-  .e-col{background:#e8f0fe;} .d-col{background:#fce8e8;}
-  .num{text-align:right;} .it{font-style:italic;}
-  .dlabel{padding-left:8px;}
-  .total-row td{font-weight:700;background:#eceef6;border-top:2px solid #555!important;}
-  .net-row td{font-weight:700;background:#e8f5e9;}
-  .words{font-size:10.5px;padding:5px 6px!important;border-top:1px solid #555!important;}
-  .footer-row{padding:8px 4px 2px;font-size:10.5px;}
-  .comp-gen{text-align:center;padding:8px;font-size:10px;color:#555;}
-  @media print{
-    body{margin:0;}
-    .slip{width:100%;margin:0;padding:0 12px 20px;}
-    @page{margin:10mm;size:A4;}
-  }
-</style></head><body>
-${records.map(p => buildSlipHTML(p)).join("")}
-${autoPrint ? "<script>window.onload=()=>window.print()</script>" : ""}
-</body></html>`
 
     const filtered   = records.filter(r => !search ||
         `${r.employee.firstName} ${r.employee.lastName} ${r.employee.employeeId}`.toLowerCase().includes(search.toLowerCase()))

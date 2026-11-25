@@ -9,7 +9,7 @@ import { PayslipPDF, type PayslipData } from "@/components/PayslipPDF"
 // Server-side salary slip PDF for one payroll row (WhatsApp, download).
 
 const COMPANY_ADDRESS = process.env.PAYSLIP_COMPANY_ADDRESS?.trim()
-    || "BR1, 3rd FLOOR, B WING, JAI GANESH VISION, 336, Near Akurdi Chowk, AKURDI, PUNE, 411035."
+    || "431, Br2, B Wing, 4th Floor, Jai Ganesh Vision, near Akurdi Chowk, Akurdi, Pune, Maharashtra 411035."
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 let logo: string | null | undefined
