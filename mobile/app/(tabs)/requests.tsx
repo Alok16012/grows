@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -88,19 +88,23 @@ export default function RequestsScreen() {
         <View style={styles.actions}>
           <ActionTile label="Apply Leave" icon="calendar" tint={tiles.amber} onPress={() => router.push("/leave/apply")} />
           <ActionTile label="New Expense" icon="receipt" tint={tiles.purple} onPress={() => router.push("/expenses/new")} />
-          <ActionTile
-            label="Letter Request"
-            icon="mail"
-            tint={tiles.blue}
-            onPress={() => Alert.alert("Letter Request", "Please reach out to HR for letter requests. In-app requests are coming soon.")}
-          />
-          <ActionTile
-            label="Missed Punch"
-            icon="alarm"
-            tint={tiles.green}
-            onPress={() => Alert.alert("Missed Punch", "Missed-punch correction requests are coming soon.")}
-          />
         </View>
+        <Card>
+          <View style={styles.offlineRequest}>
+            <Ionicons name="mail-outline" size={20} color={colors.navy} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reqTitle}>Letter requests</Text>
+              <Text style={styles.reqSub}>Contact HR to request a letter.</Text>
+            </View>
+          </View>
+          <View style={styles.offlineRequest}>
+            <Ionicons name="alarm-outline" size={20} color={colors.navy} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reqTitle}>Missed punch corrections</Text>
+              <Text style={styles.reqSub}>In-app corrections are unavailable.</Text>
+            </View>
+          </View>
+        </Card>
 
         <Text style={styles.heading}>My Requests</Text>
         {!loaded ? (
@@ -156,6 +160,7 @@ function ActionTile({
   return (
     <Pressable
       style={({ pressed }) => [styles.actionTile, pressed && { transform: [{ scale: 0.97 }] }]}
+      accessibilityRole="button"
       onPress={onPress}
     >
       <View style={[styles.actionIcon, { backgroundColor: tint.bg }]}>
@@ -192,6 +197,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md,
   },
+  offlineRequest: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
   actionIcon: { width: 42, height: 42, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
   actionLabel: { fontSize: font.size.sm, fontWeight: font.weight.semibold, color: colors.text, flexShrink: 1 },
   heading: { fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.text, marginTop: spacing.lg, marginBottom: spacing.md },

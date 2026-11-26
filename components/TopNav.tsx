@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, type KeyboardEvent } from "react"
 import { Search, Menu, X, Building2, Folder, ClipboardCheck, Loader2, UserCircle, LogOut, ChevronDown, Bell, CheckCheck, ExternalLink } from "lucide-react"
 import { useSession, signOut } from "next-auth/react"
 import Link from "next/link"
@@ -22,6 +22,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
     const { data: session } = useSession()
     const [query, setQuery] = useState("")
     const [results, setResults] = useState<SearchResults | null>(null)
+    const [searchError, setSearchError] = useState(false)
     const [loading, setLoading] = useState(false)
     const [isOpen, setIsOpen] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
@@ -35,6 +36,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
     // row over the header. The mobile home's big search bar opens it too, by
     // dispatching "grows:open-search", so there is one search, not two.
     const [mobileSearch, setMobileSearch] = useState(false)
+    const mobileSearchButtonRef = useRef<HTMLButtonElement>(null)
     const searchInputRef = useRef<HTMLInputElement>(null)
     const pathname = usePathname()
     const homeHref = session?.user?.role === "ADMIN" ? "/admin" : "/dashboard"
@@ -49,6 +51,38 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
         window.addEventListener("grows:open-search", open)
         return () => window.removeEventListener("grows:open-search", open)
     }, [])
+
+    function updateSearch(value: string) {
+        const canSearch = value.trim().length >= 2
+        setQuery(value)
+        setResults(null)
+        setSearchError(false)
+        setLoading(canSearch)
+        setIsOpen(canSearch)
+    }
+
+    function handleSearchKeys(event: KeyboardEvent<HTMLDivElement>) {
+        if (event.key === "Escape" && (isOpen || mobileSearch)) {
+            event.preventDefault()
+            if (isOpen) {
+                searchInputRef.current?.focus()
+                setIsOpen(false)
+            } else {
+                setMobileSearch(false)
+                updateSearch("")
+                mobileSearchButtonRef.current?.focus()
+            }
+            return
+        }
+        if (!isOpen || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) return
+        const links = Array.from(dropdownRef.current?.querySelectorAll<HTMLAnchorElement>("#global-search-results a") ?? [])
+        if (!links.length) return
+        event.preventDefault()
+        const index = links.indexOf(document.activeElement as HTMLAnchorElement)
+        const next = event.key === "ArrowDown" ? index + 1 : index < 0 ? links.length - 1 : index - 1
+        if (next >= 0 && next < links.length) links[next].focus()
+        else searchInputRef.current?.focus()
+    }
 
     const [notifications, setNotifications] = useState<any[]>([])
     const [unreadCount, setUnreadCount] = useState(0)
@@ -86,31 +120,31 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
     }, [])
 
     useEffect(() => {
+        if (query.trim().length < 2) return
+
+        const controller = new AbortController()
         const timer = setTimeout(async () => {
-            if (query.length >= 2) {
-                setLoading(true)
-                try {
-                    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
-                    // An error payload here would be rendered as results and crash
-                    // the nav (and with it every page), so normalise to empty lists.
-                    const data = res.ok ? await res.json() : null
-                    setResults({
-                        sites: data?.sites ?? [],
-                        projects: data?.projects ?? [],
-                        inspections: data?.inspections ?? [],
-                    })
-                    setIsOpen(true)
-                } catch {
-                    console.error("Search fetch failed")
-                } finally {
-                    setLoading(false)
-                }
-            } else {
-                setResults(null)
-                setIsOpen(false)
+            try {
+                const res = await fetch("/api/search?q=" + encodeURIComponent(query.trim()), { signal: controller.signal })
+                if (!res.ok) throw new Error("Search failed")
+                const data = await res.json()
+                if (controller.signal.aborted) return
+                setResults({
+                    sites: data?.sites ?? [],
+                    projects: data?.projects ?? [],
+                    inspections: data?.inspections ?? [],
+                })
+            } catch {
+                if (!controller.signal.aborted) setSearchError(true)
+            } finally {
+                if (!controller.signal.aborted) setLoading(false)
             }
         }, 300)
-        return () => clearTimeout(timer)
+
+        return () => {
+            clearTimeout(timer)
+            controller.abort()
+        }
     }, [query])
 
     useEffect(() => {
@@ -176,36 +210,36 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
             <div className={cn(
                 "relative md:flex-1 md:max-w-[420px] md:ml-auto md:block",
                 mobileSearch ? "absolute inset-x-3 top-[10px] z-40 flex items-center gap-2" : "hidden",
-            )} ref={dropdownRef}>
+            )} ref={dropdownRef} onKeyDown={handleSearchKeys}>
                 <div className="relative group flex-1">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-[var(--text2)] group-focus-within:text-[var(--accent)] transition-colors" aria-hidden="true" />
                     <input
                         ref={searchInputRef}
                         type="search"
-                        placeholder="Search for anything..."
+                        placeholder="Search sites, projects, inspections"
                         aria-label="Search sites, projects, and inspections"
                         className="w-full h-10 md:h-12 pl-11 pr-4 bg-[var(--surface)] border border-[var(--border)] rounded-full md:rounded-[12px] text-[16px] md:text-[14.5px] text-[var(--text)] placeholder-[var(--text3)] shadow-[0_1px_3px_rgba(15,23,41,0.04)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all"
                         value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        onFocus={() => query.length >= 2 && setIsOpen(true)}
+                        onChange={(e) => updateSearch(e.target.value)}
+                        onFocus={() => query.trim().length >= 2 && setIsOpen(true)}
                         autoComplete="off"
                     />
                     {loading && <div className="absolute right-3 top-1/2 -translate-y-1/2"><Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--text3)]" /></div>}
                 </div>
                 {mobileSearch && (
-                    <button type="button" onClick={() => { setMobileSearch(false); setQuery("") }} aria-label="Close search"
+                    <button type="button" onClick={() => { setMobileSearch(false); updateSearch(""); mobileSearchButtonRef.current?.focus() }} aria-label="Close search"
                         className="md:hidden shrink-0 h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface)] border border-[var(--border)] text-[var(--text2)]">
                         <X size={18} />
                     </button>
                 )}
 
-                {isOpen && (results?.sites?.length || results?.projects?.length || results?.inspections?.length) ? (
-                    <div className="absolute top-full left-0 mt-2 w-full max-h-[400px] overflow-y-auto rounded-[12px] border border-[var(--border)] bg-[var(--surface)] shadow-xl z-50 p-2 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                {isOpen && !loading && (results?.sites?.length || results?.projects?.length || results?.inspections?.length) ? (
+                    <div id="global-search-results" className="absolute top-full left-0 mt-2 w-full max-h-[400px] overflow-y-auto rounded-[12px] border border-[var(--border)] bg-[var(--surface)] shadow-xl z-50 p-2 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
                         {results.sites.length > 0 && (
                             <section>
                                 <h3 className="px-2 py-1 text-[10px] font-bold text-[var(--text3)] uppercase tracking-wider mb-1">Sites</h3>
                                 {results.sites.map(c => (
-                                    <Link key={c.id} href="/sites" className="flex items-center gap-3 px-3 py-1.5 rounded-[8px] hover:bg-[var(--surface2)] transition-colors">
+                                    <Link key={c.id} href="/sites" className="flex items-center gap-3 px-3 py-1.5 rounded-[8px] hover:bg-[var(--surface2)] transition-colors" onClick={() => { setIsOpen(false); setMobileSearch(false) }}>
                                         <Building2 size={16} className="text-[var(--accent)]" />
                                         <span className="text-[13px] font-medium text-[var(--text)]">{c.name}{c.code ? ` (${c.code})` : ""}</span>
                                     </Link>
@@ -216,7 +250,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                             <section>
                                 <h3 className="px-2 py-1 text-[10px] font-bold text-[var(--text3)] uppercase tracking-wider mb-1">Projects</h3>
                                 {results.projects.map(p => (
-                                    <Link key={p.id} href="/projects" className="flex flex-col px-3 py-1.5 rounded-[8px] hover:bg-[var(--surface2)] transition-colors">
+                                    <Link key={p.id} href="/projects" className="flex flex-col px-3 py-1.5 rounded-[8px] hover:bg-[var(--surface2)] transition-colors" onClick={() => { setIsOpen(false); setMobileSearch(false) }}>
                                         <div className="flex items-center gap-3">
                                             <Folder size={16} className="text-[var(--accent)]" />
                                             <span className="text-[13px] font-medium text-[var(--text)]">{p.name}</span>
@@ -230,7 +264,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                             <section>
                                 <h3 className="px-2 py-1 text-[10px] font-bold text-[var(--text3)] uppercase tracking-wider mb-1">Inspections</h3>
                                 {results.inspections.map(i => (
-                                    <Link key={i.id} href={`/approvals/${i.id}`} className="flex flex-col px-3 py-1.5 rounded-[8px] hover:bg-[var(--surface2)] transition-colors">
+                                    <Link key={i.id} href={`/approvals/${i.id}`} className="flex flex-col px-3 py-1.5 rounded-[8px] hover:bg-[var(--surface2)] transition-colors" onClick={() => { setIsOpen(false); setMobileSearch(false) }}>
                                         <div className="flex items-center gap-3">
                                             <ClipboardCheck size={16} className="text-[var(--accent)]" />
                                             <span className="text-[13px] font-medium text-[var(--text)]">{i.projectName}</span>
@@ -242,9 +276,9 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                             </section>
                         )}
                     </div>
-                ) : isOpen && query.length >= 2 && !loading ? (
+                ) : isOpen && query.trim().length >= 2 && !loading ? (
                     <div className="absolute top-full left-0 mt-2 w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-4 text-center shadow-lg z-50">
-                        <p className="text-[13px] text-[var(--text3)]">No results for &quot;{query}&quot;</p>
+                        <p role="status" className="text-[13px] text-[var(--text2)]">{searchError ? "Search is unavailable. Edit your search to try again." : <>No results for &quot;{query.trim()}&quot;</>}</p>
                     </div>
                 ) : null}
             </div>
@@ -252,7 +286,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
             {/* Right */}
             <div className="flex items-center gap-2">
                 <button type="button" onClick={() => { setMobileSearch(true); setTimeout(() => searchInputRef.current?.focus(), 30) }}
-                    aria-label="Search" className="md:hidden h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-card)]">
+                    ref={mobileSearchButtonRef} aria-label="Search" className="md:hidden h-10 w-10 rounded-full flex items-center justify-center bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-card)]">
                     <Search size={19} />
                 </button>
                 <div className="flex items-center gap-2">

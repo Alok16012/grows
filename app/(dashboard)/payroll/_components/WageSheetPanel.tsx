@@ -11,6 +11,7 @@ import { printHTML } from "@/lib/print-html"
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 // ₹0 is a real amount — show it like the hub does rather than a dash.
 const fmt  = (n: number) => "₹"+Math.round(n).toLocaleString("en-IN")
+const reviewCurrency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" })
 const fmtN = (n: number) => Math.round(n).toLocaleString("en-IN")
 
 type Site    = { id: string; name: string; code?: string }
@@ -66,6 +67,7 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
     const [neftEmail,  setNeftEmail]  = useState("")
     const [hdfcAccNo,  setHdfcAccNo]  = useState("")
     const [hdfcGenBy,  setHdfcGenBy]  = useState("")
+    const [showFullSheet, setShowFullSheet] = useState(false)
     const [selectedIds,     setSelectedIds]     = useState<Set<string>>(new Set())
     const [selectedSiteIds, setSelectedSiteIds] = useState<Set<string>>(new Set())
     const [dlCombined,      setDlCombined]      = useState(false)
@@ -90,7 +92,15 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
 
     const selectSite = (id: string) => { setSelId(id); setSearch(""); setSelectedIds(new Set()); if(id) fetchData(id); else setData([]) }
     const toggleSelect = (id: string) => setSelectedIds(prev=>{ const s=new Set(prev); s.has(id)?s.delete(id):s.add(id); return s })
-    const toggleAll = (rows: Payroll[]) => setSelectedIds(prev=>prev.size===rows.length?new Set():new Set(rows.map(p=>p.id)))
+    const toggleAll = (rows: Payroll[]) => setSelectedIds(prev => {
+        const next = new Set(prev)
+        const clear = rows.every(row => prev.has(row.id))
+        for (const row of rows) {
+            if (clear) next.delete(row.id)
+            else next.add(row.id)
+        }
+        return next
+    })
 
     const buildFormIIAoa = (rows: Payroll[], siteName: string, m: number, y: number) => {
         const monthName=MONTHS[m-1].toUpperCase()
@@ -192,7 +202,9 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
         setSelectedSiteIds(prev=>{ const s=new Set(prev); s.has(id)?s.delete(id):s.add(id); return s })
     }
 
-    const selectedCount  = selectedIds.size
+    const selectedRows = data.filter(row => selectedIds.has(row.id))
+    const selectedCount = selectedRows.length
+    const selectedNetPay = selectedRows.reduce((sum, row) => sum + row.netSalary, 0)
     const filtered       = data.filter(p=>!search||`${p.employee.firstName} ${p.employee.lastName} ${p.employee.employeeId}`.toLowerCase().includes(search.toLowerCase()))
     const selSite        = sites.find(s=>s.id===selId)
     const getSt          = (id: string) => status.find(s=>s.siteId===id)
@@ -467,14 +479,71 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                             {/* Wage Sheet Table */}
                             {activeView==="wagesheet" && (
                                 <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, overflow:"hidden" }}>
-                                    <div style={{ padding:"9px 14px", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", gap:8 }}>
+                                    <div style={{ padding:"9px 14px", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", flexWrap:"wrap", gap:8 }}>
                                         <Search size={13} style={{ color:"var(--text3)", flexShrink:0 }} />
-                                        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search employees…"
-                                            style={{ flex:1, border:"none", outline:"none", fontSize:12, background:"transparent", color:"var(--text)" }} />
-                                        {selectedCount>0 && <span style={{ fontSize:11, fontWeight:700, color:"var(--accent)", whiteSpace:"nowrap", background:"var(--accent-light)", padding:"2px 8px", borderRadius:20 }}>{selectedCount} selected</span>}
+                                        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search employees…" aria-label="Search wage sheet employees"
+                                            style={{ flex:1, border:"none", minWidth:0, fontSize:14, background:"transparent", color:"var(--text)" }} />
+                                        {selectedCount>0 && <span role="status" style={{ fontSize:11, fontWeight:700, color:"var(--accent)", whiteSpace:"nowrap", background:"var(--accent-light)", padding:"2px 8px", borderRadius:20 }}>{selectedCount} selected · {reviewCurrency.format(selectedNetPay)}</span>}
                                         <span style={{ fontSize:11, color:"var(--text3)", whiteSpace:"nowrap" }}>{filtered.length}/{data.length}</span>
                                     </div>
-                                    <div style={{ overflowX:"auto" }}>
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+                                        <h2 className="text-sm font-semibold">Wage sheet review</h2>
+                                        <button type="button" aria-pressed={showFullSheet} onClick={() => setShowFullSheet(value => !value)}
+                                            className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-[var(--surface2)]">
+                                            Full wage sheet
+                                        </button>
+                                    </div>
+                                    {!showFullSheet && (
+                                        <div className="overflow-x-auto" role="region" aria-label="Wage sheet summary" tabIndex={0}>
+                                            <table className="w-full min-w-[520px] text-sm">
+                                                <thead className="bg-[var(--surface2)] text-left">
+                                                    <tr>
+                                                        <th scope="col" className="p-3">
+                                                            <input type="checkbox" aria-label="Select all visible employees" disabled={!rows.length}
+                                                                checked={rows.length > 0 && rows.every(row => selectedIds.has(row.id))}
+                                                                onChange={() => toggleAll(rows)} />
+                                                        </th>
+                                                        <th scope="col" className="p-3">Employee</th>
+                                                        <th scope="col" className="p-3 text-right">Days worked</th>
+                                                        <th scope="col" className="p-3 text-right">Gross pay</th>
+                                                        <th scope="col" className="p-3 text-right">Deductions</th>
+                                                        <th scope="col" className="p-3 text-right">Net pay</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {rows.map(row => (
+                                                        <tr key={row.id} className="border-b" style={{ background: selectedIds.has(row.id) ? "var(--accent-light)" : undefined }}>
+                                                            <td className="p-3"><input type="checkbox" aria-label={"Select " + row.employee.employeeId}
+                                                                checked={selectedIds.has(row.id)} onChange={() => toggleSelect(row.id)} /></td>
+                                                            <th scope="row" className="p-3 text-left font-semibold">
+                                                                {row.employee.firstName} {row.employee.lastName}
+                                                                <span className="block text-xs font-normal text-[var(--text2)]">{row.employee.employeeId}</span>
+                                                            </th>
+                                                            <td className="p-3 text-right tabular-nums">{row.presentDays ?? row.workingDays ?? 26}</td>
+                                                            <td className="p-3 text-right tabular-nums">{reviewCurrency.format(row.grossSalary)}</td>
+                                                            <td className="p-3 text-right tabular-nums">{reviewCurrency.format(row.totalDeductions)}</td>
+                                                            <td className="p-3 text-right font-semibold tabular-nums">{reviewCurrency.format(row.netSalary)}</td>
+                                                        </tr>
+                                                    ))}
+                                                    {!rows.length && (
+                                                        <tr><td colSpan={6} className="p-6 text-center">{data.length ? "No employees match your search" : "No processed payroll records found"}</td></tr>
+                                                    )}
+                                                </tbody>
+                                                {rows.length > 0 && (
+                                                    <tfoot className="bg-[var(--surface2)] font-semibold tabular-nums">
+                                                        <tr>
+                                                            <th scope="row" colSpan={3} className="p-3 text-left">Visible total ({rows.length})</th>
+                                                            <td className="p-3 text-right">{reviewCurrency.format(totals.gross)}</td>
+                                                            <td className="p-3 text-right">{reviewCurrency.format(totals.ded)}</td>
+                                                            <td className="p-3 text-right">{reviewCurrency.format(totals.net)}</td>
+                                                        </tr>
+                                                    </tfoot>
+                                                )}
+                                            </table>
+                                        </div>
+                                    )}
+                                    {showFullSheet && (
+                                    <div style={{ overflowX:"auto" }} role="region" aria-label="Full wage sheet" tabIndex={0}>
                                         <table style={{ width:"max-content", minWidth:"100%", borderCollapse:"collapse", fontSize:11 }}>
                                             <thead>
                                                 <tr style={{ background:"var(--surface2)", borderBottom:"1px solid var(--border)" }}>
@@ -486,7 +555,7 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                                                     <th rowSpan={2} style={{...th,background:"#D9EAD3",color:"#145214"}}>NET<br/>PAY</th>
                                                 </tr>
                                                 <tr style={{ background:"var(--surface2)", borderBottom:"2px solid var(--border)" }}>
-                                                    <th style={th}><input type="checkbox" checked={filtered.length>0&&filtered.every(p=>selectedIds.has(p.id))} onChange={()=>toggleAll(filtered)} style={{ cursor:"pointer", accentColor:"var(--accent)" }} /></th>
+                                                    <th style={th}><input type="checkbox" aria-label="Select all visible employees" disabled={!filtered.length} checked={filtered.length>0&&filtered.every(p=>selectedIds.has(p.id))} onChange={()=>toggleAll(filtered)} style={{ cursor:"pointer", accentColor:"var(--accent)" }} /></th>
                                                     <th style={th}>SR</th><th style={th}>EMP CODE</th><th style={{...th,textAlign:"left"}}>NAME</th><th style={th}>DESIG.</th>
                                                     <th style={{...th,background:"#eaf0ff"}}>Month<br/>Days</th><th style={{...th,background:"#eaf0ff"}}>LOP</th><th style={{...th,background:"#eaf0ff"}}>DAYS</th><th style={{...th,background:"#eaf0ff"}}>OT<br/>DAYS</th><th style={{...th,background:"#eaf0ff"}}>OT<br/>Hrs</th>
                                                     <th style={{...th,background:"#f0fdf4"}}>BASIC</th><th style={{...th,background:"#f0fdf4"}}>DA</th><th style={{...th,background:"#f0fdf4"}}>HRA</th><th style={{...th,background:"#f0fdf4"}}>Washing</th><th style={{...th,background:"#f0fdf4"}}>Convence</th><th style={{...th,background:"#f0fdf4"}}>LWW</th><th style={{...th,background:"#f0fdf4"}}>BONUS</th><th style={{...th,background:"#f0fdf4"}}>Other</th><th style={{...th,background:"#dcfce7",color:"#15803d"}}>GROSS</th>
@@ -504,7 +573,7 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                                                     const otHrs=p.overtimeHrs??Math.round((p.otDays??0)*8)
                                                     return (
                                                         <tr key={p.id} onClick={()=>toggleSelect(p.id)} style={{ borderBottom:"1px solid var(--border)", cursor:"pointer", background:selectedIds.has(p.id)?"var(--accent-light)":i%2===0?"var(--surface)":"var(--surface2)" }}>
-                                                            <td style={td} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(p.id)} onChange={()=>toggleSelect(p.id)} style={{ cursor:"pointer", accentColor:"var(--accent)" }} /></td>
+                                                            <td style={td} onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={"Select " + p.employee.employeeId} checked={selectedIds.has(p.id)} onChange={()=>toggleSelect(p.id)} style={{ cursor:"pointer", accentColor:"var(--accent)" }} /></td>
                                                             <td style={td}>{i+1}</td>
                                                             <td style={{...td,color:"var(--accent)",fontWeight:700}}>{p.employee.employeeId}</td>
                                                             <td style={{...td,textAlign:"left",fontWeight:600}}>{p.employee.firstName} {p.employee.lastName}</td>
@@ -551,7 +620,7 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                                             {data.length>0 && (
                                                 <tfoot>
                                                     <tr style={{ background:"var(--surface2)", borderTop:"2px solid var(--border)", fontWeight:700 }}>
-                                                        <td colSpan={5} style={{...td,textAlign:"right",fontSize:10,color:"var(--text3)",textTransform:"uppercase"}}>{isFiltered?`Filtered total (${rows.length} of ${data.length})`:`Total (${selectedCount>0?`${selectedCount} selected`:data.length})`}</td>
+                                                        <td colSpan={5} style={{...td,textAlign:"right",fontSize:10,color:"var(--text3)",textTransform:"uppercase"}}>{isFiltered?`Filtered total (${rows.length} of ${data.length})`:`Total (${rows.length})`}</td>
                                                         <td style={{...td,background:"#eaf0ff"}}>{rows.reduce((s,p)=>s+(p.workingDays??26),0)}</td>
                                                         {/* Days are decimal (half days), so round the sum like the OT column does. */}
                                                         <td style={{...td,background:"#eaf0ff"}}>{Math.round(rows.reduce((s,p)=>s+((p.workingDays??26)-(p.presentDays??(p.workingDays??26))),0)*1000)/1000}</td>
@@ -593,6 +662,7 @@ export default function WageSheetPanel({ onClose, initialMonth, initialYear, lat
                                             )}
                                         </table>
                                     </div>
+                                    )}
                                 </div>
                             )}
                         </>

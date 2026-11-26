@@ -26,13 +26,13 @@ export default function Error({
                 </div>
                 <h2 className="text-xl font-semibold text-[var(--text)]">Something went wrong</h2>
                 <p className="text-[var(--text3)] text-sm max-w-sm">
-                    {error.message || "An unexpected error occurred. Please try again."}
+                    We couldn’t load this page. Try again or return to your dashboard.
                 </p>
                 {error.digest && (
                     <p className="text-[10px] text-[var(--text3)] font-mono">Ref: {error.digest}</p>
                 )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-3">
                 <Button onClick={() => reset()} className="gap-2">
                     <span>Try again</span>
                 </Button>

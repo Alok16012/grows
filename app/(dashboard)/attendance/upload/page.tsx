@@ -108,7 +108,9 @@ export default function AttendanceUploadPage() {
 
     const [file, setFile] = useState<File | null>(null)
     const [parsing, setParsing] = useState(false)
+    const [skippedSheetRows, setSkippedSheetRows] = useState<number[]>([])
     const [matched, setMatched] = useState<MatchedRow[] | null>(null)
+    const [uploadError, setUploadError] = useState("")
     const [processing, setProcessing] = useState(false)
     const [siteEmployees, setSiteEmployees] = useState<Employee[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -137,14 +139,17 @@ export default function AttendanceUploadPage() {
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFile(e.target.files?.[0] ?? null)
+        setUploadError("")
         setMatched(null)
     }
 
     const handleValidate = useCallback(async () => {
         if (!siteId) { toast.error("Select a site first"); return }
         if (!file)   { toast.error("Choose an Excel file first"); return }
+        setUploadError("")
         setParsing(true)
         setMatched(null)
+        setSkippedSheetRows([])
         try {
             const XLSX = await loadXLSX()
             const buf = await file.arrayBuffer()
@@ -167,22 +172,23 @@ export default function AttendanceUploadPage() {
                 Array.isArray(row) && row.some(cell => EMP_ID_VARIANTS.has(norm(cell)))
             )
             if (headerIdx === -1) {
-                toast.error("Could not find header row with 'Employee ID' / 'EMP CODE' column")
+                setUploadError("Could not find header row with 'Employee ID' / 'EMP CODE' column")
                 setParsing(false)
                 return
             }
             const headers = (rawRows[headerIdx] as unknown[]).map(h => norm(h))
-            const dataRows = rawRows.slice(headerIdx + 1).filter(row =>
-                Array.isArray(row) && row.some(cell => String(cell).trim() !== "")
-            )
+            const firstSheetRow = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]).s.r : 0
+            const dataRows = rawRows.slice(headerIdx + 1)
+                .map((cells, index) => ({ cells, rowIndex: firstSheetRow + headerIdx + index + 2 }))
+                .filter(({ cells }) => Array.isArray(cells) && cells.some(cell => String(cell).trim() !== ""))
 
-            const rows: Record<string, unknown>[] = dataRows.map(row => {
-                const obj: Record<string, unknown> = {}
-                headers.forEach((h, i) => { obj[h] = (row as unknown[])[i] ?? "" })
-                return obj
+            const rows = dataRows.map(({ cells, rowIndex }) => {
+                const values: Record<string, unknown> = {}
+                headers.forEach((header, index) => { values[header] = cells[index] ?? "" })
+                return { rowIndex, values }
             })
 
-            if (rows.length === 0) { toast.error("No data rows found in file"); setParsing(false); return }
+            if (rows.length === 0) { setUploadError("No data rows found in file"); setParsing(false); return }
 
             // Multi-alias column lookup (case-insensitive, whitespace-normalised keys)
             const pick = (row: Record<string, unknown>, ...aliases: string[]) => {
@@ -194,8 +200,8 @@ export default function AttendanceUploadPage() {
                 return undefined
             }
 
-            const parsed: ParsedRow[] = rows.map((row, i) => ({
-                rowIndex: i + 2,
+            const sheetRows: ParsedRow[] = rows.map(({ values: row, rowIndex }) => ({
+                rowIndex,
                 rawEmployeeId: String(pick(row, "EMPLOYEE ID", "EMP ID", "EMP CODE", "EMPLOYEE CODE", "EMPLOYEE NO", "EMP NO", "EMPCODE", "EMPLOYEEID") ?? "").trim(),
                 rawName:       String(pick(row, "EMPLOYEE NAME", "NAME", "EMPLOYEE", "EMP NAME") ?? "").trim(),
                 // Only a BLANK cell falls back to the 26-day default. The old
@@ -214,9 +220,11 @@ export default function AttendanceUploadPage() {
                 penalty:       Number(pick(row, "PENALTY", "FINE") ?? 0) || 0,
                 advance:       Number(pick(row, "ADVANCE", "ADV", "LOAN") ?? 0) || 0,
                 productionIncentive: Number(pick(row, "PRODUCTION INCENTIVE", "PROD INCENTIVE", "PROD INC", "INCENTIVE", "PI") ?? 0) || 0,
-            })).filter(r => r.rawEmployeeId && !/^(SR|TOTAL|GRAND TOTAL|—)$/i.test(r.rawEmployeeId))
+            }))
+            const parsed = sheetRows.filter(row => row.rawEmployeeId && !/^(SR|TOTAL|GRAND TOTAL|—)$/i.test(row.rawEmployeeId))
+            setSkippedSheetRows(sheetRows.filter(row => !row.rawEmployeeId).map(row => row.rowIndex))
 
-            if (!parsed.length) { toast.error("No valid Employee ID rows found"); setParsing(false); return }
+            if (!parsed.length) { setUploadError("No valid Employee ID rows found"); setParsing(false); return }
 
             // Fetch ALL active employees (not just site-deployed) so attendance
             // can be processed even if deployment record is missing for some employees
@@ -247,7 +255,7 @@ export default function AttendanceUploadPage() {
             toast.success(`${found} of ${matchedRows.length} employees matched at ${selectedSite?.name}`)
         } catch (err) {
             console.error(err)
-            toast.error("Failed to parse file")
+            setUploadError("Failed to parse file")
         } finally {
             setParsing(false)
         }
@@ -257,6 +265,7 @@ export default function AttendanceUploadPage() {
         if (!matched || !siteId) return
         const valid = matched.filter(r => r.matched && r.employeeId)
         if (!valid.length) { toast.error("No matched employees to process"); return }
+        setUploadError("")
         setProcessing(true)
         try {
             const attendance = valid.map(r => ({
@@ -282,12 +291,13 @@ export default function AttendanceUploadPage() {
             toast.success(`Payroll processed for ${data.processedCount} employees at ${selectedSite?.name}`)
             router.push("/payroll")
         } catch (e: unknown) {
-            toast.error(e instanceof Error ? e.message : "Processing failed")
+            setUploadError(e instanceof Error ? e.message : "Processing failed")
         } finally {
             setProcessing(false)
         }
     }
 
+    const busy = parsing || processing
     const matchedCount   = matched?.filter(r => r.matched).length  ?? 0
     const unmatchedCount = matched?.filter(r => !r.matched).length  ?? 0
 
@@ -324,7 +334,7 @@ export default function AttendanceUploadPage() {
                                 <Loader2 size={14} className="animate-spin" /> Loading sites…
                             </div>
                         ) : (
-                            <select value={siteId} onChange={e => { setSiteId(e.target.value); setMatched(null) }}
+                            <select disabled={busy} value={siteId} onChange={e => { setSiteId(e.target.value); setMatched(null); setUploadError("") }}
                                 style={{ ...inputSt, width: "100%" }}>
                                 <option value="">— Select Site —</option>
                                 {sites.map(s => (
@@ -335,14 +345,14 @@ export default function AttendanceUploadPage() {
                     </div>
                     <div>
                         <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 5 }}>Month *</label>
-                        <select value={month} onChange={e => setMonth(Number(e.target.value))}
+                        <select disabled={busy} value={month} onChange={e => setMonth(Number(e.target.value))}
                             style={{ ...inputSt, width: "100%" }}>
                             {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                         </select>
                     </div>
                     <div>
                         <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 5 }}>Year *</label>
-                        <select value={year} onChange={e => setYear(Number(e.target.value))}
+                        <select disabled={busy} value={year} onChange={e => setYear(Number(e.target.value))}
                             style={{ ...inputSt, width: "100%" }}>
                             {payrollYears().map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
@@ -410,24 +420,27 @@ export default function AttendanceUploadPage() {
                 </div>
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileChange} style={{ display: "none" }} />
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                    <button onClick={() => fileInputRef.current?.click()} style={btnOutline}>
+                    <button disabled={busy} onClick={() => fileInputRef.current?.click()} style={btnOutline}>
                         <FileSpreadsheet size={14} style={{ color: "#16a34a" }} />
                         {file ? file.name : "Choose Excel File"}
                     </button>
                     {file && (
-                        <button onClick={handleValidate} disabled={parsing || !siteId}
+                        <button onClick={handleValidate} disabled={busy || !siteId}
                             style={{ ...btnPrimary, opacity: (!siteId || parsing) ? 0.6 : 1 }}>
                             {parsing ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
                             {parsing ? "Validating…" : "Upload & Validate"}
                         </button>
                     )}
                     {matched && (
-                        <button onClick={() => { setFile(null); setMatched(null); if (fileInputRef.current) fileInputRef.current.value = "" }}
+                        <button disabled={busy} onClick={() => { setFile(null); setMatched(null); setUploadError(""); if (fileInputRef.current) fileInputRef.current.value = "" }}
                             style={btnOutline}>
                             <RefreshCw size={13} /> Clear
                         </button>
                     )}
                 </div>
+                {uploadError && !matched && (
+                    <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">{uploadError}</p>
+                )}
                 {file && (
                     <p style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>
                         {file.name} — {(file.size / 1024).toFixed(1)} KB
@@ -448,9 +461,9 @@ export default function AttendanceUploadPage() {
                     {/* Stats */}
                     <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
                         {[
-                            { label: "Total Rows",  value: matched.length,   color: "#555c72", bg: "var(--surface2)", border: "var(--border)" },
-                            { label: "Matched",     value: matchedCount,     color: "#15803d", bg: "#dcfce7",         border: "#86efac" },
-                            { label: "Not Found",   value: unmatchedCount,   color: "#dc2626", bg: "#fee2e2",         border: "#fca5a5" },
+                            { label: "Employee Rows", value: matched.length,   color: "#555c72", bg: "var(--surface2)", border: "var(--border)" },
+                            { label: "Ready",     value: matchedCount,     color: "#15803d", bg: "#dcfce7",         border: "#86efac" },
+                            { label: "Unmatched",   value: unmatchedCount,   color: "#dc2626", bg: "#fee2e2",         border: "#fca5a5" },
                         ].map(s => (
                             <div key={s.label} style={{ padding: "8px 16px", borderRadius: 8, background: s.bg, border: `1px solid ${s.border}`, display: "flex", alignItems: "center", gap: 8 }}>
                                 <Users size={14} style={{ color: s.color }} />
@@ -462,8 +475,15 @@ export default function AttendanceUploadPage() {
                     {unmatchedCount > 0 && (
                         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde047", marginBottom: 12, fontSize: 12, color: "#a16207" }}>
                             <AlertCircle size={14} style={{ flexShrink: 0 }} />
-                            {unmatchedCount} employee ID(s) not found in the system or not deployed to {selectedSite?.name}. They will be skipped.
+                            {unmatchedCount} employee ID(s) did not match an active employee. These rows will be skipped.
                         </div>
+                    )}
+
+                    {skippedSheetRows.length > 0 && (
+                        <p className="mb-3 text-sm text-[var(--text2)]">
+                            Rows missing an employee ID ({skippedSheetRows.length}) will be skipped.
+                            {" Sheet rows: "}{skippedSheetRows.slice(0, 12).join(", ")}{skippedSheetRows.length > 12 ? ", …" : ""}
+                        </p>
                     )}
 
                     {/* Table */}
@@ -471,19 +491,21 @@ export default function AttendanceUploadPage() {
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                             <thead>
                                 <tr style={{ background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
-                                    {["","Emp ID","Name (File)","Name (DB)","Designation","Days","OT Days","Other Ded.","LWF","Canteen Days","Canteen ₹","Penalty","Advance","Prod. Inc."].map(h => (
-                                        <th key={h} style={{ padding: "8px 10px", textAlign: h === "" ? "center" : "left", fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
+                                    {["Status","Sheet row","Emp ID","Name (File)","Name (DB)","Designation","Days","OT Days","Other Ded.","LWF","Canteen Days","Canteen ₹","Penalty","Advance","Prod. Inc."].map(h => (
+                                        <th key={h} style={{ padding: "8px 10px", textAlign: h === "Status" ? "center" : "left", fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody>
                                 {matched.map((r, i) => (
-                                    <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: r.matched ? (i % 2 === 0 ? "var(--surface)" : "var(--surface2)") : "#fff5f5" }}>
+                                    <tr key={r.rowIndex} style={{ borderBottom: "1px solid var(--border)", background: r.matched ? (i % 2 === 0 ? "var(--surface)" : "var(--surface2)") : "#fff5f5" }}>
                                         <td style={{ padding: "7px 10px", textAlign: "center" }}>
+                                            <span className="sr-only">{r.matched ? "Ready" : "Unmatched"}</span>
                                             {r.matched
                                                 ? <CheckCircle2 size={14} style={{ color: "#16a34a" }} />
                                                 : <XCircle     size={14} style={{ color: "#dc2626" }} />}
                                         </td>
+                                        <td className="px-2.5 py-1.5 tabular-nums">{r.rowIndex}</td>
                                         <td style={{ padding: "7px 10px", fontFamily: "monospace", color: "var(--accent)", fontWeight: 700 }}>{r.rawEmployeeId}</td>
                                         <td style={{ padding: "7px 10px", color: "var(--text2)" }}>{r.rawName || "—"}</td>
                                         <td style={{ padding: "7px 10px", color: r.matched ? "var(--text)" : "#dc2626", fontWeight: r.matched ? 600 : 400, fontStyle: r.matched ? "normal" : "italic" }}>
@@ -524,16 +546,19 @@ export default function AttendanceUploadPage() {
                         </table>
                     </div>
 
+                    {uploadError && (
+                        <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">{uploadError}</p>
+                    )}
                     {/* Process Button */}
                     {matchedCount > 0 && (
                         <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
-                            <button onClick={() => { setFile(null); setMatched(null) }} style={btnOutline}>
+                            <button disabled={busy} onClick={() => { setFile(null); setMatched(null); setUploadError(""); if (fileInputRef.current) fileInputRef.current.value = "" }} style={btnOutline}>
                                 Upload Another Site
                             </button>
                             <button onClick={handleProcess} disabled={processing}
                                 style={{ ...btnPrimary, background: "#16a34a", opacity: processing ? 0.7 : 1, fontSize: 13, padding: "9px 20px" }}>
                                 {processing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                                {processing ? "Processing…" : `Process Payroll — ${matchedCount} Employees at ${selectedSite?.name}`}
+                                {processing ? "Processing…" : `Process Payroll — ${matchedCount} Employees at ${selectedSite?.name} · ${MONTHS[month - 1]} ${year}`}
                             </button>
                         </div>
                     )}
