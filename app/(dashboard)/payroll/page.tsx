@@ -361,14 +361,12 @@ export default function PayrollPage() {
         <div className="p-4 lg:p-0" style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 48 }}>
 
             {/* ── Header: the month picker IS the control for this page ── */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3">
                 <div className="min-w-0">
                     <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.5px" }}>Payroll</h1>
                     <p style={{ fontSize: 13.5, color: "var(--text3)", margin: "4px 0 0 0" }}>Pick a month, then follow the four steps.</p>
                 </div>
-                {/* One line from xl up: the title gives way instead (its subtitle
-                    wraps). Narrower screens may still wrap rather than overflow. */}
-                <div className="page-actions xl:!flex-nowrap xl:shrink-0">
+                <div className="page-actions !justify-start">
                     {/* One month switch, beside the month it applies to: the month is
                         locked and unlocked as a whole, all sites at once. While any row is
                         still open it offers Lock month (which locks every open row); once
