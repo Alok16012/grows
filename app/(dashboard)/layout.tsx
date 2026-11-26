@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import * as Dialog from "@radix-ui/react-dialog"
 import { Sidebar } from "@/components/Sidebar"
 import { TopNav } from "@/components/TopNav"
 import { InspectionStepper } from "@/components/InspectionStepper"
@@ -18,6 +19,21 @@ export default function DashboardLayout({
     children: React.ReactNode
 }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const sidebarTrigger = useRef<HTMLElement | null>(null)
+
+    function openSidebar() {
+        sidebarTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+        setIsSidebarOpen(true)
+    }
+
+    useEffect(() => {
+        const desktop = window.matchMedia("(min-width: 768px)")
+        const closeOnDesktop = (event: MediaQueryListEvent) => {
+            if (event.matches) setIsSidebarOpen(false)
+        }
+        desktop.addEventListener("change", closeOnDesktop)
+        return () => desktop.removeEventListener("change", closeOnDesktop)
+    }, [])
 
     // Desktop: full sidebar or icon-only rail. The choice is remembered; with
     // none saved, narrow screens (tablets, small laptops) start on the rail so
@@ -48,23 +64,26 @@ export default function DashboardLayout({
                 </div>
             </div>
 
-            {/* Sidebar Mobile Overlay */}
-            {isSidebarOpen && (
-                <div
-                    className="fixed inset-0 z-40 bg-black/60 md:hidden animate-in fade-in duration-300"
-                    onClick={() => setIsSidebarOpen(false)}
-                />
-            )}
-
-            <div className={cn(
-                "fixed inset-y-0 left-0 z-50 w-[280px] max-w-[85vw] transform transition-transform duration-300 ease-in-out md:hidden",
-                isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-            )}>
-                <Sidebar onMobileClose={() => setIsSidebarOpen(false)} />
-            </div>
+            <Dialog.Root open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+                <Dialog.Portal>
+                    <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/45 animate-in fade-in md:hidden" />
+                    <Dialog.Content
+                        aria-describedby={undefined}
+                        className="fixed inset-y-0 left-0 z-50 w-[310px] max-w-[90vw] shadow-2xl animate-in slide-in-from-left duration-200 md:hidden"
+                        onCloseAutoFocus={event => {
+                            event.preventDefault()
+                            const trigger = sidebarTrigger.current
+                            if (trigger?.getClientRects().length) trigger.focus()
+                        }}
+                    >
+                        <Dialog.Title className="sr-only">App navigation</Dialog.Title>
+                        <Sidebar onMobileClose={() => setIsSidebarOpen(false)} />
+                    </Dialog.Content>
+                </Dialog.Portal>
+            </Dialog.Root>
 
             <div className="flex flex-col w-full min-w-0">
-                <TopNav onMenuClick={() => setIsSidebarOpen(true)} />
+                <TopNav onMenuClick={openSidebar} />
                 <main className="flex-1 overflow-y-auto flex flex-col">
                     {/* Removed 500ms fade-in/slide animation — was adding
                         perceived 500ms latency to every page navigation. */}
@@ -76,13 +95,13 @@ export default function DashboardLayout({
                     </div>
                     {/* Bottom padding on phones clears the floating bottom nav,
                         so it never sits over the last row of a page. */}
-                    <footer className="py-4 pb-[96px] md:pb-4 text-center text-[13px] text-muted-foreground/80 mt-auto">
+                    <footer className="py-4 pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-4 text-center text-[13px] text-muted-foreground/80 mt-auto">
                         Developed by <a href={COMPANY.developerUrl} target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline font-medium">{COMPANY.developerCredit}</a>
                     </footer>
                 </main>
             </div>
 
-            <MobileBottomNav onMore={() => setIsSidebarOpen(true)} />
+            <MobileBottomNav onMore={openSidebar} />
             {/* Click-to-call panel (startCall) */}
             <CallHost />
             {/* To-do and note alarms ring on any page while the app is open. */}

@@ -25,17 +25,6 @@ import { WorkPanels } from "@/components/dashboard/WorkPanels"
 
 // ─── Small shared pieces (mirrors the admin dashboard) ───────────────────────
 
-function MiniBar({ pct, danger }: { pct: number; danger?: boolean }) {
-    return (
-        <div className="h-[6px] rounded-full bg-[var(--surface2)] overflow-hidden w-full">
-            <div
-                className="h-full rounded-full transition-all"
-                style={{ width: `${Math.min(100, pct)}%`, backgroundColor: danger ? "var(--red)" : "var(--accent)" }}
-            />
-        </div>
-    )
-}
-
 type DonutSlice = { label: string; value: number; color: string }
 
 function Donut({ slices, centerLabel }: { slices: DonutSlice[]; centerLabel: string }) {
@@ -79,7 +68,7 @@ function DonutLegend({ slices }: { slices: DonutSlice[] }) {
                     <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: s.color }} />
                     <span className="text-[var(--text2)] truncate flex-1">{s.label}</span>
                     <span className="font-semibold text-[var(--text)] tabular-nums">{s.value.toLocaleString("en-IN")}</span>
-                    <span className="text-[11px] text-[var(--text3)] tabular-nums w-9 text-right">
+                    <span className="text-xs text-[var(--text2)] tabular-nums w-9 text-right">
                         {sum > 0 ? Math.round((s.value / sum) * 100) : 0}%
                     </span>
                 </div>
@@ -90,7 +79,7 @@ function DonutLegend({ slices }: { slices: DonutSlice[] }) {
 
 // ─── KPI card ────────────────────────────────────────────────────────────────
 
-const kpiCard = "bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] hover:shadow-sm transition-all group block"
+const kpiCard = "group flex min-h-[148px] min-w-0 flex-col rounded-2xl border border-[var(--border2)] bg-[var(--surface)] p-4 shadow-sm transition-colors hover:border-[var(--accent)] lg:p-5"
 
 function KpiCard({ href, icon: Icon, iconBg, iconColor, label, value, sub }: {
     href: string; icon: React.ElementType; iconBg: string; iconColor: string
@@ -98,17 +87,17 @@ function KpiCard({ href, icon: Icon, iconBg, iconColor, label, value, sub }: {
 }) {
     return (
         <Link href={href} className={kpiCard}>
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-[10px] flex items-center justify-center" style={{ background: iconBg }}>
-                        <Icon size={17} style={{ color: iconColor }} />
+            <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: iconBg }}>
+                        <Icon size={17} style={{ color: iconColor }} aria-hidden="true" />
                     </div>
-                    <span className="text-[12.5px] font-medium text-[var(--text2)]">{label}</span>
+                    <span className="text-sm font-medium leading-snug text-[var(--text2)]">{label}</span>
                 </div>
-                <ChevronRight size={15} className="text-[var(--text3)] group-hover:text-[var(--text)] transition-colors" />
+                <ChevronRight size={16} className="shrink-0 text-[var(--text2)] transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </div>
-            <div className="text-[28px] font-semibold text-[var(--text)] leading-none tabular-nums mb-3">{value}</div>
-            {sub ?? <span className="text-[11px] text-[var(--text3)]">&nbsp;</span>}
+            <div className="mb-3 break-words text-[clamp(1.75rem,2.4vw,2.2rem)] font-bold leading-none tracking-tight text-[var(--text)] tabular-nums">{value}</div>
+            {sub && <div className="mt-auto text-xs text-[var(--text2)]">{sub}</div>}
         </Link>
     )
 }
@@ -121,19 +110,19 @@ function PipelineCard({ href, icon: Icon, iconBg, iconColor, title, big, bigSub,
     rows: { label: string; value: string }[]; linkLabel: string
 }) {
     return (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[16px] flex flex-col">
+        <div className="flex min-w-0 flex-col rounded-2xl border border-[var(--border2)] bg-[var(--surface)] p-4 shadow-sm lg:p-5">
             <div className="h-8 w-8 rounded-[9px] flex items-center justify-center mb-3" style={{ background: iconBg }}>
                 <Icon size={15} style={{ color: iconColor }} />
             </div>
-            <p className="text-[12px] font-semibold text-[var(--text)] leading-tight mb-2">{title}</p>
-            <div className="text-[24px] font-semibold text-[var(--text)] leading-none tabular-nums">{big}</div>
-            <p className="text-[10.5px] text-[var(--text3)] mt-0.5 mb-3">{bigSub}</p>
-            <div className="space-y-1.5 text-[11px] text-[var(--text2)] mb-3">
+            <p className="mb-2 text-sm font-semibold leading-snug text-[var(--text)]">{title}</p>
+            <div className="text-[26px] font-bold leading-none text-[var(--text)] tabular-nums">{big}</div>
+            <p className="mb-3 mt-1 text-xs text-[var(--text2)]">{bigSub}</p>
+            <div className="mb-3 space-y-2 text-xs text-[var(--text2)]">
                 {rows.map(r => (
-                    <div key={r.label} className="flex justify-between"><span>{r.label}</span><span className="font-semibold tabular-nums">{r.value}</span></div>
+                    <div key={r.label} className="flex justify-between gap-2"><span>{r.label}</span><span className="font-semibold tabular-nums">{r.value}</span></div>
                 ))}
             </div>
-            <Link href={href} className="text-[11px] font-medium text-[var(--accent-text)] hover:underline mt-auto">{linkLabel} →</Link>
+            <Link href={href} className="mt-auto inline-flex min-h-8 items-center text-sm font-medium text-[var(--accent-text)] hover:underline">{linkLabel} →</Link>
         </div>
     )
 }
@@ -206,10 +195,7 @@ function DesktopDashboard() {
         )
     }
 
-    const hour = new Date().getHours()
-    const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening"
-    const firstName = (session?.user?.name || "there").split(" ")[0]
-    const roleName = (session?.user as any)?.customRoleName || null
+    const roleName = (session.user as { customRoleName?: string | null }).customRoleName
 
     const att = stats.attendanceToday
     const approvals = stats.approvals
@@ -230,13 +216,13 @@ function DesktopDashboard() {
             label="Active Employees" value={(employees.active ?? 0).toLocaleString("en-IN")}
             sub={employees.new30d > 0
                 ? <span className="inline-flex items-center gap-0.5 h-6 px-2 rounded-full bg-[var(--accent-light)] text-[var(--accent-text)] text-[11px] font-semibold"><ArrowUpRight size={12} className="stroke-[3px]" />+{employees.new30d} last 30 days</span>
-                : <span className="text-[11px] text-[var(--text3)]">No new joiners in 30 days</span>}
+                : <span className="text-xs text-[var(--text2)]">No new joiners in 30 days</span>}
         />
     )
     if (att) kpis.push(
         <KpiCard key="att" href="/attendance" icon={CalendarCheck} iconBg="#dcfce7" iconColor="#15803d"
             label="Today's Attendance" value={`${att.pct}%`}
-            sub={<div className="flex items-center gap-4 text-[11px]">
+            sub={<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                 <span className="text-[var(--text3)]">Present <span className="font-semibold text-[var(--accent-text)] tabular-nums">{att.present.toLocaleString("en-IN")}</span></span>
                 <span className="text-[var(--text3)]">Absent <span className="font-semibold text-[var(--red)] tabular-nums">{att.absent.toLocaleString("en-IN")}</span></span>
                 <span className="text-[var(--text3)]">Leave <span className="font-semibold text-[var(--amber)] tabular-nums">{att.onLeave.toLocaleString("en-IN")}</span></span>
@@ -246,7 +232,7 @@ function DesktopDashboard() {
     if (approvals) kpis.push(
         <KpiCard key="apr" href="/approvals" icon={ClipboardCheck} iconBg="#fef3c7" iconColor="#d97706"
             label="Pending Approvals" value={String(approvals.total)}
-            sub={<span className="text-[11px] text-[var(--text3)]">
+            sub={<span className="text-xs text-[var(--text2)]">
                 {[
                     approvals.hasLeaves ? `${approvals.leaves} leaves` : null,
                     approvals.hasExpenses ? `${approvals.expenses} expenses` : null,
@@ -258,7 +244,7 @@ function DesktopDashboard() {
     if (recruitment) kpis.push(
         <KpiCard key="rec" href="/recruitment" icon={Target} iconBg="#f1edff" iconColor="#8b6cf6"
             label="Active Candidates" value={String(recruitment.activeLeads)}
-            sub={<span className="text-[11px] text-[var(--text3)]">+{recruitment.newLeads30d} new · {recruitment.joined30d} joined (30d)</span>}
+            sub={<span className="text-xs text-[var(--text2)]">+{recruitment.newLeads30d} new · {recruitment.joined30d} joined (30d)</span>}
         />
     )
     if (logins) kpis.push(
@@ -266,7 +252,7 @@ function DesktopDashboard() {
             label="Employee Logins" value={`${logins.withLogin}/${logins.totalEmployees}`}
             sub={logins.withoutLogin > 0
                 ? <span className="text-[11px] font-semibold text-[var(--amber)]">{logins.withoutLogin} without login</span>
-                : <span className="text-[11px] text-[var(--text3)]">All employees have logins</span>}
+                : <span className="text-xs text-[var(--text2)]">All employees have logins</span>}
         />
     )
     if (stats.activeAssignments !== undefined) kpis.push(
@@ -333,8 +319,11 @@ function DesktopDashboard() {
     const hasAnyWidget = kpiRow.length > 0 || pipelines.length > 0 || attSlices.length > 0 || projSlices.length > 0
 
     return (
-        <div className="p-4 lg:p-0 space-y-4">
-            {/* The greeting, time and date are in the top bar (components/TopGreeting). */}
+        <div className="space-y-5 p-4 lg:space-y-6 lg:p-0 [container-type:inline-size]">
+            <header className="rounded-2xl bg-[#152647] px-5 py-5 text-white lg:px-6">
+                <h1 className="text-[clamp(1.6rem,2.8vw,2rem)] font-semibold leading-tight tracking-tight">Workspace</h1>
+                {roleName && <p className="mt-1 text-sm text-slate-200">{roleName}</p>}
+            </header>
             <NeedsSiteBanner />
             {/* Issued assets waiting for Received / Not received (blinks). */}
             <AssetReceiptCard />
@@ -342,15 +331,15 @@ function DesktopDashboard() {
             <MyDay />
             {/* The profile's own work first: recruiter, payroll, inspector, HR, approver … */}
             <WorkPanels />
-            {hasAnyWidget && <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text3)] pt-2">Company overview</p>}
+            {hasAnyWidget && <h2 className="pt-1 text-lg font-semibold text-[var(--text)]">Company overview</h2>}
 
             {/* ── KPI ROW ── */}
             {kpiRow.length > 0 && (
                 <div className={cn(
-                    "hidden md:grid gap-[14px]",
-                    kpiRow.length === 1 ? "grid-cols-1 max-w-sm" :
-                        kpiRow.length === 2 ? "grid-cols-2" :
-                            kpiRow.length === 3 ? "grid-cols-3" : "grid-cols-2 lg:grid-cols-4"
+                    "grid grid-cols-1 gap-4",
+                    kpiRow.length === 1 ? "max-w-sm" : "[@container(min-width:420px)]:grid-cols-2",
+                    kpiRow.length === 3 && "[@container(min-width:680px)]:grid-cols-3",
+                    kpiRow.length === 4 && "[@container(min-width:940px)]:grid-cols-4"
                 )}>
                     {kpiRow}
                 </div>
@@ -359,12 +348,13 @@ function DesktopDashboard() {
             {/* ── Visual row: donuts + 7-day trend ── */}
             {(attSlices.length > 0 || projSlices.length > 0) && (
                 <div className={cn(
-                    "grid grid-cols-1 gap-[14px] items-stretch",
-                    att && pbs ? "md:grid-cols-3" : "md:grid-cols-2"
+                    "grid grid-cols-1 items-stretch gap-4",
+                    "[@container(min-width:640px)]:grid-cols-2",
+                    att && pbs && "[@container(min-width:960px)]:grid-cols-3"
                 )}>
                     {att && (
-                        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px]">
-                            <h3 className="text-[13.5px] font-semibold text-[var(--text)] mb-3">
+                        <div className="min-w-0 rounded-2xl border border-[var(--border2)] bg-[var(--surface)] p-4 shadow-sm lg:p-5">
+                            <h3 className="text-base font-semibold text-[var(--text)] mb-3">
                                 Attendance Split <span className="font-normal text-[var(--text3)]">(Today)</span>
                             </h3>
                             {att.present + att.absent + att.onLeave === 0 ? (
@@ -378,8 +368,8 @@ function DesktopDashboard() {
                         </div>
                     )}
                     {pbs && (
-                        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px]">
-                            <h3 className="text-[13.5px] font-semibold text-[var(--text)] mb-3">Projects by Status</h3>
+                        <div className="min-w-0 rounded-2xl border border-[var(--border2)] bg-[var(--surface)] p-4 shadow-sm lg:p-5">
+                            <h3 className="text-base font-semibold text-[var(--text)] mb-3">Projects by Status</h3>
                             {projSlices.every(s => s.value === 0) ? (
                                 <p className="text-[12.5px] text-[var(--text3)] text-center py-8">No projects yet.</p>
                             ) : (
@@ -391,11 +381,11 @@ function DesktopDashboard() {
                         </div>
                     )}
                     {att && (
-                        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-[18px] flex flex-col">
-                            <h3 className="text-[13.5px] font-semibold text-[var(--text)] mb-1">
+                        <div className="min-w-0 rounded-2xl border border-[var(--border2)] bg-[var(--surface)] p-4 shadow-sm lg:p-5 flex flex-col">
+                            <h3 className="text-base font-semibold text-[var(--text)] mb-1">
                                 Attendance <span className="font-normal text-[var(--text3)]">(Last 7 days)</span>
                             </h3>
-                            <p className="text-[11px] text-[var(--text3)] mb-3">Employees checked in per day</p>
+                            <p className="text-xs text-[var(--text2)] mb-3">Employees checked in per day</p>
                             {week7.length === 0 ? (
                                 <p className="text-[12.5px] text-[var(--text3)] text-center py-8">No attendance data yet.</p>
                             ) : (
@@ -424,7 +414,7 @@ function DesktopDashboard() {
                                     </div>
                                     <div className="flex gap-[6px] pl-9 mt-1.5">
                                         {week7.map(d => (
-                                            <span key={d.day} className="flex-1 text-center text-[11px] text-[var(--text3)] font-medium">
+                                            <span key={d.day} className="flex-1 text-center text-xs text-[var(--text2)] font-medium">
                                                 {format(new Date(d.day), "EEE")}
                                             </span>
                                         ))}
@@ -438,36 +428,33 @@ function DesktopDashboard() {
 
             {/* ── Pipelines + Quick Actions ── */}
             {(pipelines.length > 0 || actions.length > 0) && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px] items-stretch">
+                <div className="grid grid-cols-1 items-stretch gap-4 [@container(min-width:920px)]:grid-cols-2">
                     {pipelines.length > 0 && (
                         <div className={cn(
-                            "grid gap-[14px]",
-                            pipelines.length === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2",
-                            actions.length === 0 && "lg:col-span-2 sm:grid-cols-3"
+                            "grid min-w-0 gap-4",
+                            pipelines.length > 1 && "grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))]",
+                            actions.length === 0 && "[@container(min-width:920px)]:col-span-2"
                         )}>
                             {pipelines}
                         </div>
                     )}
                     {actions.length > 0 && (
                         <div className={cn(
-                            "bg-[var(--surface)] border border-[var(--border)] rounded-[14px] overflow-hidden h-full flex flex-col",
-                            pipelines.length === 0 && "lg:col-span-2"
+                            "flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--border2)] bg-[var(--surface)] shadow-sm",
+                            pipelines.length === 0 && "[@container(min-width:920px)]:col-span-2"
                         )}>
                             <div className="px-4 py-3.5 border-b border-[var(--border)]">
-                                <h3 className="text-[14px] font-semibold text-[var(--text)] leading-none">Quick Actions</h3>
+                                <h3 className="text-base font-semibold leading-snug text-[var(--text)]">Quick actions</h3>
                             </div>
-                            <div className={cn(
-                                "p-4 grid auto-rows-fr gap-3 flex-1",
-                                pipelines.length === 0 ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2"
-                            )}>
+                            <div className="grid flex-1 auto-rows-fr grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-3 p-4">
                                 {actions.map(({ href, icon: Icon, label, sub, color, bg }) => (
                                     <Link key={label} href={href} className="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[12px] hover:shadow-sm hover:border-[var(--accent)] transition-all">
                                         <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0" style={{ backgroundColor: bg }}>
                                             <Icon size={16} style={{ color }} />
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="text-[12.5px] font-semibold text-[var(--text)] leading-tight truncate">{label}</p>
-                                            <p className="text-[11px] text-[var(--text3)] mt-0.5 truncate">{sub}</p>
+                                            <p className="text-sm font-semibold leading-snug text-[var(--text)]">{label}</p>
+                                            <p className="mt-0.5 text-xs text-[var(--text2)]">{sub}</p>
                                         </div>
                                     </Link>
                                 ))}

@@ -1,8 +1,6 @@
 "use client"
 
-// The admin "Operations overview" dashboard: gradient KPI tiles, tinted
-// panels, and the tables below them. Pure view — the page fetches
-// /api/admin/stats and hands the payload in, so this can render any snapshot.
+// The operations dashboard renders a snapshot from /api/admin/stats.
 
 import { useState } from "react"
 import Link from "next/link"
@@ -17,39 +15,34 @@ import { cn } from "@/lib/utils"
 import { useCachedFetch } from "@/lib/useCachedFetch"
 import { NeedsSiteBanner } from "@/components/new-joiners/NeedsSiteBanner"
 
-// ─── Palette ─────────────────────────────────────────────────────────────────
-// Each panel gets a soft tint with a matching hairline and icon chip. Local to
-// the dashboard; the rest of the app keeps its tokens.
+type Tone = "blue" | "mint" | "violet" | "amber" | "white"
 
-type Tone = "blue" | "mint" | "rose" | "violet" | "amber" | "white"
-
-const TONES: Record<Tone, { card: string; chip: string; icon: string }> = {
-    blue:   { card: "bg-[linear-gradient(160deg,#f1f6ff_0%,#e8f0ff_100%)] border-[#d5e3ff]", chip: "bg-[#dce8ff]", icon: "text-[#3d6ff5]" },
-    mint:   { card: "bg-[linear-gradient(160deg,#effcf6_0%,#e3f8ee_100%)] border-[#c8eedb]", chip: "bg-[#d3f3e3]", icon: "text-[#3d6ff5]" },
-    rose:   { card: "bg-[linear-gradient(160deg,#fff4f3_0%,#ffe9e7_100%)] border-[#fbd3cf]", chip: "bg-[#ffe0dc]", icon: "text-[#3d6ff5]" },
-    violet: { card: "bg-[linear-gradient(160deg,#f7f3ff_0%,#efe8ff_100%)] border-[#e2d6ff]", chip: "bg-[#e7ddff]", icon: "text-[#3d6ff5]" },
-    amber:  { card: "bg-[linear-gradient(160deg,#fffaf0_0%,#fff3dc_100%)] border-[#fbe2ad]", chip: "bg-[#ffecc4]", icon: "text-[#3d6ff5]" },
-    white:  { card: "bg-white border-[var(--border)]", chip: "bg-[var(--accent-light)]", icon: "text-[var(--accent)]" },
+const CHIP_COLORS: Record<Tone, string> = {
+    blue: "bg-[var(--accent-light)] text-[var(--accent-text)]",
+    mint: "bg-[#e8f7f0] text-[#167052]",
+    violet: "bg-[var(--violet-light)] text-[#6444c5]",
+    amber: "bg-[var(--gold-light)] text-[#925109]",
+    white: "bg-[var(--surface2)] text-[var(--accent-text)]",
 }
 
-function Panel({ tone, className, children }: { tone: Tone; className?: string; children: React.ReactNode }) {
-    return <div className={cn("rounded-[22px] p-5 bg-white shadow-[var(--shadow-card)]", className)} data-tone={tone}>{children}</div>
+function Panel({ className, children }: { className?: string; children: React.ReactNode }) {
+    return <div className={cn("min-w-0 rounded-2xl border border-[var(--border2)] bg-[var(--surface)] p-5 shadow-sm", className)}>{children}</div>
 }
 
 function PanelHead({ tone, icon: Icon, title, hint, sub, action }: {
     tone: Tone; icon: React.ElementType; title: string; hint?: string; sub?: string; action?: React.ReactNode
 }) {
     return (
-        <div className="flex items-start justify-between gap-3 mb-4">
-            <div className="flex items-center gap-3 min-w-0">
-                <div className={cn("h-10 w-10 rounded-[11px] flex items-center justify-center shrink-0", TONES[tone].chip)}>
-                    <Icon size={19} className={TONES[tone].icon} />
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+            <div className="flex min-w-0 flex-1 basis-52 items-center gap-3">
+                <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", CHIP_COLORS[tone])}>
+                    <Icon size={19} aria-hidden="true" />
                 </div>
                 <div className="min-w-0">
-                    <h3 className="text-[15px] font-semibold text-[var(--text)] leading-tight truncate">
+                    <h3 className="text-base font-semibold leading-snug text-[var(--text)]">
                         {title} {hint && <span className="font-normal text-[var(--text2)]">({hint})</span>}
                     </h3>
-                    {sub && <p className="text-[12px] text-[var(--text2)] mt-0.5 truncate">{sub}</p>}
+                    {sub && <p className="mt-1 text-sm text-[var(--text2)]">{sub}</p>}
                 </div>
             </div>
             {action}
@@ -65,31 +58,26 @@ function HeadLink({ href, children }: { href: string; children: React.ReactNode 
     )
 }
 
-// ─── KPI tile (soft theme) ───────────────────────────────────────────────────
-// White rounded card with a tinted icon chip in the tile's own colour (taken
-// from the first colour of `gradient`, kept so callers stay the same).
-
-function KpiTile({ href, gradient, icon: Icon, label, value, children }: {
-    href: string; gradient: string; dark?: boolean; icon: React.ElementType
+function KpiTile({ href, tone, icon: Icon, label, value, children }: {
+    href: string; tone: Tone; icon: React.ElementType
     label: string; value: string; children: React.ReactNode
 }) {
-    const hue = gradient.match(/#[0-9a-f]{6}/i)?.[0] ?? "#3d6ff5"
     return (
-        <div className="relative overflow-hidden rounded-[22px] bg-white p-5 min-h-[148px] flex flex-col group transition-transform hover:-translate-y-0.5 shadow-[var(--shadow-card)] text-[var(--text)]">
+        <div className="group relative flex min-h-[148px] min-w-0 flex-col rounded-2xl border border-[var(--border2)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-sm transition-colors hover:border-[var(--accent)] lg:p-5">
             {/* Whole-tile link underneath; content above ignores the pointer so
                 clicks fall through, except links in `children` (pointer-events-auto).
                 Avoids nesting <a> inside <a>. */}
-            <Link href={href} aria-label={label} className="absolute inset-0 rounded-[22px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" />
-            <div className="relative pointer-events-none flex items-center justify-between mb-3">
+            <Link href={href} aria-label={label + ": " + value} className="absolute inset-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" />
+            <div className="pointer-events-none relative mb-3 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-[12px] flex items-center justify-center shrink-0" style={{ background: `${hue}1a`, color: hue }}>
-                        <Icon size={19} />
+                    <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", CHIP_COLORS[tone])}>
+                        <Icon size={19} aria-hidden="true" />
                     </div>
-                    <span className="text-[14px] font-medium text-[var(--text2)] truncate">{label}</span>
+                    <span className="text-sm font-medium leading-snug text-[var(--text2)]">{label}</span>
                 </div>
-                <ChevronRight size={18} className="text-[var(--text3)] group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight size={18} className="shrink-0 text-[var(--text2)] transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </div>
-            <div className="relative pointer-events-none text-[32px] font-bold leading-none tabular-nums tracking-[-0.02em] mb-3">{value}</div>
+            <div className="pointer-events-none relative mb-3 break-words text-[clamp(1.75rem,2.4vw,2.2rem)] font-bold leading-none tracking-tight tabular-nums">{value}</div>
             <div className="relative pointer-events-none mt-auto text-[12.5px] text-[var(--text2)]">{children}</div>
         </div>
     )
@@ -141,7 +129,7 @@ function DonutLegend({ slices }: { slices: DonutSlice[] }) {
                     <span className="w-3 h-3 rounded-full shrink-0" style={{ background: s.color }} />
                     <span className="text-[var(--text)] truncate flex-1">{s.label}</span>
                     <span className="font-semibold text-[var(--text)] tabular-nums">{s.value.toLocaleString("en-IN")}</span>
-                    <span className="text-[12px] text-[var(--text3)] tabular-nums w-10 text-right">
+                    <span className="text-[12px] text-[var(--text2)] tabular-nums w-10 text-right">
                         {sum > 0 ? Math.round((s.value / sum) * 100) : 0}%
                     </span>
                 </div>
@@ -242,7 +230,7 @@ function RecruitmentPanel() {
     })
 
     return (
-        <Panel tone="mint" className="h-full flex flex-col p-0 overflow-hidden">
+        <Panel className="h-full flex flex-col p-0 overflow-hidden">
             <div className="px-5 pt-5">
                 <PanelHead
                     tone="mint" icon={Users} title="Recruitment overview by HR" sub="Who recruited & onboarded how many"
@@ -273,10 +261,10 @@ function RecruitmentPanel() {
                     <p className="text-[13px] text-[var(--text2)]">No recruitment activity for this period.</p>
                 </div>
             ) : (
-                <div className="overflow-y-auto max-h-[380px] flex-1 px-5 pb-3">
-                    <table className="w-full table-fixed text-[13px]">
-                        <thead className="sticky top-0 z-10 bg-[#e9f9f1]">
-                            <tr className="border-b border-[#c8eedb] text-[12px] text-[var(--text2)]">
+                <div className="max-h-[380px] flex-1 overflow-auto px-5 pb-3">
+                    <table className="w-full min-w-[520px] table-fixed text-sm">
+                        <thead className="sticky top-0 z-10 bg-[var(--surface2)]">
+                            <tr className="border-b border-[var(--border2)] text-[12px] text-[var(--text2)]">
                                 <th className="w-[32%] text-left font-medium py-2.5">Recruiter</th>
                                 {REC_COLS.map(c => <th key={c.key} className="text-center font-medium py-2.5">{c.label}</th>)}
                                 <th className="w-[14%] text-right font-medium py-2.5">Conversion</th>
@@ -284,7 +272,7 @@ function RecruitmentPanel() {
                         </thead>
                         <tbody>
                             {data.rows.map((row: any) => (
-                                <tr key={row.id} className="border-b border-[#d6f2e4] last:border-0">
+                                <tr key={row.id} className="border-b border-[var(--border)] last:border-0">
                                     <td className="py-2.5">
                                         <span className="flex items-center gap-2.5 min-w-0">
                                             <Initials name={row.name || ""} />
@@ -306,7 +294,7 @@ function RecruitmentPanel() {
                             ))}
                         </tbody>
                         <tfoot>
-                            <tr className="border-t-2 border-[#c8eedb] font-semibold text-[var(--text)]">
+                            <tr className="border-t-2 border-[var(--border2)] font-semibold text-[var(--text)]">
                                 <td className="py-2.5">Total</td>
                                 {REC_COLS.map(c => <td key={c.key} className="text-center tabular-nums">{data.totals[c.key] || "—"}</td>)}
                                 <td className="text-right tabular-nums pr-2.5">
@@ -347,7 +335,7 @@ function ExpensePanel() {
     })
 
     return (
-        <Panel tone="white" className="p-0 overflow-hidden">
+        <Panel className="p-0 overflow-hidden">
             <div className="px-5 pt-5">
                 <PanelHead
                     tone="white" icon={CreditCard} title="Employee expense summary" sub={data?.monthLabel}
@@ -506,7 +494,7 @@ export function AdminOverview({ stats }: { stats: any }) {
     ]
 
     return (
-        <div className="p-4 lg:p-0 space-y-5">
+        <div className="space-y-5 p-4 lg:space-y-6 lg:p-0 [container-type:inline-size]">
             <NeedsSiteBanner />
             {stats.failedQueries > 0 && (
                 <div role="alert" className="rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
@@ -514,34 +502,34 @@ export function AdminOverview({ stats }: { stats: any }) {
                 </div>
             )}
             {/* ── Header ── */}
-            <div className="hidden md:flex flex-wrap items-end justify-between gap-4">
+            <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#152647] px-5 py-5 text-white lg:px-6">
                 <div>
-                    <h1 className="text-[32px] font-bold text-[var(--text)] tracking-[-0.03em] leading-tight">Operations overview</h1>
-                    <p className="text-[16px] text-[var(--text2)] mt-1">Your workforce and inspections, at a glance.</p>
+                    <h1 className="text-[clamp(1.6rem,2.8vw,2rem)] font-semibold leading-tight tracking-tight">Operations overview</h1>
+                    <p className="mt-1 text-sm text-slate-200">Workforce, attendance and inspections</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-2 text-[14.5px] text-[var(--text)] px-2">
-                        <CalendarDays size={19} className="text-[var(--text2)]" />
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <time className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/20 px-3 text-sm text-slate-100" dateTime={format(new Date(), "yyyy-MM-dd")}>
+                        <CalendarDays size={16} aria-hidden="true" />
                         {format(new Date(), "d MMM yyyy")}
-                    </span>
+                    </time>
                     <div className="relative">
                         <select
                             value={range} onChange={e => setRange(Number(e.target.value) as typeof range)} aria-label="Date range"
-                            className="appearance-none h-12 pl-4 pr-10 rounded-[12px] border border-[var(--border2)] bg-white text-[14.5px] text-[var(--text)] outline-none focus:ring-2 focus:ring-[#3d6ff5]/25 cursor-pointer"
+                            className="h-10 cursor-pointer appearance-none rounded-lg border border-white/20 bg-[#233759] pl-3 pr-9 text-sm text-white focus-visible:ring-2 focus-visible:ring-white"
                         >
                             {RANGES.map(r => <option key={r} value={r}>Last {r} days</option>)}
                         </select>
-                        <ChevronDown size={17} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text2)]" />
+                        <ChevronDown size={17} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-200" />
                     </div>
-                    <Link href="/reports" className="h-12 inline-flex items-center gap-2.5 px-5 rounded-[12px] text-white text-[14.5px] font-semibold bg-[var(--accent)] shadow-[0_8px_20px_-8px_rgba(61,111,245,0.6)] hover:bg-[var(--accent-hover)] transition">
+                    <Link href="/reports" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-3.5 text-sm font-semibold text-[#152647] transition-colors hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#152647]">
                         <BarChart3 size={19} /> View reports
                     </Link>
                 </div>
-            </div>
+            </header>
 
             {/* ── KPI tiles ── */}
-            <div className="hidden md:grid grid-cols-2 xl:grid-cols-4 gap-4">
-                <KpiTile href="/employees" gradient="linear-gradient(135deg,#3d6ff5 0%,#2f5be0 100%)" icon={Users} label="Active employees"
+            <div className="grid grid-cols-1 gap-4 [@container(min-width:420px)]:grid-cols-2 [@container(min-width:940px)]:grid-cols-4">
+                <KpiTile href="/employees" tone="blue" icon={Users} label="Active employees"
                     value={(stats.activeEmployees ?? 0).toLocaleString("en-IN")}>
                     {(stats.newEmployees30d ?? 0) > 0 ? (
                         <span className="inline-flex items-center gap-1 font-semibold text-[#15803d]">
@@ -550,7 +538,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                     ) : <span className="text-[var(--text2)]">No new joiners in 30 days</span>}
                 </KpiTile>
 
-                <KpiTile href="/attendance" gradient="linear-gradient(135deg,#0f766e 0%,#0b4d4a 100%)" icon={CalendarCheck} label="Today's attendance"
+                <KpiTile href="/attendance" tone="mint" icon={CalendarCheck} label="Today's attendance"
                     value={attPctLabel}>
                     <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[var(--text2)]">
                         <span>Present <b className="font-semibold text-[var(--accent)] tabular-nums">{att.present.toLocaleString("en-IN")}</b></span>
@@ -563,7 +551,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                     </span>
                 </KpiTile>
 
-                <KpiTile href="/approvals" dark gradient="linear-gradient(135deg,#ffd84d 0%,#f7a823 100%)" icon={ClipboardCheck} label="Pending approvals"
+                <KpiTile href="/approvals" tone="amber" icon={ClipboardCheck} label="Pending approvals"
                     value={String(approvals.total)}>
                     <span className="font-medium flex flex-wrap items-center gap-x-1.5">
                         {approvalBits.map((b, i) => (
@@ -577,7 +565,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                     </span>
                 </KpiTile>
 
-                <KpiTile href="/approvals?date=today" gradient="linear-gradient(135deg,#8b6cf6 0%,#6d4fe0 100%)" icon={FileCheck} label="Inspections today"
+                <KpiTile href="/approvals?date=today" tone="violet" icon={FileCheck} label="Inspections today"
                     value={String(inspToday)}>
                     {inspDelta === null ? (
                         <span className="text-[var(--text2)] tabular-nums">{inspToday.toLocaleString("en-IN")} today · {inspYesterday.toLocaleString("en-IN")} yesterday</span>
@@ -611,8 +599,8 @@ export function AdminOverview({ stats }: { stats: any }) {
             )}
 
             {/* ── Inspection completion · Attendance breakdown ── */}
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.07fr)_minmax(0,1fr)] gap-4 items-stretch">
-                <Panel tone="blue">
+            <div className="grid grid-cols-1 [@container(min-width:940px)]:grid-cols-[minmax(0,1.07fr)_minmax(0,1fr)] gap-4 items-stretch">
+                <Panel>
                     <PanelHead tone="blue" icon={BarChart3} title="Inspection completion" hint={`Last ${range} days`}
                         action={<HeadLink href="/reports">View report</HeadLink>} />
                     <div className="flex items-baseline flex-wrap gap-x-4 gap-y-2 mb-5">
@@ -658,11 +646,11 @@ export function AdminOverview({ stats }: { stats: any }) {
                     )}
                 </Panel>
 
-                <Panel tone="mint" className="flex flex-col">
+                <Panel className="flex flex-col">
                     <PanelHead tone="mint" icon={Users} title="Today's attendance breakdown"
                         action={<HeadLink href="/attendance">View all sites</HeadLink>} />
                     <div className="flex items-center gap-4 mb-5 mt-1">
-                        <Meter pct={attPct ?? 0} className="flex-1 bg-white/80" />
+                        <Meter pct={attPct ?? 0} className="flex-1" />
                         <span className="text-[18px] font-bold text-[var(--text)] tabular-nums">{attPctLabel}</span>
                     </div>
                     {topSites.length === 0 ? (
@@ -673,7 +661,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                     ) : (
                         <div className="text-[13px]">
                             {/* Per site: present ÷ (deployed − on leave); "—" when nobody is expected there. */}
-                            <div className="grid grid-cols-[1.5fr_0.65fr_0.65fr_0.8fr_1.4fr] gap-2 text-[12.5px] text-[var(--text2)] pb-2.5 border-b border-[#c8eedb]">
+                            <div className="grid grid-cols-[1.5fr_0.65fr_0.65fr_0.8fr_1.4fr] gap-2 text-[12.5px] text-[var(--text2)] pb-2.5 border-b border-[var(--border2)]">
                                 <span>Site</span>
                                 <span className="text-center">Present</span>
                                 <span className="text-center">Absent</span>
@@ -681,13 +669,13 @@ export function AdminOverview({ stats }: { stats: any }) {
                                 <span className="text-right">Attendance</span>
                             </div>
                             {topSites.map(s => (
-                                <div key={s.siteId ?? s.name} className="grid grid-cols-[1.5fr_0.65fr_0.65fr_0.8fr_1.4fr] gap-2 items-center py-3 border-b border-[#d6f2e4] last:border-0">
+                                <div key={s.siteId ?? s.name} className="grid grid-cols-[1.5fr_0.65fr_0.65fr_0.8fr_1.4fr] gap-2 items-center py-3 border-b border-[var(--border)] last:border-0">
                                     <span title={`${s.name} · ${s.expected} expected`} className="font-semibold text-[var(--text)] truncate">{s.name}</span>
                                     <span className="text-center font-semibold text-[#3d6ff5] tabular-nums">{s.present}</span>
                                     <span className={cn("text-center tabular-nums", s.absent > 0 ? "font-semibold text-[#dc2626]" : "text-[var(--text2)]")}>{s.absent}</span>
                                     <span className={cn("text-center tabular-nums", (s.notMarked ?? 0) > 0 ? "font-semibold text-[#b45309]" : "text-[var(--text2)]")}>{s.notMarked ?? 0}</span>
                                     <span className="flex items-center gap-3 justify-end">
-                                        <Meter pct={s.pct ?? 0} className="w-[72px] bg-white/80" />
+                                        <Meter pct={s.pct ?? 0} className="w-12 shrink lg:w-[72px]" />
                                         <span className="font-medium text-[var(--text)] tabular-nums w-10 text-right">{fmtAttPct(s.pct, s.present)}</span>
                                     </span>
                                 </div>
@@ -699,8 +687,8 @@ export function AdminOverview({ stats }: { stats: any }) {
 
             {/* ── Projects donut · weekly trend ── */}
             {/* The "Attendance split" donut was dropped: it repeated the KPI tile. */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-                <Panel tone="violet">
+            <div className="grid grid-cols-1 [@container(min-width:640px)]:grid-cols-2 gap-4 items-stretch">
+                <Panel>
                     <PanelHead tone="violet" icon={Box} title="Projects by status" />
                     {projSlices.every(s => s.value === 0) ? (
                         <p className="text-[13px] text-[var(--text2)] text-center py-10">No projects yet.</p>
@@ -712,7 +700,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                     )}
                 </Panel>
 
-                <Panel tone="blue" className="flex flex-col">
+                <Panel className="flex flex-col">
                     <PanelHead tone="blue" icon={BarChart3} title="Attendance" hint="Last 7 days" sub="Employees checked in per day" />
                     {week7.length === 0 ? (
                         <p className="text-[13px] text-[var(--text2)] text-center py-10">No attendance data yet.</p>
@@ -735,12 +723,12 @@ export function AdminOverview({ stats }: { stats: any }) {
             </div>
 
             {/* ── Recruitment · Alerts ── */}
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-4 items-stretch">
+            <div className="grid grid-cols-1 [@container(min-width:990px)]:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-4 items-stretch">
                 <RecruitmentPanel />
 
-                <Panel tone="amber" className="flex flex-col">
+                <Panel className="flex flex-col">
                     {/* No "View all": alerts span attendance, inspections and approvals; each row links to its own page. */}
-                    <PanelHead tone="amber" icon={Bell} title="Alerts & important" />
+                    <PanelHead tone="amber" icon={Bell} title="Needs attention" />
                     {alertItems.length === 0 ? (
                         <div className="flex-1 flex flex-col items-center justify-center py-8 text-center">
                             <CheckCircle2 size={28} className="text-[#16a34a] mb-2" />
@@ -766,7 +754,7 @@ export function AdminOverview({ stats }: { stats: any }) {
             </div>
 
             {/* ── Pipelines ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 [@container(min-width:660px)]:grid-cols-3 gap-4">
                 {[
                     { href: "/onboarding", icon: UserPlus, tone: "blue" as Tone, title: "Onboarding pipeline", big: String(onboarding.inProgress), bigSub: "In progress", link: "View pipeline",
                       rows: [["Yet to start", onboarding.notStarted], ["On hold", onboarding.onHold]] },
@@ -775,7 +763,7 @@ export function AdminOverview({ stats }: { stats: any }) {
                     { href: "/payroll", icon: Wallet, tone: "violet" as Tone, title: "Payroll status", big: `${payroll.pct}%`, bigSub: `Processed · ${format(new Date(), "MMM yyyy")}`, link: "View payroll",
                       rows: [["Processed", payroll.processed], ["Pending", payroll.pending]] },
                 ].map(p => (
-                    <Panel key={p.title} tone={p.tone} className="flex flex-col">
+                    <Panel key={p.title} className="flex flex-col">
                         <PanelHead tone={p.tone} icon={p.icon} title={p.title} />
                         <div className="text-[30px] font-bold text-[var(--text)] leading-none tabular-nums">{p.big}</div>
                         <p className="text-[12px] text-[var(--text2)] mt-1 mb-3">{p.bigSub}</p>
@@ -794,8 +782,8 @@ export function AdminOverview({ stats }: { stats: any }) {
             </div>
 
             {/* ── Recent submissions · Quick actions ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-                <Panel tone="white" className="p-0 overflow-hidden flex flex-col">
+            <div className="grid grid-cols-1 [@container(min-width:860px)]:grid-cols-2 gap-4 items-stretch">
+                <Panel className="p-0 overflow-hidden flex flex-col">
                     <div className="px-5 pt-5">
                         <PanelHead tone="white" icon={FileCheck} title="Recent submissions" action={<HeadLink href="/approvals">View all</HeadLink>} />
                     </div>
@@ -831,17 +819,17 @@ export function AdminOverview({ stats }: { stats: any }) {
                     )}
                 </Panel>
 
-                <Panel tone="white" className="flex flex-col">
+                <Panel className="flex flex-col">
                     <PanelHead tone="white" icon={ClipboardList} title="Quick actions" />
-                    <div className="grid grid-cols-2 auto-rows-fr gap-3 flex-1">
+                    <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] auto-rows-fr gap-3">
                         {QUICK_ACTIONS.map(({ href, icon: Icon, label, sub, color, bg }) => (
                             <Link key={label} href={href} className="flex items-center gap-3 p-3 rounded-[12px] bg-[var(--surface2)] hover:bg-white hover:shadow-[0_4px_14px_rgba(15,23,41,0.08)] transition-all">
                                 <div className="w-10 h-10 rounded-[11px] flex items-center justify-center shrink-0" style={{ backgroundColor: bg }}>
                                     <Icon size={18} style={{ color }} />
                                 </div>
                                 <div className="min-w-0">
-                                    <p className="text-[13px] font-semibold text-[var(--text)] leading-tight truncate">{label}</p>
-                                    <p className="text-[11.5px] text-[var(--text2)] mt-0.5 truncate">{sub}</p>
+                                    <p className="text-sm font-semibold leading-snug text-[var(--text)]">{label}</p>
+                                    <p className="mt-0.5 text-xs text-[var(--text2)]">{sub}</p>
                                 </div>
                             </Link>
                         ))}

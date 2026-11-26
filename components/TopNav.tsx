@@ -199,7 +199,7 @@ export function TopNav({ onMenuClick }: { onMenuClick: () => void }) {
                 </Link>
                 {/* Kept for pages without the bottom bar (e.g. the inspection
                     form), so the menu is never out of reach on a phone. */}
-                <button onClick={onMenuClick} aria-label="Open menu" className={cn("items-center justify-center rounded-[10px] w-9 h-9 text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors", noBottomBar ? "inline-flex md:hidden" : "hidden")}>
+                <button onClick={onMenuClick} aria-label="Open menu" aria-haspopup="dialog" className={cn("items-center justify-center rounded-[10px] w-9 h-9 text-[var(--text2)] hover:bg-[var(--surface2)] transition-colors", noBottomBar ? "inline-flex md:hidden" : "hidden")}>
                     <Menu size={20} />
                 </button>
                 <TopGreeting />

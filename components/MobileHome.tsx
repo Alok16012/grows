@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { AssetReceiptCard } from "@/components/assets/AssetReceiptCard"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
@@ -8,7 +8,7 @@ import { format } from "date-fns"
 import {
     ArrowRight, ChevronRight, CalendarCheck, Wallet, ClipboardCheck, HardHat,
     UserCheck, Clock, Target, BarChart2, CalendarOff, CreditCard, Headphones, UserPlus,
-    LogOut, KeyRound, MapPin, ClipboardList, CheckCircle2, User, Sparkles, ListChecks,
+    LogOut, KeyRound, MapPin, ClipboardList, CheckCircle2, User, ListChecks,
     IndianRupee, Eye, EyeOff, PartyPopper, Megaphone, CalendarHeart, AlertTriangle, type LucideIcon,
 } from "lucide-react"
 import { useCachedFetch } from "@/lib/useCachedFetch"
@@ -77,7 +77,7 @@ const INSPECTOR_TILE: Tile = { label: "Inspections", href: "/inspection", icon: 
 const HELP_TILE: Tile = { label: "Help", href: "/helpdesk", icon: Headphones, color: "#5b6478", tint: "#f0f2f8" }
 const PROFILE_TILE: Tile = { label: "My profile", href: "/profile", icon: User, color: "#3d6ff5", tint: "#eaf0ff" }
 
-type Slide = { pill: string; title: string; highlight: string; sub: string; cta: string; href: string; icon: LucideIcon }
+type FocusCard = { title: string; highlight: string; sub: string; cta: string; href: string; icon: LucideIcon }
 
 const fmt = (n: number) => n.toLocaleString("en-IN")
 const time = (s: string | null) => s ? new Date(s).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) : ""
@@ -87,10 +87,8 @@ const card: React.CSSProperties = { background: "var(--surface)", borderRadius: 
 export function MobileHome() {
     const { data: session } = useSession()
     const { data: stats, loading } = useCachedFetch<Stats>("/api/dashboard/stats")
-    const { data: meData } = useCachedFetch<Me>("/api/me/home")
-    const [slide, setSlide] = useState(0)
+    const { data: meData, loading: loadingMe } = useCachedFetch<Me>("/api/me/home")
     const [showPay, setShowPay] = useState(false)
-    const railRef = useRef<HTMLDivElement>(null)
 
     const role = String((session?.user as any)?.role ?? "")
     const perms: string[] = (session?.user as any)?.permissions ?? []
@@ -100,30 +98,45 @@ export function MobileHome() {
 
     const me: Me | null = meData && !meData.error ? meData : null
     const emp = me?.employee ?? null
-    const firstName = emp?.firstName || (session?.user?.name || "there").split(" ")[0]
+    const firstName = emp?.firstName || session?.user?.name?.trim().split(/\s+/)[0]
     const hour = new Date().getHours()
     const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
     const s: Stats = stats && !stats.error ? stats : {}
 
-    // ── Company hero slides (people without their own employee record, e.g. Admin) ──
-    const slides: Slide[] = []
-    if (isInspector) slides.push({ pill: "Today", title: "Your inspections", highlight: `${s.activeAssignments ?? 0} active`, sub: "Open your assignments and start the next part", cta: "My Assignments", href: "/inspection", icon: HardHat })
+    // Put the first available action in view. Company metrics stay available below.
+    const focusCards: FocusCard[] = []
+    if (isInspector) focusCards.push({
+        title: "Your inspections",
+        highlight: typeof s.activeAssignments === "number" ? fmt(s.activeAssignments) + " active" : "My assignments",
+        sub: "Review scheduled work and continue an inspection.",
+        cta: "Open assignments", href: "/inspection", icon: HardHat,
+    })
+    if (s.approvals && s.approvals.total > 0) focusCards.push({
+        title: "Approvals",
+        highlight: fmt(s.approvals.total) + " pending",
+        sub: [
+            s.approvals.hasLeaves ? s.approvals.leaves + " leaves" : null,
+            s.approvals.hasExpenses ? s.approvals.expenses + " expenses" : null,
+            s.approvals.hasInspections ? s.approvals.inspections + " inspections" : null,
+        ].filter(Boolean).join(" · ") || "Requests are ready for review.",
+        cta: "Review approvals", href: "/approvals", icon: ClipboardCheck,
+    })
     if (s.attendanceToday) {
         const a = s.attendanceToday
-        slides.push({
-            pill: format(new Date(), "EEE, d MMM"), title: "Today's attendance",
-            highlight: a.pct > 0 || !a.expected ? `${a.pct}% present` : `${fmt(a.present)} of ${fmt(a.expected)} in`,
-            sub: `Present ${fmt(a.present)} · Absent ${fmt(a.absent)} · Leave ${fmt(a.onLeave)}`, cta: "View Attendance", href: "/attendance", icon: CalendarCheck,
+        focusCards.push({
+            title: "Today's attendance",
+            highlight: fmt(a.present) + " present",
+            sub: fmt(a.absent) + " absent · " + fmt(a.onLeave) + " on leave",
+            cta: "View attendance", href: "/attendance", icon: CalendarCheck,
         })
     }
-    if (s.approvals && s.approvals.total > 0) slides.push({
-        pill: "Action needed", title: "Approvals waiting", highlight: `${fmt(s.approvals.total)} pending`,
-        sub: [s.approvals.hasLeaves ? `${s.approvals.leaves} leaves` : null, s.approvals.hasExpenses ? `${s.approvals.expenses} expenses` : null, s.approvals.hasInspections ? `${s.approvals.inspections} inspections` : null].filter(Boolean).join(" · ") || "Review and approve",
-        cta: "Review Now", href: "/approvals", icon: ClipboardCheck,
+    if (s.payroll) focusCards.push({
+        title: "Payroll",
+        highlight: s.payroll.pct + "% processed",
+        sub: fmt(s.payroll.pending) + " pending this month",
+        cta: "Open payroll", href: "/payroll", icon: Wallet,
     })
-    if (s.payroll) slides.push({ pill: format(new Date(), "MMMM yyyy"), title: "Payroll", highlight: `${s.payroll.pct}% processed`, sub: `Processed ${fmt(s.payroll.processed)} · Pending ${fmt(s.payroll.pending)}`, cta: "Open Payroll", href: "/payroll", icon: Wallet })
-    if (slides.length === 0) slides.push({ pill: format(new Date(), "EEE, d MMM"), title: "Welcome back", highlight: firstName, sub: "Everything you need is one tap away", cta: "My Profile", href: "/profile", icon: Sparkles })
-    const heroSlides = slides.slice(0, 3)
+    const primary = focusCards[0]
 
     // ── Tiles: own things first, then the staff screens this role may open (max 8) ──
     const tiles: Tile[] = []
@@ -138,6 +151,7 @@ export function MobileHome() {
     if (s.employees) today.push({ label: "Active employees", value: fmt(s.employees.active ?? 0), sub: s.employees.new30d > 0 ? `+${s.employees.new30d} in 30 days` : undefined, href: "/employees", icon: UserCheck, color: "#3d6ff5", tint: "#eaf0ff" })
     if (s.attendanceToday) today.push({ label: "Present today", value: fmt(s.attendanceToday.present), sub: s.attendanceToday.expected ? `of ${fmt(s.attendanceToday.expected)} expected` : `${s.attendanceToday.pct}% attendance`, href: "/attendance", icon: CalendarCheck, color: "#15803d", tint: "#dcfce7" })
     if (s.approvals) today.push({ label: "Pending approvals", value: fmt(s.approvals.total), href: "/approvals", icon: ClipboardCheck, color: "#dd8f0d", tint: "#fff6e4" })
+    if (s.payroll) today.push({ label: "Payroll processed", value: s.payroll.pct + "%", sub: fmt(s.payroll.pending) + " pending", href: "/payroll", icon: Wallet, color: "#2f5be0", tint: "#eaf0ff" })
     if (s.recruitment) today.push({ label: "Active candidates", value: fmt(s.recruitment.activeLeads), sub: `${s.recruitment.joined30d} joined in 30 days`, href: "/recruitment", icon: Target, color: "#6d4fe0", tint: "#f1edff" })
     if (s.activeAssignments !== undefined) today.push({ label: "Active assignments", value: fmt(s.activeAssignments), href: isInspector ? "/inspection" : "/assignments", icon: ClipboardList, color: "#0d9488", tint: "#e6fffa" })
     if (s.activeSites !== undefined) today.push({ label: "Active sites", value: fmt(s.activeSites), href: "/sites", icon: MapPin, color: "#0891b2", tint: "#ecfeff" })
@@ -145,73 +159,65 @@ export function MobileHome() {
 
     // ── Needs attention: own tasks first, then the queues this role owns ──
     type Tone = "warn" | "info" | "danger"
-    const attention: { title: string; sub: string; value: string; status: string; tone: Tone; href: string; cta: string; icon: LucideIcon; color: string; tint: string }[] = []
+    const attention: { title: string; sub: string; value: string; tone: Tone; href: string; icon: LucideIcon; color: string; tint: string }[] = []
     const t = me?.tasks
-    if (t && t.myOverdue > 0) attention.push({ title: "Overdue tasks", sub: `${t.myOpen} open in total`, value: `${fmt(t.myOverdue)} overdue`, status: "Overdue", tone: "danger", href: "/tasks", cta: "Open", icon: AlertTriangle, color: "#dc2626", tint: "#fef2f2" })
-    else if (t && t.myOpen > 0) attention.push({ title: "My tasks", sub: "Given to you", value: `${fmt(t.myOpen)} open`, status: "Open", tone: "info", href: "/tasks", cta: "Open", icon: ListChecks, color: "#3d6ff5", tint: "#eaf0ff" })
-    if (t && t.awaitingMine > 0) attention.push({ title: "Tasks to approve", sub: "Marked done, waiting for you", value: `${fmt(t.awaitingMine)} waiting`, status: "Approve", tone: "warn", href: "/tasks?view=byme", cta: "Review", icon: CheckCircle2, color: "#dd8f0d", tint: "#fff6e4" })
-    if (s.approvals && s.approvals.total > 0) attention.push({ title: "Approvals", sub: "Leaves, expenses and inspections", value: `${fmt(s.approvals.total)} waiting`, status: "Pending", tone: "warn", href: "/approvals", cta: "Review", icon: ClipboardCheck, color: "#dd8f0d", tint: "#fff6e4" })
-    if (s.onboarding && s.onboarding.inProgress > 0) attention.push({ title: "Onboarding", sub: `${s.onboarding.notStarted} yet to start · ${s.onboarding.onHold} on hold`, value: `${fmt(s.onboarding.inProgress)} in progress`, status: "In Progress", tone: "info", href: "/onboarding", cta: "View", icon: UserPlus, color: "#3d6ff5", tint: "#eaf0ff" })
-    if (s.payroll && s.payroll.pending > 0) attention.push({ title: `Payroll · ${format(new Date(), "MMM yyyy")}`, sub: `${fmt(s.payroll.processed)} processed`, value: `${fmt(s.payroll.pending)} pending`, status: "Pending", tone: "warn", href: "/payroll", cta: "Continue", icon: Wallet, color: "#6d4fe0", tint: "#f1edff" })
-    if (s.exits && s.exits.pending > 0) attention.push({ title: "Exits", sub: `${s.exits.clearancePending} clearances pending`, value: `${fmt(s.exits.pending)} open`, status: "Open", tone: "danger", href: "/exit", cta: "View", icon: LogOut, color: "#dc2626", tint: "#fef2f2" })
-    if (s.logins && s.logins.withoutLogin > 0) attention.push({ title: "Employee logins", sub: `${fmt(s.logins.withLogin)} of ${fmt(s.logins.totalEmployees)} set up`, value: `${fmt(s.logins.withoutLogin)} without login`, status: "Action", tone: "info", href: "/admin/employee-logins", cta: "Manage", icon: KeyRound, color: "#3d6ff5", tint: "#eaf0ff" })
+    if (t && t.myOverdue > 0) attention.push({ title: "Overdue tasks", sub: `${t.myOpen} open in total`, value: `${fmt(t.myOverdue)} overdue`, tone: "danger", href: "/tasks", icon: AlertTriangle, color: "#dc2626", tint: "#fef2f2" })
+    else if (t && t.myOpen > 0) attention.push({ title: "My tasks", sub: "Given to you", value: `${fmt(t.myOpen)} open`, tone: "info", href: "/tasks", icon: ListChecks, color: "#3d6ff5", tint: "#eaf0ff" })
+    if (t && t.awaitingMine > 0) attention.push({ title: "Tasks to approve", sub: "Marked done, waiting for you", value: `${fmt(t.awaitingMine)} waiting`, tone: "warn", href: "/tasks?view=byme", icon: CheckCircle2, color: "#dd8f0d", tint: "#fff6e4" })
+    if (s.approvals && s.approvals.total > 0) attention.push({ title: "Approvals", sub: "Leaves, expenses and inspections", value: `${fmt(s.approvals.total)} waiting`, tone: "warn", href: "/approvals", icon: ClipboardCheck, color: "#dd8f0d", tint: "#fff6e4" })
+    if (s.onboarding && s.onboarding.inProgress > 0) attention.push({ title: "Onboarding", sub: `${s.onboarding.notStarted} yet to start · ${s.onboarding.onHold} on hold`, value: `${fmt(s.onboarding.inProgress)} in progress`, tone: "info", href: "/onboarding", icon: UserPlus, color: "#3d6ff5", tint: "#eaf0ff" })
+    if (s.payroll && s.payroll.pending > 0) attention.push({ title: `Payroll · ${format(new Date(), "MMM yyyy")}`, sub: `${fmt(s.payroll.processed)} processed`, value: `${fmt(s.payroll.pending)} pending`, tone: "warn", href: "/payroll", icon: Wallet, color: "#6d4fe0", tint: "#f1edff" })
+    if (s.exits && s.exits.pending > 0) attention.push({ title: "Exits", sub: `${s.exits.clearancePending} clearances pending`, value: `${fmt(s.exits.pending)} open`, tone: "danger", href: "/exit", icon: LogOut, color: "#dc2626", tint: "#fef2f2" })
+    if (s.logins && s.logins.withoutLogin > 0) attention.push({ title: "Employee logins", sub: `${fmt(s.logins.withLogin)} of ${fmt(s.logins.totalEmployees)} set up`, value: `${fmt(s.logins.withoutLogin)} without login`, tone: "info", href: "/admin/employee-logins", icon: KeyRound, color: "#3d6ff5", tint: "#eaf0ff" })
 
-    const onRailScroll = () => { const el = railRef.current; if (el) setSlide(Math.round(el.scrollLeft / el.clientWidth)) }
     const hasCompany = today.length > 0
+    const loadingHome = (loading && !stats) || (loadingMe && !meData)
 
     return (
-        <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 20, padding: "4px 16px 8px" }}>
-            {/* Greeting + who I am */}
-            <div>
-                <p style={{ margin: 0, fontSize: 13, color: "var(--text2)" }}>{greeting},</p>
-                <p style={{ margin: "1px 0 0", fontSize: 22, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>{firstName} 👋</p>
-                {emp && (emp.designation || emp.site || emp.code) && <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--text3)" }}>{[emp.designation, emp.site, emp.code].filter(Boolean).join(" · ")}</p>}
-            </div>
+        <div className="flex min-w-0 flex-col gap-6 px-4 pb-6 pt-5 sm:px-6">
+            <header className="min-w-0">
+                <p className="text-sm font-medium text-[var(--text2)]">{format(new Date(), "EEEE, d MMMM")}</p>
+                <h1 className="mt-1 break-words text-[clamp(1.45rem,6vw,1.95rem)] font-bold leading-tight text-[var(--text)]">
+                    {greeting}{firstName ? ", " + firstName : ""}
+                </h1>
+                {emp && (emp.designation || emp.site || emp.code) && (
+                    <p className="mt-1 break-words text-sm text-[var(--text2)]">
+                        {[emp.designation, emp.site, emp.code].filter(Boolean).join(" · ")}
+                    </p>
+                )}
+            </header>
 
             {/* Issued assets waiting for Received / Not received (blinks). */}
             <AssetReceiptCard />
 
-            {/* My day — attendance today, the first thing an employee checks. */}
-            {emp ? <MyDayCard me={me!} /> : (
-                <div>
-                    <div ref={railRef} onScroll={onRailScroll} className="no-scrollbar" style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", borderRadius: 22, scrollbarWidth: "none" }}>
-                        {(loading && !stats ? [null] : heroSlides).map((h, i) => (
-                            <div key={i} style={{ flex: "0 0 100%", scrollSnapAlign: "start" }}>
-                                {h ? <HeroCard {...h} /> : <div style={{ height: 196, borderRadius: 22, background: "var(--accent-light)" }} className="skeleton-pulse" />}
-                            </div>
+            {emp && me ? <MyDayCard me={me} /> : loadingHome ? (
+                <div className="h-40 animate-pulse rounded-2xl bg-[var(--accent-light)]" role="status">
+                    <span className="sr-only">Loading your dashboard</span>
+                </div>
+            ) : primary && <PrimaryCard {...primary} />}
+
+            {tiles.length > 0 && (
+                <section aria-labelledby="mobile-quick-links">
+                    <SectionHead id="mobile-quick-links" title="Quick links" />
+                    <div className="grid grid-cols-4 gap-x-1.5 gap-y-2 rounded-2xl border bg-[var(--surface)] p-2 shadow-sm sm:gap-x-3 sm:p-3">
+                        {tiles.map(({ href, label, icon: Icon, color, tint }) => (
+                            <Link key={href} href={href} className="flex min-w-0 flex-col items-center gap-2 rounded-xl px-0.5 py-2.5 text-center transition-colors hover:bg-[var(--surface2)]">
+                                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl" style={{ background: tint }}>
+                                    <Icon size={20} color={color} strokeWidth={2} aria-hidden="true" />
+                                </span>
+                                <span className="max-w-full break-words text-[11px] font-semibold leading-tight text-[var(--text)] min-[380px]:text-xs">
+                                    {label}
+                                </span>
+                            </Link>
                         ))}
                     </div>
-                    {heroSlides.length > 1 && (
-                        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
-                            {heroSlides.map((_, i) => <span key={i} style={{ height: 6, width: i === slide ? 22 : 6, borderRadius: 99, background: i === slide ? "var(--accent)" : "#c7d3f0", transition: "all 0.2s" }} />)}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Quick actions — up to two rows of four. */}
-            {tiles.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "14px 12px" }}>
-                    {tiles.map(tl => {
-                        const Icon = tl.icon
-                        return (
-                            <Link key={tl.href + tl.label} href={tl.href} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, textDecoration: "none" }}>
-                                <span style={{ width: "100%", aspectRatio: "1 / 1", maxWidth: 64, borderRadius: 18, background: "var(--surface)", boxShadow: "var(--shadow-card)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                    <span style={{ width: 38, height: 38, borderRadius: 12, background: tl.tint, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                        <Icon size={21} color={tl.color} strokeWidth={2.2} aria-hidden="true" />
-                                    </span>
-                                </span>
-                                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text)", textAlign: "center", lineHeight: 1.2 }}>{tl.label}</span>
-                            </Link>
-                        )
-                    })}
-                </div>
+                </section>
             )}
 
             {/* My summary — leave left, last salary (hidden until tapped), this month. */}
             {emp && me && (
                 <section>
-                    <SectionHead kicker="Your numbers" title="My summary" />
+                    <SectionHead title="My summary" />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                         <Link href="/leaves" style={{ ...card, padding: 14, display: "block" }}>
                             <Mini icon={CalendarOff} color="#dd8f0d" tint="#fff6e4" label="Leave left" />
@@ -221,7 +227,7 @@ export function MobileHome() {
                         <div style={{ ...card, padding: 14 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                                 <Mini icon={IndianRupee} color="#6d4fe0" tint="#f1edff" label="Last salary" />
-                                {me.payslip && <button type="button" onClick={() => setShowPay(v => !v)} aria-label={showPay ? "Hide salary" : "Show salary"} style={{ border: "none", background: "none", padding: 2, cursor: "pointer", color: "var(--text3)" }}>{showPay ? <EyeOff size={16} /> : <Eye size={16} />}</button>}
+                                {me.payslip && <button type="button" onClick={() => setShowPay(v => !v)} aria-label={showPay ? "Hide salary" : "Show salary"} style={{ border: "none", background: "none", width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--text2)", flexShrink: 0 }}>{showPay ? <EyeOff size={16} /> : <Eye size={16} />}</button>}
                             </div>
                             <Link href="/profile?tab=payslip" style={{ textDecoration: "none" }}>
                                 <p style={big}>{me.payslip ? (showPay ? `₹${fmt(Math.round(me.payslip.net))}` : "₹ • • • • •") : "—"}</p>
@@ -246,9 +252,9 @@ export function MobileHome() {
             <WorkPanels compact />
 
             {/* Needs attention */}
-            {(me || (stats && !stats.error)) && (
+            {(attention.length > 0 || (!loadingHome && (me || (stats && !stats.error)))) && (
                 <section>
-                    <SectionHead kicker="For you" title="Needs attention" />
+                    <SectionHead title="Needs attention" />
                     {attention.length === 0 ? (
                         <div style={{ ...card, padding: 18, display: "flex", alignItems: "center", gap: 14 }}>
                             <span style={{ width: 44, height: 44, borderRadius: 14, background: "var(--success-light)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -260,7 +266,7 @@ export function MobileHome() {
                             </div>
                         </div>
                     ) : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>{attention.map(a => <AttentionCard key={a.title} {...a} />)}</div>
+                        <div className="overflow-hidden rounded-2xl border bg-[var(--surface)] shadow-sm">{attention.map(a => <AttentionRow key={a.title} {...a} />)}</div>
                     )}
                 </section>
             )}
@@ -268,12 +274,12 @@ export function MobileHome() {
             {/* Company today — staff only. */}
             {hasCompany && (
                 <section>
-                    <SectionHead kicker="At a glance" title={emp ? "Company today" : "Today"} />
-                    <div className="no-scrollbar" style={{ display: "flex", gap: 12, overflowX: "auto", margin: "0 -16px", padding: "2px 16px 6px", scrollbarWidth: "none" }}>
+                    <SectionHead title="Company overview" />
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                         {today.map(c => {
                             const Icon = c.icon
                             return (
-                                <Link key={c.label} href={c.href} style={{ ...card, flex: "0 0 150px", padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                                <Link key={c.label} href={c.href} style={{ ...card, padding: 14, display: "flex", flexDirection: "column", gap: 10 }} className="min-w-0">
                                     <span style={{ width: 36, height: 36, borderRadius: 11, background: c.tint, display: "flex", alignItems: "center", justifyContent: "center" }}><Icon size={18} color={c.color} aria-hidden="true" /></span>
                                     <div>
                                         <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em", lineHeight: 1.1 }}>{c.value}</p>
@@ -290,7 +296,7 @@ export function MobileHome() {
             {/* Coming up — holiday, birthdays & anniversaries, announcements. */}
             {me && (me.holiday || me.celebrations.length > 0 || me.announcements.length > 0) && (
                 <section>
-                    <SectionHead kicker="Around the company" title="Coming up" />
+                    <SectionHead title="Coming up" />
                     <div style={{ ...card, padding: "4px 14px" }}>
                         {me.holiday && (
                             <Row href="/leaves" icon={CalendarHeart} color="#db2777" tint="#fdf2f8"
@@ -310,7 +316,7 @@ export function MobileHome() {
                 </section>
             )}
 
-            {stats?.error && !me && (
+            {!loadingHome && (!stats || stats.error) && !me && (
                 <p style={{ margin: 0, fontSize: 12.5, color: "var(--text3)", textAlign: "center" }}>
                     Couldn&apos;t load today&apos;s numbers. <button type="button" onClick={() => window.location.reload()} style={{ border: "none", background: "none", color: "var(--accent)", fontWeight: 600, cursor: "pointer", padding: 0 }}>Try again</button>
                 </p>
@@ -320,7 +326,7 @@ export function MobileHome() {
 }
 
 const big: React.CSSProperties = { margin: "10px 0 0", fontSize: 19, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em", lineHeight: 1.15 }
-const small: React.CSSProperties = { margin: "3px 0 0", fontSize: 11.5, color: "var(--text3)", lineHeight: 1.3 }
+const small: React.CSSProperties = { margin: "3px 0 0", fontSize: 12, color: "var(--text2)", lineHeight: 1.4 }
 
 function daysAway(d: string) {
     const ist = (x: Date) => { const t = new Date(x.getTime() + 330 * 60_000); return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) }
@@ -368,82 +374,50 @@ function MyDayCard({ me }: { me: Me }) {
         leave:  { highlight: "On leave", sub: "Enjoy your day off", cta: "View leave" },
         absent: { highlight: "Marked absent", sub: "Think this is wrong? Raise it with HR", cta: "View attendance" },
     }[state]
-    return <HeroCard pill={format(new Date(), "EEE, d MMM")} title="Today" highlight={view.highlight} sub={view.sub} cta={view.cta} href={state === "leave" ? "/leaves" : "/attendance"} icon={state === "done" ? CheckCircle2 : CalendarCheck} />
+    return <PrimaryCard title="Today’s attendance" highlight={view.highlight} sub={view.sub} cta={view.cta} href={state === "leave" ? "/leaves" : "/attendance"} icon={state === "done" ? CheckCircle2 : CalendarCheck} />
 }
 
-function HeroCard({ pill, title, highlight, sub, cta, href, icon: Icon }: Slide) {
+function PrimaryCard({ title, highlight, sub, cta, href, icon: Icon }: FocusCard) {
     return (
-        <div style={{
-            position: "relative", overflow: "hidden", borderRadius: 22, padding: "20px 18px", minHeight: 196,
-            background: "var(--accent-gradient)", color: "white", display: "flex", gap: 12,
-        }}>
-            {/* Soft glows, as on Zavtoo's banner. */}
-            <span aria-hidden="true" style={{ position: "absolute", right: -40, top: -40, width: 170, height: 170, borderRadius: "50%", background: "rgba(255,255,255,0.10)" }} />
-            <span aria-hidden="true" style={{ position: "absolute", left: -30, bottom: -60, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
-
-            <div style={{ position: "relative", flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-                <span style={{ background: "#d9f99d", color: "#04246b", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 99 }}>{pill}</span>
-                <p style={{ margin: "12px 0 0", fontSize: 21, fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.02em" }}>{title}</p>
-                <p style={{ margin: "2px 0 0", fontSize: 21, fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.02em", color: "var(--gold)" }}>{highlight}</p>
-                <p style={{ margin: "8px 0 0", fontSize: 12.5, lineHeight: 1.4, color: "rgba(255,255,255,0.85)" }}>{sub}</p>
-                <Link href={href} className="press" style={{
-                    marginTop: 14, display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 16px",
-                    borderRadius: 12, background: "var(--gold-gradient)", color: "#04246b", fontSize: 13.5, fontWeight: 700,
-                    textDecoration: "none", boxShadow: "0 6px 14px rgba(221,143,13,0.35)",
-                }}>
-                    {cta} <ArrowRight size={15} aria-hidden="true" />
-                </Link>
-            </div>
-
-            <div aria-hidden="true" style={{ position: "relative", alignSelf: "center", flexShrink: 0 }}>
-                <span style={{
-                    width: 84, height: 84, borderRadius: 24, background: "rgba(255,255,255,0.96)",
-                    display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 24px rgba(2,11,36,0.25)",
-                    transform: "rotate(-6deg)",
-                }}>
-                    <Icon size={40} color="#3d6ff5" strokeWidth={2} />
+        <section className="rounded-2xl bg-[#102653] p-4 text-white shadow-[0_8px_24px_rgba(16,38,83,0.18)] sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h2 className="text-sm font-medium text-blue-100">{title}</h2>
+                    <p className="mt-1.5 break-words text-[clamp(1.25rem,5.5vw,1.65rem)] font-bold leading-tight tracking-tight">{highlight}</p>
+                </div>
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-white/20 bg-white/10 text-blue-100">
+                    <Icon size={21} aria-hidden="true" />
                 </span>
             </div>
-        </div>
+            <p className="mt-2 text-sm leading-relaxed text-blue-100">{sub}</p>
+            <Link href={href} className="mt-4 inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-[#102653] transition-colors hover:bg-blue-50">
+                {cta} <ArrowRight size={16} className="shrink-0" aria-hidden="true" />
+            </Link>
+        </section>
     )
 }
 
-function SectionHead({ kicker, title }: { kicker: string; title: string }) {
-    return (
-        <div style={{ marginBottom: 12 }}>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text2)" }}>{kicker}</p>
-            <p style={{ margin: "1px 0 0", fontSize: 19, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>{title}</p>
-        </div>
-    )
+function SectionHead({ title, id }: { title: string; id?: string }) {
+    return <h2 id={id} className="mb-2.5 text-lg font-bold tracking-tight text-[var(--text)]">{title}</h2>
 }
 
-const TONES = {
-    warn:   { bg: "#fef3c7", fg: "#d97706", bd: "#fde68a" },
-    info:   { bg: "#eaf0ff", fg: "#2f5be0", bd: "#e3ebff" },
-    danger: { bg: "#fee2e2", fg: "#dc2626", bd: "#fecaca" },
-}
+const TONES = { warn: "#93540a", info: "#2f5be0", danger: "#b91c1c" }
 
-function AttentionCard({ title, sub, value, status, tone, href, cta, icon: Icon, color, tint }: {
-    title: string; sub: string; value: string; status: string; tone: keyof typeof TONES
-    href: string; cta: string; icon: LucideIcon; color: string; tint: string
+function AttentionRow({ title, sub, value, tone, href, icon: Icon, color, tint }: {
+    title: string; sub: string; value: string; tone: keyof typeof TONES
+    href: string; icon: LucideIcon; color: string; tint: string
 }) {
-    const t = TONES[tone]
     return (
-        <Link href={href} style={{ background: "var(--surface)", borderRadius: 18, padding: 14, boxShadow: "var(--shadow-card)", display: "flex", gap: 14, textDecoration: "none" }}>
-            <span style={{ width: 64, height: 64, borderRadius: 14, background: tint, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Icon size={28} color={color} aria-hidden="true" />
+        <Link href={href} className="flex min-h-[72px] min-w-0 items-center gap-3 border-b px-3 py-3 transition-colors last:border-b-0 hover:bg-[var(--surface2)] sm:px-4">
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg" style={{ background: tint }}>
+                <Icon size={19} color={color} aria-hidden="true" />
             </span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                    <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</p>
-                    <span style={{ background: t.bg, color: t.fg, border: `1px solid ${t.bd}`, fontSize: 10.5, fontWeight: 600, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", flexShrink: 0 }}>{status}</span>
-                </div>
-                <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--text2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</p>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
-                    <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{value}</p>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>{cta} <ArrowRight size={14} aria-hidden="true" /></span>
-                </div>
-            </div>
+            <span className="min-w-0 flex-1">
+                <span className="block break-words text-sm font-semibold text-[var(--text)]">{title}</span>
+                <span className="mt-0.5 block break-words text-xs leading-5 text-[var(--text2)]">{sub}</span>
+            </span>
+            <span className="max-w-[30%] break-words text-right text-xs font-semibold" style={{ color: TONES[tone] }}>{value}</span>
+            <ChevronRight size={16} className="shrink-0 text-[var(--text2)]" aria-hidden="true" />
         </Link>
     )
 }
