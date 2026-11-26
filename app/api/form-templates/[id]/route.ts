@@ -1,5 +1,6 @@
 
 import { getServerSession } from "next-auth"
+import { bumpFormVersion } from "@/lib/form-version"
 import { NextResponse } from "next/server"
 import prisma, { ensureProjectSchema } from "@/lib/prisma"
 import { REPORT_ROLE_VALUES } from "@/lib/report-roles"
@@ -38,6 +39,8 @@ export async function PUT(
                 ...(isHidden !== undefined && { isHidden: !!isHidden }),
             },
         })
+        // Anything but a pure reorder is a new form version.
+        if ([fieldLabel, fieldType, options, category, reportRole, isHidden, isRequired].some(v => v !== undefined)) await bumpFormVersion(field.projectId)
 
         return NextResponse.json(field)
     } catch (error) {
@@ -56,9 +59,16 @@ export async function DELETE(
             return new NextResponse("Forbidden", { status: 403 })
         }
 
-        await prisma.formTemplate.delete({
+        // Deleting a field also deletes its answers from every past report, so a
+        // field that has been filled in can only be hidden.
+        const answers = await prisma.inspectionData.count({ where: { fieldId: params.id, NOT: [{ value: null }, { value: "" }] } })
+        if (answers > 0) {
+            return NextResponse.json({ error: `This field has answers on ${answers} report${answers === 1 ? "" : "s"}. Hide it instead so past reports keep them.` }, { status: 409 })
+        }
+        const deleted = await prisma.formTemplate.delete({
             where: { id: params.id },
         })
+        await bumpFormVersion(deleted.projectId)
 
         return new NextResponse(null, { status: 204 })
     } catch (error) {

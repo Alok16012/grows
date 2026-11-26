@@ -39,6 +39,18 @@ export type InspectionSettings = {
          */
         defectMatch: "exact" | "atLeast"
     }
+    ncr: {
+        /** Open a non-conformance report (NCR / 8D) automatically when an approved report crosses a limit. */
+        autoOpen: boolean
+        /** Rejected ÷ inspected, in %, at or above which an NCR opens. 0 = not used. */
+        rejectedPct: number
+        /** Rejected pieces at or above which an NCR opens. 0 = not used. */
+        rejectedQty: number
+        /** Any piece with a CRITICAL defect (defect library) opens an NCR. */
+        onCritical: boolean
+        /** Days the owner has to close it. */
+        dueDays: number
+    }
     drafts: {
         /** Remind the inspector about a draft this many days old. 0 = never. */
         remindAfterDays: number
@@ -52,6 +64,7 @@ export const DEFAULT_INSPECTION_SETTINGS: InspectionSettings = {
     alerts: { enabled: true, rejectedPct: 2, rejectedQty: 0, reworkPct: 0 },
     summary: { frequency: "off", weekday: 1 },
     form: { defectMatch: "exact" },
+    ncr: { autoOpen: false, rejectedPct: 5, rejectedQty: 0, onCritical: true, dueDays: 7 },
     drafts: { remindAfterDays: 2, deleteEmptyAfterDays: 0 },
 }
 
@@ -61,7 +74,7 @@ const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d)
 
 export function sanitizeInspectionSettings(v: any): InspectionSettings {
     const d = DEFAULT_INSPECTION_SETTINGS
-    const a = v?.approval ?? {}, al = v?.alerts ?? {}, s = v?.summary ?? {}, dr = v?.drafts ?? {}, fo = v?.form ?? {}
+    const a = v?.approval ?? {}, al = v?.alerts ?? {}, s = v?.summary ?? {}, dr = v?.drafts ?? {}, fo = v?.form ?? {}, nc = v?.ncr ?? {}
     return {
         approval: {
             targetHours: num(a.targetHours, d.approval.targetHours, 1, 24 * 60),
@@ -81,6 +94,13 @@ export function sanitizeInspectionSettings(v: any): InspectionSettings {
         },
         form: {
             defectMatch: fo.defectMatch === "atLeast" ? "atLeast" : "exact",
+        },
+        ncr: {
+            autoOpen: bool(nc.autoOpen, d.ncr.autoOpen),
+            rejectedPct: num(nc.rejectedPct, d.ncr.rejectedPct, 0, 100),
+            rejectedQty: num(nc.rejectedQty, d.ncr.rejectedQty, 0),
+            onCritical: bool(nc.onCritical, d.ncr.onCritical),
+            dueDays: num(nc.dueDays, d.ncr.dueDays, 1, 180),
         },
         drafts: {
             remindAfterDays: num(dr.remindAfterDays, d.drafts.remindAfterDays, 0, 365),

@@ -7,13 +7,14 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
-import { BarChart3, BookOpen, Link2, Loader2, Plus, Search, Upload, X, ScanSearch, Check } from "lucide-react"
+import { BarChart3, BookOpen, Link2, Loader2, Plus, Search, Upload, X, ScanSearch, Check, ShieldAlert } from "lucide-react"
 import { canAny } from "@/lib/can"
+import { NcrStatusPill, NewNcrModal } from "@/components/quality/NcrUi"
 
 type Severity = "CRITICAL" | "MAJOR" | "MINOR"
 type Defect = { id: string; code: string; name: string; severity: Severity; category: string | null; description: string | null; photoUrl: string | null; aliases: string[]; isActive: boolean; fields: number; projects: number }
 type MapRow = { key: string; label: string; variants: string[]; projects: number; fields: number; qty: number; linkedTo: string | null; partlyLinked: boolean; suggestion: string | null }
-type Tab = "pareto" | "library" | "map" | "trace"
+type Tab = "pareto" | "ncr" | "library" | "map" | "trace"
 
 const CATEGORIES = ["Welding", "Surface", "Dimension", "Assembly", "Paint / Coating", "Material", "Marking / Label", "Packing", "Other"]
 const SEV_STYLE: Record<Severity, string> = {
@@ -48,7 +49,7 @@ export default function QualityPage() {
 
     useEffect(() => {
         const t = new URLSearchParams(window.location.search).get("tab") as Tab | null
-        if (t && ["pareto", "library", "map", "trace"].includes(t)) setTab(t)
+        if (t && ["pareto", "ncr", "library", "map", "trace"].includes(t)) setTab(t)
     }, [])
     const go = (t: Tab) => { setTab(t); const u = new URL(window.location.href); u.searchParams.set("tab", t); window.history.replaceState(null, "", u.toString()) }
 
@@ -64,6 +65,7 @@ export default function QualityPage() {
 
     const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
         { id: "pareto", label: "Pareto (all customers)", icon: <BarChart3 className="h-3.5 w-3.5" /> },
+        { id: "ncr", label: "NCR / 8D", icon: <ShieldAlert className="h-3.5 w-3.5" /> },
         { id: "library", label: `Defect library (${defects.filter(d => d.isActive).length})`, icon: <BookOpen className="h-3.5 w-3.5" /> },
         { id: "map", label: "Match project defects", icon: <Link2 className="h-3.5 w-3.5" /> },
         { id: "trace", label: "Traceability", icon: <ScanSearch className="h-3.5 w-3.5" /> },
@@ -85,6 +87,7 @@ export default function QualityPage() {
             </div>
             {libError ? <div className={`${card} p-5 text-[13px] text-[#dc2626]`}>{libError}</div> : (<>
                 {tab === "pareto" && <ParetoTab onMap={() => go("map")} />}
+                {tab === "ncr" && <NcrTab />}
                 {tab === "library" && <LibraryTab defects={defects} canManage={canManage} reload={loadLib} />}
                 {tab === "map" && <MapTab defects={defects} canManage={canManage} reloadLib={loadLib} />}
                 {tab === "trace" && <TraceTab />}
@@ -493,6 +496,78 @@ function TraceTab() {
                     )}
                 </div>
             )}
+        </div>
+    )
+}
+
+// ─── NCR / 8D ────────────────────────────────────────────────────────────────
+
+function NcrTab() {
+    const [status, setStatus] = useState<"open" | "closed" | "all">("open")
+    const [q, setQ] = useState("")
+    const [data, setData] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
+    const [creating, setCreating] = useState(false)
+
+    const load = useCallback(async () => {
+        setLoading(true)
+        try { setData(await api(`/api/quality/ncr?${new URLSearchParams({ status, ...(q.trim() ? { q: q.trim() } : {}) })}`)) }
+        catch (e: any) { toast.error(e.message) } finally { setLoading(false) }
+    }, [status, q])
+    useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [load])
+
+    const counts = data?.counts ?? {}
+    const openCount = ["OPEN", "CONTAINMENT", "ROOT_CAUSE", "ACTION", "VERIFICATION"].reduce((n, k) => n + (counts[k] ?? 0), 0)
+    const now = Date.now()
+
+    return (
+        <div className="space-y-3">
+            <div className={`${card} p-4 flex flex-wrap items-center gap-2`}>
+                <select className={input} value={status} onChange={e => setStatus(e.target.value as any)}>
+                    <option value="open">Open ({openCount})</option>
+                    <option value="closed">Closed / cancelled ({(counts.CLOSED ?? 0) + (counts.CANCELLED ?? 0)})</option>
+                    <option value="all">All</option>
+                </select>
+                <div className="relative"><Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text3)]" /><input className={`${input} pl-8 w-[240px]`} placeholder="Code, title, part or lot…" value={q} onChange={e => setQ(e.target.value)} /></div>
+                <div className="flex-1" />
+                <Link href="/approvals/settings" className="text-[12px] text-[var(--text3)] underline mr-2">Auto-open limits</Link>
+                {data?.canManage && <button className={btnPrimary} onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> New NCR</button>}
+            </div>
+            <div className={card}>
+                {loading && !data ? <div className="p-6"><Loader2 className="h-5 w-5 animate-spin text-[var(--text3)]" /></div>
+                    : !data?.rows?.length ? <p className="p-6 text-[13px] text-[var(--text3)]">No NCRs here. They open automatically when an approved report crosses the limits in Approvals → Settings (once switched on), or you can open one by hand.</p> : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-[var(--surface2)]"><tr>
+                                <th className={th}>NCR</th><th className={th}>Project</th><th className={th}>Part / lot</th><th className={`${th} text-right`}>Pieces</th>
+                                <th className={th}>Severity</th><th className={th}>Status</th><th className={th}>Owner</th><th className={th}>Due</th>
+                            </tr></thead>
+                            <tbody className="divide-y divide-[var(--border)]">
+                                {data.rows.map((r: any) => {
+                                    const late = r.dueDate && !["CLOSED", "CANCELLED"].includes(r.status) && new Date(r.dueDate).getTime() < now
+                                    return (
+                                        <tr key={r.id} className="hover:bg-[var(--surface2)]/60">
+                                            <td className={td}>
+                                                <Link href={`/quality/ncr/${r.id}`} className="font-mono text-[12px] text-[var(--accent)]">{r.code}</Link>
+                                                <p className="font-medium text-[var(--text)] max-w-[320px] truncate" title={r.title}>{r.title}</p>
+                                                {r.source !== "MANUAL" && <p className="text-[10.5px] text-[var(--text3)]">Opened automatically</p>}
+                                            </td>
+                                            <td className={`${td} text-[12.5px]`}>{r.project?.name ?? "—"}<p className="text-[11px] text-[var(--text3)]">{r.project?.site?.name ?? ""}</p></td>
+                                            <td className={`${td} text-[12px]`}>{r.partName ?? "—"}{r.lotNumber ? <p className="text-[11px] text-[var(--text3)]">Lot {r.lotNumber}</p> : null}</td>
+                                            <td className={`${td} text-right font-mono`}>{r.qtyAffected != null ? fmt(r.qtyAffected) : "—"}</td>
+                                            <td className={td}><SevPill s={r.severity} /></td>
+                                            <td className={td}><NcrStatusPill s={r.status} /></td>
+                                            <td className={`${td} text-[12.5px]`}>{r.ownerName ?? "—"}</td>
+                                            <td className={`${td} text-[12px] whitespace-nowrap ${late ? "text-[#dc2626] font-semibold" : "text-[var(--text2)]"}`}>{r.dueDate ? new Date(r.dueDate).toLocaleDateString("en-GB") : "—"}{late ? " · late" : ""}</td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+            {creating && <NewNcrModal onClose={() => setCreating(false)} onDone={id => { setCreating(false); window.location.href = `/quality/ncr/${id}` }} />}
         </div>
     )
 }

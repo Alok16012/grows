@@ -18,7 +18,7 @@ const fmtN = (n: number) => Math.round(n).toLocaleString("en-IN")
 
 export async function runInspectionDaily(now = new Date(), opts: { createdBy?: string | null } = {}) {
     const s = await getInspectionSettings()
-    const out = { overdue: 0, escalated: 0, draftReminders: 0, draftsDeleted: 0, summaries: 0, summaryMessages: 0 }
+    const out = { overdue: 0, escalated: 0, draftReminders: 0, draftsDeleted: 0, summaries: 0, summaryMessages: 0, ncrOverdue: 0 }
 
     // ── 1. Overdue approvals ──────────────────────────────────────────────
     const overdue = await prisma.inspection.findMany({
@@ -117,5 +117,17 @@ export async function runInspectionDaily(now = new Date(), opts: { createdBy?: s
             out.summaryMessages += r.queued
         }
     }
+
+    // ── NCRs past their due date: remind the owner every morning ───────────
+    try {
+        const late = await prisma.ncr.findMany({
+            where: { status: { notIn: ["CLOSED", "CANCELLED"] }, dueDate: { lt: now }, ownerUserId: { not: null } },
+            select: { id: true, code: true, title: true, ownerUserId: true, dueDate: true },
+        })
+        for (const n of late) {
+            await prisma.notification.create({ data: { userId: n.ownerUserId!, type: "quality", title: `${n.code} is overdue`, message: `${n.title} — due ${n.dueDate!.toLocaleDateString("en-GB")}. Update the 8D steps or the due date.`, link: `/quality/ncr/${n.id}` } })
+        }
+        out.ncrOverdue = late.length
+    } catch (e) { if (!isMissingTableErr(e)) throw e }
     return out
 }

@@ -162,6 +162,9 @@ model Project {
   defectColumns     Json?
   reportConfig      Json?
   alertConfig       AlertConfig?
+  /// Goes up by one on every Form Builder change; each submitted inspection keeps the version it was filled on.
+  formVersion       Int                @default(1)
+  ncrs              Ncr[]
 }
 
 model Assignment {
@@ -215,6 +218,11 @@ model Inspection {
   customerSignature  String?
   customerSignedName String?
   customerSignedAt   DateTime?
+  /// Form versioning: the project's form version and the fields as they were when submitted
+  /// ({ [fieldId]: { l: label, t: type, c: category, r: reportRole, o: displayOrder } }).
+  formVersion    Int?
+  formSnapshot   Json?
+  ncrs           Ncr[]
   assignment     Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   submitter      User             @relation(fields: [submittedBy], references: [id])
   responses      InspectionData[]
@@ -3433,4 +3441,62 @@ model CallLog {
   @@index([startedAt])
   @@index([targetType, targetId])
   @@index([phoneKey])
+}
+
+/// Non-conformance report + CAPA (8D). Opened automatically when an approved
+/// inspection crosses the limits in Approvals → Settings, or by hand.
+model Ncr {
+  id            String     @id @default(uuid())
+  code          String     @unique // NCR-2026-0001
+  title         String
+  source        String     @default("MANUAL") // MANUAL | AUTO_REJECTION | AUTO_CRITICAL
+  status        String     @default("OPEN") // OPEN | CONTAINMENT | ROOT_CAUSE | ACTION | VERIFICATION | CLOSED | CANCELLED
+  severity      String     @default("MAJOR") // CRITICAL | MAJOR | MINOR
+  inspectionId  String?
+  projectId     String?
+  defectTypeId  String?
+  partName      String?
+  lotNumber     String?
+  qtyInspected  Int?
+  qtyAffected   Int?
+  ownerUserId   String?
+  dueDate       DateTime?
+  // 8D
+  d1Team        String?
+  d2Problem     String?
+  d3Containment String?
+  d3Date        DateTime?
+  d4RootCause   String?
+  d4Whys        Json? // string[] — the 5 Whys
+  d5Action      String?
+  d6Implemented String?
+  d6Date        DateTime?
+  d7Prevention  String?
+  d8Closure     String?
+  effective     Boolean?
+  closedAt      DateTime?
+  closedBy      String?
+  createdBy     String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  inspection    Inspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  project       Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  events        NcrEvent[]
+
+  @@index([status])
+  @@index([inspectionId])
+  @@index([projectId])
+  @@index([ownerUserId])
+}
+
+model NcrEvent {
+  id        String   @id @default(uuid())
+  ncrId     String
+  userId    String
+  action    String // CREATED | UPDATED | STATUS | COMMENT
+  note      String?
+  createdAt DateTime @default(now())
+  ncr       Ncr      @relation(fields: [ncrId], references: [id], onDelete: Cascade)
+
+  @@index([ncrId])
 }

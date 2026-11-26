@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { withSnapshot } from "@/lib/form-version"
 import prisma, { ensureProjectSchema } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -77,7 +78,7 @@ export async function GET(req: Request) {
         await ensureProjectSchema()
 
         // Fetch all relevant inspections with full relations
-        const inspections = await prisma.inspection.findMany({
+        const rawInspections = await prisma.inspection.findMany({
             where: {
                 status: "approved",
                 submittedAt: {
@@ -111,6 +112,8 @@ export async function GET(req: Request) {
             },
             orderBy: { submittedAt: "desc" },
         })
+        // Form versioning: each report reads its fields as they were when submitted.
+        const inspections = rawInspections.map(i => ({ ...i, responses: withSnapshot(i.responses, i.formSnapshot) }))
 
         // Aggregate data
         const summary = {

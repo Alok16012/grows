@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { isPdfUrl, paperPages } from "@/lib/paper-form"
 import { basicFieldSlot } from "@/lib/form-field-order"
+import { NcrCard } from "@/components/quality/NcrCard"
 import { useRouter, useParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { Textarea } from "@/components/ui/textarea"
@@ -566,6 +567,17 @@ export default function ReviewInspectionPage() {
                             )}
                         </div>
                     </div>
+
+                    {/* Form version it was filled on (Form Builder changes don't rewrite old reports) */}
+                    {inspection.formVersion && inspection.currentFormVersion && inspection.formVersion !== inspection.currentFormVersion && (
+                        <div className="bg-[#fffbeb] border border-[#fde68a] rounded-[14px] p-4">
+                            <p className="text-[12px] font-semibold text-[#92400e]">Filled on form v{inspection.formVersion}</p>
+                            <p className="text-[11.5px] text-[#92400e] mt-0.5">The project&apos;s form is now v{inspection.currentFormVersion}. This report shows the fields as they were when it was submitted.</p>
+                        </div>
+                    )}
+
+                    {/* Non-conformance (NCR / 8D) */}
+                    <NcrCard inspectionId={inspection.id} canOpen={inspection.status === "approved" || inspection.status === "pending"} />
 
                     {/* Customer acknowledgement (signed on the shared report) */}
                     {inspection.customerSignedAt && (

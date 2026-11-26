@@ -1,4 +1,5 @@
 import fs from "fs"
+import { withSnapshot } from "@/lib/form-version"
 import path from "path"
 import { createElement, type ReactElement } from "react"
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer"
@@ -21,7 +22,7 @@ export async function loadInspectionForReport(id: string) {
         where: { id },
         select: {
             id: true, status: true, submittedAt: true, approvedAt: true, gpsLocation: true, signature: true,
-            approvedBy: true, defectPhotos: true, customerSignature: true, customerSignedName: true, customerSignedAt: true,
+            approvedBy: true, defectPhotos: true, customerSignature: true, customerSignedName: true, customerSignedAt: true, formSnapshot: true,
             submitter: { select: { name: true } },
             assignment: { select: { project: { select: { id: true, name: true, reportConfig: true, site: { select: { id: true, name: true } } } } } },
             responses: { select: { id: true, fieldId: true, value: true, field: { select: { fieldLabel: true, fieldType: true, displayOrder: true, isHidden: true } } } },
@@ -39,6 +40,6 @@ export async function renderInspectionReport(id: string): Promise<{ filename: st
     const i = await loadInspectionForReport(id)
     if (!i || i.status !== "approved") return null
     const approver = i.approvedBy ? await prisma.user.findUnique({ where: { id: i.approvedBy }, select: { name: true } }) : null
-    const el = createElement(InspectionPDF, { inspection: { ...i, approverName: approver?.name ?? null }, logo: logoDataUrl() }) as unknown as ReactElement<DocumentProps>
+    const el = createElement(InspectionPDF, { inspection: { ...i, responses: withSnapshot(i.responses, i.formSnapshot), approverName: approver?.name ?? null }, logo: logoDataUrl() }) as unknown as ReactElement<DocumentProps>
     return { filename: reportFilename(i), content: await renderToBuffer(el) }
 }

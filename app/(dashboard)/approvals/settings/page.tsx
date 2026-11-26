@@ -12,6 +12,7 @@ type S = {
     approval: { targetHours: number; escalateAfterHours: number; remindApprovers: boolean; autoSignature: boolean }
     alerts: { enabled: boolean; rejectedPct: number; rejectedQty: number; reworkPct: number }
     summary: { frequency: "off" | "daily" | "weekly"; weekday: number }
+    ncr: { autoOpen: boolean; rejectedPct: number; rejectedQty: number; onCritical: boolean; dueDays: number }
     drafts: { remindAfterDays: number; deleteEmptyAfterDays: number }
     form: { defectMatch: "exact" | "atLeast" }
 }
@@ -91,7 +92,7 @@ export default function InspectionSettingsPage() {
             const r = await fetch("/api/cron/inspection-daily", { method: "POST" })
             const d = await r.json().catch(() => ({}))
             if (!r.ok) throw new Error(d?.error || "Could not run")
-            setResult(`Overdue reminders: ${d.overdue ?? 0} · Escalated: ${d.escalated ?? 0} · Draft reminders: ${d.draftReminders ?? 0} · Empty drafts deleted: ${d.draftsDeleted ?? 0} · Customer summaries: ${d.summaries ?? 0} (${d.summaryMessages ?? 0} messages)`)
+            setResult(`Overdue reminders: ${d.overdue ?? 0} · Escalated: ${d.escalated ?? 0} · Draft reminders: ${d.draftReminders ?? 0} · Empty drafts deleted: ${d.draftsDeleted ?? 0} · Customer summaries: ${d.summaries ?? 0} (${d.summaryMessages ?? 0} messages) · Overdue NCRs: ${d.ncrOverdue ?? 0}`)
         } catch (e: any) { toast.error(e.message) } finally { setRunning(false) }
     }
 
@@ -159,6 +160,14 @@ export default function InspectionSettingsPage() {
                         <option value="atLeast">Must be at least Rework + Rejected</option>
                     </select>
                 </div>
+            </Card>
+
+            <Card title="Non-conformance (NCR / 8D)" hint="Open an NCR automatically when an approved report crosses any limit below. It's owned by the approver, who fills the 8D steps in Quality → NCR / 8D. 0 = that limit is not used.">
+                <Toggle label="Open NCRs automatically" value={s.ncr.autoOpen} onChange={b => set("ncr", { autoOpen: b })} />
+                <NumRow label="Rejected at or above" value={s.ncr.rejectedPct} unit="%" step={0.1} onChange={n => set("ncr", { rejectedPct: n })} />
+                <NumRow label="Rejected pieces at or above" value={s.ncr.rejectedQty} unit="pcs" onChange={n => set("ncr", { rejectedQty: n })} />
+                <Toggle label="Any critical defect opens an NCR" hint="Defects marked Critical in Quality → Defect library." value={s.ncr.onCritical} onChange={b => set("ncr", { onCritical: b })} />
+                <NumRow label="Days to close" hint="Owners are reminded every morning once it's overdue." value={s.ncr.dueDays} unit="days" onChange={n => set("ncr", { dueDays: n })} />
             </Card>
 
             <Card title="Drafts" hint="Reports started but not submitted.">

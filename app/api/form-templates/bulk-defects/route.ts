@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth"
+import { bumpFormVersion } from "@/lib/form-version"
 import { autoLinkDefects } from "@/lib/defect-library"
 import { NextResponse } from "next/server"
 import prisma, { ensureProjectSchema } from "@/lib/prisma"
@@ -131,6 +132,7 @@ export async function POST(req: Request) {
         ]
         if (writes.length) await prisma.$transaction(writes)
         if (toAdd.length) await autoLinkDefects(projectId)
+        if (writes.length) await bumpFormVersion(projectId)
 
         return NextResponse.json({
             added: toAdd.map(i => i.label),

@@ -1,7 +1,9 @@
 
 import { NextResponse } from "next/server"
+import { withSnapshot } from "@/lib/form-version"
 import { getInspectionSettings } from "@/lib/inspection-settings"
 import { maybeSendReworkAlert } from "@/lib/inspection-customers"
+import { maybeOpenNcr } from "@/lib/ncr"
 import { getUserSignature } from "@/lib/hr-doc-schema"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
@@ -55,8 +57,9 @@ export async function GET(
             return NextResponse.json({ error: "This inspection belongs to a project you don't manage" }, { status: 403 })
         }
 
-        const [named] = await withApproverNames([inspection])
-        return NextResponse.json(named)
+        const [named] = await withApproverNames([{ ...inspection, responses: withSnapshot(inspection.responses, inspection.formSnapshot) }])
+        // The form version it was filled on vs the project's current one.
+        return NextResponse.json({ ...named, currentFormVersion: (inspection.assignment?.project as any)?.formVersion ?? null })
     } catch (error) {
         console.error("GET_APPROVAL_DETAIL_ERROR", error)
         return NextResponse.json({ error: "Internal Error" }, { status: 500 })
@@ -245,6 +248,8 @@ export async function PATCH(
                     if (sig) await prisma.inspection.update({ where: { id: inspectionId }, data: { signature: sig } })
                 }
                 if (settings.alerts.enabled) await maybeSendReworkAlert(inspectionId, settings.alerts, session!.user.id)
+                // NCR / 8D when the report crosses the limits (Approvals → Settings → NCR).
+                if (settings.ncr.autoOpen) await maybeOpenNcr(inspectionId, settings.ncr, session!.user.id)
             } catch (e) { console.error("APPROVAL_FOLLOWUPS", e) }
         }
 

@@ -1,6 +1,7 @@
 
 import { NextResponse } from "next/server"
 import { paperPages, paperValue } from "@/lib/paper-form"
+import { snapshotForm } from "@/lib/form-version"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -264,6 +265,8 @@ export async function PATCH(
         }
 
         await prisma.$transaction(ops)
+        // Form versioning: keep the form as it was when this report was submitted.
+        if (status === "pending") await snapshotForm(inspectionId)
 
         const updatedInspection = await prisma.inspection.findUnique({
             where: { id: inspectionId },

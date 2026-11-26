@@ -414,9 +414,15 @@ export default function FormBuilderClient({
         if (!confirm(`Delete field "${label}"?`)) return
         setDeletingId(id)
         try {
-            await fetch(`/api/form-templates/${id}`, { method: "DELETE" })
+            const res = await fetch(`/api/form-templates/${id}`, { method: "DELETE" })
+            // A field with recorded answers can't be deleted (it would wipe them
+            // from past reports) — the server says to hide it instead.
+            if (!res.ok) {
+                const d = await res.json().catch(() => ({}))
+                toast.error(d?.error || "Could not delete the field")
+            }
             await fetchFields()
-        } catch { /* ignore */ }
+        } catch { toast.error("Could not delete the field") }
         finally { setDeletingId(null) }
     }
 

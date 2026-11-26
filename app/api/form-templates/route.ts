@@ -1,5 +1,6 @@
 
 import { getServerSession } from "next-auth"
+import { bumpFormVersion } from "@/lib/form-version"
 import { autoLinkDefects } from "@/lib/defect-library"
 import { NextResponse } from "next/server"
 import prisma, { ensureProjectSchema } from "@/lib/prisma"
@@ -71,6 +72,7 @@ export async function POST(req: Request) {
         })
         // A defect column whose name is in the defect library links to it.
         if (safeCategory === "DEFECT") await autoLinkDefects(projectId)
+        await bumpFormVersion(projectId)
 
         return NextResponse.json(field)
     } catch (error) {
