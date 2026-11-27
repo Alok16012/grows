@@ -77,7 +77,18 @@ const INSPECTOR_TILE: Tile = { label: "Inspections", href: "/inspection", icon: 
 const HELP_TILE: Tile = { label: "Help", href: "/helpdesk", icon: Headphones, color: "#5b6478", tint: "#f0f2f8" }
 const PROFILE_TILE: Tile = { label: "My profile", href: "/profile", icon: User, color: "#3d6ff5", tint: "#eaf0ff" }
 
-type FocusCard = { title: string; highlight: string; sub: string; cta: string; href: string; icon: LucideIcon }
+type CardTone = "accent" | "amber" | "green" | "violet" | "red"
+type FocusCard = { title: string; highlight: string; sub: string; cta: string; href: string; icon: LucideIcon; tone?: CardTone }
+
+// Soft hero-card colours (the app's soft theme): a pale wash, a matching hairline
+// and a stronger icon colour — the colour says the state at a glance.
+const CARD_TONES: Record<CardTone, { bg: string; line: string; icon: string; chip: string }> = {
+    accent: { bg: "#eaf0ff", line: "#d4e0ff", icon: "#3d6ff5", chip: "#ffffff" },
+    amber:  { bg: "#fff6e4", line: "#fbe0a6", icon: "#dd8f0d", chip: "#ffffff" },
+    green:  { bg: "#eafaf0", line: "#c8eedb", icon: "#15803d", chip: "#ffffff" },
+    violet: { bg: "#f1edff", line: "#e3dbff", icon: "#6d4fe0", chip: "#ffffff" },
+    red:    { bg: "#fef2f2", line: "#fecaca", icon: "#dc2626", chip: "#ffffff" },
+}
 
 const fmt = (n: number) => n.toLocaleString("en-IN")
 const time = (s: string | null) => s ? new Date(s).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) : ""
@@ -374,23 +385,24 @@ function MyDayCard({ me }: { me: Me }) {
         leave:  { highlight: "On leave", sub: "Enjoy your day off", cta: "View leave" },
         absent: { highlight: "Marked absent", sub: "Think this is wrong? Raise it with HR", cta: "View attendance" },
     }[state]
-    return <PrimaryCard title="Today’s attendance" highlight={view.highlight} sub={view.sub} cta={view.cta} href={state === "leave" ? "/leaves" : "/attendance"} icon={state === "done" ? CheckCircle2 : CalendarCheck} />
+    return <PrimaryCard title="Today’s attendance" highlight={view.highlight} sub={view.sub} cta={view.cta} href={state === "leave" ? "/leaves" : "/attendance"} icon={state === "done" ? CheckCircle2 : CalendarCheck} tone={({ none: "amber", in: "green", done: "green", leave: "violet", absent: "red" } as const)[state]} />
 }
 
-function PrimaryCard({ title, highlight, sub, cta, href, icon: Icon }: FocusCard) {
+function PrimaryCard({ title, highlight, sub, cta, href, icon: Icon, tone = "accent" }: FocusCard) {
+    const t = CARD_TONES[tone]
     return (
-        <section className="rounded-2xl bg-[#102653] p-4 text-white shadow-[0_8px_24px_rgba(16,38,83,0.18)] sm:p-5">
+        <section className="rounded-[22px] border p-4 shadow-[var(--shadow-card)] sm:p-5" style={{ background: t.bg, borderColor: t.line }}>
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <h2 className="text-sm font-medium text-blue-100">{title}</h2>
-                    <p className="mt-1.5 break-words text-[clamp(1.25rem,5.5vw,1.65rem)] font-bold leading-tight tracking-tight">{highlight}</p>
+                    <h2 className="text-[13px] font-semibold text-[var(--text2)]">{title}</h2>
+                    <p className="mt-1.5 break-words text-[clamp(1.35rem,6vw,1.75rem)] font-extrabold leading-tight tracking-tight text-[var(--text)]">{highlight}</p>
                 </div>
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-white/20 bg-white/10 text-blue-100">
-                    <Icon size={21} aria-hidden="true" />
+                <span className="grid size-11 shrink-0 place-items-center rounded-2xl shadow-sm" style={{ background: t.chip, color: t.icon }}>
+                    <Icon size={22} aria-hidden="true" />
                 </span>
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-blue-100">{sub}</p>
-            <Link href={href} className="mt-4 inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-[#102653] transition-colors hover:bg-blue-50">
+            <p className="mt-2 text-[13px] leading-relaxed text-[var(--text2)]">{sub}</p>
+            <Link href={href} className="mt-4 inline-flex min-h-11 max-w-full items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-hover)]">
                 {cta} <ArrowRight size={16} className="shrink-0" aria-hidden="true" />
             </Link>
         </section>
